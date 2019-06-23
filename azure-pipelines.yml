@@ -27,6 +27,20 @@ jobs:
       pytest --cov=freqtrade --cov-config=.coveragerc freqtrade/tests/
       coveralls || true
     displayName: 'PyTest'
+  - script: |
+      cp config.json.example config.json
+      python freqtrade --datadir freqtrade/tests/testdata backtesting
+    displayName: backtest
+  - script: |
+      cp config.json.example config.json
+      python freqtrade --datadir freqtrade/tests/testdata hyperopt -e 5
+    displayName: hyperopt
+
+  - script: flake8 freqtrade scripts
+    displayName: flake8
+
+  - script: mypy freqtrade scripts
+    displayName: mypy
 
 
   # Add additional tasks to run using each Python version in the matrix above
