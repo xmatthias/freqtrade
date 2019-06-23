@@ -1,15 +1,24 @@
 # https://aka.ms/yaml
 jobs:
-- job: 'Test'
-  pool:
-    vmImage: 'ubuntu-latest' # other options: 'macOS-10.13', 'vs2017-win2016'
+- job: 'CI'
   strategy:
     matrix:
-      Python36:
+      linux_Python36:
+        imageName: 'ubuntu-latest'
         python.version: '3.6'
-      Python37:
+      linux_Python37:
+        imageName: 'ubuntu-latest'
+        python.version: '3.7'
+      macOS_Python36:
+        imageName: 'macOS-latest'
+        python.version: '3.6'
+      macOS_Python37:
+        imageName: 'macOS-Latest'
         python.version: '3.7'
     maxParallel: 3
+
+  pool:
+    vmImage: $(imageName)
 
   steps:
   - task: UsePythonVersion@0
