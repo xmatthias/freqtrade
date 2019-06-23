@@ -5,8 +5,8 @@ jobs:
     vmImage: 'ubuntu-latest' # other options: 'macOS-10.13', 'vs2017-win2016'
   strategy:
     matrix:
-      # Python36:
-      #   python.version: '3.6'
+      Python36:
+        python.version: '3.6'
       Python37:
         python.version: '3.7'
     maxParallel: 3
