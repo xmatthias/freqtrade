@@ -1,0 +1,32 @@
+# https://aka.ms/yaml
+jobs:
+- job: 'Test'
+  pool:
+    vmImage: 'ubuntu-latest' # other options: 'macOS-10.13', 'vs2017-win2016'
+  strategy:
+    matrix:
+      Python36:
+        python.version: '3.6'
+      Python37:
+        python.version: '3.7'
+    maxParallel: 3
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+      architecture: 'x64'
+  - script: |
+      cd build_helpers && ./install_ta-lib.sh; cd ..
+      export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+      pip install --upgrade pytest-random-order
+      pip install -r requirements-dev.txt
+      pip install -e .
+    displayName: 'Install Dependencies'
+  - script: |
+      pytest --cov=freqtrade --cov-config=.coveragerc freqtrade/tests/
+      coveralls || true
+    displayName: 'PyTest'
+
+
+  # Add additional tasks to run using each Python version in the matrix above
