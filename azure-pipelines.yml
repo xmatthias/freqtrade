@@ -24,14 +24,17 @@ jobs:
       pip install -e .
     displayName: 'Install Dependencies'
   - script: |
+      export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
       pytest --cov=freqtrade --cov-config=.coveragerc freqtrade/tests/
-      coveralls || true
+      # coveralls || true
     displayName: 'PyTest'
   - script: |
+      export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
       cp config.json.example config.json
       python freqtrade --datadir freqtrade/tests/testdata backtesting
     displayName: backtest
   - script: |
+      export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
       cp config.json.example config.json
       python freqtrade --datadir freqtrade/tests/testdata hyperopt -e 5
     displayName: hyperopt
