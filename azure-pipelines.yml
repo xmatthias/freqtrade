@@ -54,5 +54,8 @@ jobs:
   - script: mypy freqtrade scripts
     displayName: mypy
 
+  - script: build_helpers/publish_docker_az.sh
+    displayName: Build docker image
+
 
   # Add additional tasks to run using each Python version in the matrix above
