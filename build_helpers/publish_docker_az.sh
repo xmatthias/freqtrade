@@ -1,4 +1,6 @@
 #!/bin/sh
+echo "tag_sb: $BUILD_SOURCEBRANCH"
+echo "tag_tb: $SYSTEM_PULLREQUEST_TARGETBRANCH"
 # - export TAG=`if [ "$BUILD_SOURCEBRANCH" == "develop" ]; then echo "latest"; else echo $BUILD_SOURCEBRANCH ; fi`
 # Replace / with _ to create a valid tag
 if [ -z ${SYSTEM_PULLREQUEST_TARGETBRANCH} ]; then
@@ -7,9 +9,9 @@ else
     TAG=$(echo "${SYSTEM_PULLREQUEST_TARGETBRANCH}" | sed -e "s/\//_/g")
 fi
 
+TAG_PI="${TAG}_pi"
+
 echo "tag: $TAG"
-echo "tag_sb: $BUILD_SOURCEBRANCH"
-echo "tag_tb: $SYSTEM_PULLREQUEST_TARGETBRANCH"
 
 # Add commit and commit_message to docker container
 echo "${BUILD_SOURCEVERSION} ${BUILD_SOURCEVERSIONMESSAGE}" > freqtrade_commit
@@ -17,11 +19,18 @@ echo "${BUILD_SOURCEVERSION} ${BUILD_SOURCEVERSIONMESSAGE}" > freqtrade_commit
 if [ "${BUILD_REASON}" = "cron" ]; then
     echo "event ${BUILD_REASON}: full rebuild - skipping cache"
     docker build -t freqtrade:${TAG} .
+
+    echo "event ${TRAVIS_EVENT_TYPE}: full rebuild - skipping cache"
+    docker build -f Dockerfile.pi -t freqtrade:${TAG_PI} .
 else
     echo "event ${BUILD_REASON}: building with cache"
     # Pull last build to avoid rebuilding the whole image
     docker pull ${IMAGE_NAME}:${TAG}
     docker build --cache-from ${IMAGE_NAME}:${TAG} -t freqtrade:${TAG} .
+
+    # docker pull ${IMAGE_NAME}:${TAG_PI}
+    docker build -f Dockerfile.pi -t freqtrade:${TAG_PI} .
+    # docker build --cache_from ${IMAGE_NAME}:${TAG_PI} -f Dockerfile.pi -t freqtrade:${TAG_PI} .
 fi
 
 if [ $? -ne 0 ]; then

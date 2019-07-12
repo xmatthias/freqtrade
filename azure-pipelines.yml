@@ -63,6 +63,7 @@ jobs:
   dependsOn: CI
   # TODO: this should be a more complex trigger to only build when merging PR's
   condition: succeeded()
+  timeoutInMinutes: 0
   strategy:
     matrix:
       linux_Python37:
