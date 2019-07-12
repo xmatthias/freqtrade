@@ -3,6 +3,7 @@
 # Replace / with _ to create a valid tag
 TAG=$(echo "${BUILD_SOURCEBRANCH}" | sed -e "s/\//_/")
 
+echo "tag: $TAG"
 
 # Add commit and commit_message to docker container
 echo "${BUILD_SOURCEVERSION} ${BUILD_SOURCEVERSIONMESSAGE}" > freqtrade_commit

@@ -54,8 +54,22 @@ jobs:
   - script: mypy freqtrade scripts
     displayName: mypy
 
-  - script: build_helpers/publish_docker_az.sh
-    displayName: Build docker image
-
 
   # Add additional tasks to run using each Python version in the matrix above
+
+- job: 'deploy'
+  dependsOn: CI
+  # TODO: this should be a more complex trigger to only build when merging PR's
+  condition: succeeded()
+  strategy:
+    matrix:
+      linux_Python37:
+        imageName: 'ubuntu-latest'
+        python.version: '3.7'
+
+  pool:
+    vmImage: $(imageName)
+
+  steps:
+  - script: build_helpers/publish_docker_az.sh
+    displayName: Build docker image
