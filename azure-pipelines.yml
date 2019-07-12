@@ -15,7 +15,7 @@ jobs:
       macOS_Python37:
         imageName: 'macOS-Latest'
         python.version: '3.7'
-    maxParallel: 3
+    # maxParallel: 4
 
   pool:
     vmImage: $(imageName)
