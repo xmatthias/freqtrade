@@ -1,7 +1,11 @@
 #!/bin/sh
 # - export TAG=`if [ "$BUILD_SOURCEBRANCH" == "develop" ]; then echo "latest"; else echo $BUILD_SOURCEBRANCH ; fi`
 # Replace / with _ to create a valid tag
-TAG=$(echo "${BUILD_SOURCEBRANCH}" | sed -e "s/\//_/")
+if [ -z BUILD_SOURCEBRANCH ]; then
+    TAG=$(echo "${BUILD_SOURCEBRANCH}" | sed -e "s/\//_/")
+else
+    TAG=$(echo "${SYSTEM_PULLREQUEST_TARGETBRANCH}" | sed -e "s/\//_/")
+fi
 
 echo "tag: $TAG"
 
