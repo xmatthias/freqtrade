@@ -1,4 +1,6 @@
 # https://aka.ms/yaml
+variables:
+  IMAGE_NAME: freqtradeorg/freqtrade
 jobs:
 - job: 'CI'
   strategy:
