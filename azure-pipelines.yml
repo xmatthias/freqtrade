@@ -36,18 +36,18 @@ jobs:
     displayName: 'Install Dependencies'
   - script: |
       export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-      pytest --cov=freqtrade --cov-config=.coveragerc freqtrade/tests/
+      pytest --cov=freqtrade --cov-config=.coveragerc tests/
       # coveralls || true
     displayName: 'PyTest'
   - script: |
       export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
       cp config.json.example config.json
-      python freqtrade --datadir freqtrade/tests/testdata backtesting
+      python freqtrade --datadir tests/testdata backtesting
     displayName: backtest
   - script: |
       export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
       cp config.json.example config.json
-      python freqtrade --datadir freqtrade/tests/testdata hyperopt -e 5
+      python freqtrade --datadir tests/testdata hyperopt -e 5
     displayName: hyperopt
 
   - script: flake8 freqtrade scripts
