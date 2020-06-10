@@ -1,7 +1,9 @@
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
+from math import pi
 
+import numpy as np
 import pandas as pd
 
 from freqtrade.configuration import TimeRange
@@ -12,7 +14,7 @@ from freqtrade.data.btanalysis import (calculate_max_drawdown,
 from freqtrade.data.converter import trim_dataframe
 from freqtrade.data.history import load_data
 from freqtrade.exceptions import OperationalException
-from freqtrade.exchange import timeframe_to_prev_date
+from freqtrade.exchange import timeframe_to_prev_date, timeframe_to_minutes
 from freqtrade.misc import pair_to_filename
 from freqtrade.resolvers import StrategyResolver
 
@@ -23,8 +25,13 @@ try:
     from plotly.subplots import make_subplots
     from plotly.offline import plot
     import plotly.graph_objects as go
+    from bokeh.palettes import viridis
+    from bokeh.models import HoverTool, ColumnDataSource, CDSView, BooleanFilter
+    from bokeh.plotting import figure, gridplot
+    from bokeh.io import save
+
 except ImportError:
-    logger.exception("Module plotly not found \n Please install using `pip3 install plotly`")
+    logger.exception("Module bokeh not found \n Please install using `pip3 install bokeh`")
     exit(1)
 
 
@@ -71,29 +78,29 @@ def init_plotscript(config):
             }
 
 
-def add_indicators(fig, row, indicators: Dict[str, Dict], data: pd.DataFrame) -> make_subplots:
+def add_indicators(row: figure, indicators: Dict[str, Dict], data: pd.DataFrame,
+                   columnds: ColumnDataSource) -> figure:
     """
     Generate all the indicators selected by the user for a specific row, based on the configuration
-    :param fig: Plot figure to append to
-    :param row: row number for this plot
+    :param row: figure object for this plot
     :param indicators: Dict of Indicators with configuration options.
                        Dict key must correspond to dataframe column.
     :param data: candlestick DataFrame
     """
+
     for indicator, conf in indicators.items():
         logger.debug(f"indicator {indicator} with config {conf}")
         if indicator in data:
-            kwargs = {'x': data['date'],
-                      'y': data[indicator].values,
-                      'mode': 'lines',
-                      'name': indicator
+            kwargs = {'x': 'date',
+                      'y': indicator,
+                      'source': columnds,
+                      'legend_label': indicator
                       }
             if 'color' in conf:
-                kwargs.update({'line': {'color': conf['color']}})
-            scatter = go.Scatter(
+                kwargs.update({'line_color': conf['color']})
+            row.line(
                 **kwargs
             )
-            fig.add_trace(scatter, row, 1)
         else:
             logger.info(
                 'Indicator "%s" ignored. Reason: This indicator is not found '
@@ -101,7 +108,7 @@ def add_indicators(fig, row, indicators: Dict[str, Dict], data: pd.DataFrame) ->
                 indicator
             )
 
-    return fig
+    return row
 
 
 def add_profit(fig, row, data: pd.DataFrame, column: str, name: str) -> make_subplots:
@@ -251,6 +258,7 @@ def create_plotconfig(indicators1: List[str], indicators2: List[str],
 
 
 def generate_candlestick_graph(pair: str, data: pd.DataFrame, trades: pd.DataFrame = None, *,
+                               timeframe: str,
                                indicators1: List[str] = [],
                                indicators2: List[str] = [],
                                plot_config: Dict[str, Dict] = {},
@@ -267,118 +275,142 @@ def generate_candlestick_graph(pair: str, data: pd.DataFrame, trades: pd.DataFra
     :return: Plotly figure
     """
     plot_config = create_plotconfig(indicators1, indicators2, plot_config)
+    data['candle_color'] = np.where(data['close'] > data['open'], 'green', 'red')
+    columnds = ColumnDataSource(data)
+    # rows = 2 + len(plot_config['subplots'])
+    # row_widths = [1 for _ in plot_config['subplots']]
+    tools = "pan,wheel_zoom,box_zoom,reset,save"
 
-    rows = 2 + len(plot_config['subplots'])
-    row_widths = [1 for _ in plot_config['subplots']]
-    # Define the graph
-    fig = make_subplots(
-        rows=rows,
-        cols=1,
-        shared_xaxes=True,
-        row_width=row_widths + [1, 4],
-        vertical_spacing=0.0001,
-    )
-    fig['layout'].update(title=pair)
-    fig['layout']['yaxis1'].update(title='Price')
-    fig['layout']['yaxis2'].update(title='Volume')
-    for i, name in enumerate(plot_config['subplots']):
-        fig['layout'][f'yaxis{3 + i}'].update(title=name)
-    fig['layout']['xaxis']['rangeslider'].update(visible=False)
+    fig = figure(x_axis_type="datetime", tools=tools, plot_width=1900,
+                 title=pair)
+    fig.sizing_mode = 'scale_both'
+    fig.xaxis.major_label_orientation = pi/4
+    fig.grid.grid_line_alpha = 0.3
 
-    # Common information
-    candles = go.Candlestick(
-        x=data.date,
-        open=data.open,
-        high=data.high,
-        low=data.low,
-        close=data.close,
-        name='Price'
-    )
-    fig.add_trace(candles, 1, 1)
+    fig.add_tools(HoverTool(
+        tooltips=[
+            ('date',   '@date{%F}'),
+            ('open',  '$@{open}{%0.8f}'),
+            ('high',  '$@{high}{%0.8f}'),
+            ('low',  '$@{low}{%0.8f}'),
+            ('close',  '$@{close}{%0.8f}'),
+            # ('volume', '@volume{0.00 a}'),
+        ],
+        formatters={
+            'date': 'datetime',  # use 'datetime' formatter for 'date' field
+            'open': 'printf',
+            'high': 'printf',
+            'low': 'printf',
+            'close': 'printf',
+            # use default 'numeral' formatter for other fields
+        },
 
+        # display a tooltip whenever the cursor is vertically in line with a glyph
+        mode='vline'
+    ))
+
+    # Graph candlesticks
+    # Candle "extension" (black high / low)
+    fig.segment(x0='date', y0='low', x1='date', y1='high', color="black",
+                legend_label='candles', source=columnds)
+    fig.yaxis.axis_label = 'Price'
+    fig.legend.click_policy = "hide"
+
+    # width in ms (using 50 to generate small spacing)
+    w = timeframe_to_minutes(timeframe) * 50 * 1000
+    # Generate bars
+    fig.vbar('date', w, 'open', 'close',
+             fill_color='candle_color', line_color='candle_color', legend_label='candles',
+             source=columnds)
+
+    # Add buy and sell signals
     if 'buy' in data.columns:
         df_buy = data[data['buy'] == 1]
         if len(df_buy) > 0:
-            buys = go.Scatter(
-                x=df_buy.date,
-                y=df_buy.close,
-                mode='markers',
-                name='buy',
-                marker=dict(
-                    symbol='triangle-up-dot',
-                    size=9,
-                    line=dict(width=1),
-                    color='green',
-                )
+            fig.scatter(
+                x=df_buy['date'],
+                y=df_buy['close'],
+                legend_label='Buy',
+                marker='triangle',
+                color='darkgreen',
+                size=9,
             )
-            fig.add_trace(buys, 1, 1)
         else:
             logger.warning("No buy-signals found.")
 
     if 'sell' in data.columns:
         df_sell = data[data['sell'] == 1]
         if len(df_sell) > 0:
-            sells = go.Scatter(
-                x=df_sell.date,
-                y=df_sell.close,
-                mode='markers',
-                name='sell',
-                marker=dict(
-                    symbol='triangle-down-dot',
-                    size=9,
-                    line=dict(width=1),
-                    color='red',
-                )
+            fig.scatter(
+                x=df_sell['date'],
+                y=df_sell['close'],
+                legend_label='Sell',
+                marker='inverted_triangle',
+                size=9,
+                color='darkred',
+                line_color='black',
             )
-            fig.add_trace(sells, 1, 1)
         else:
             logger.warning("No sell-signals found.")
 
     # TODO: Figure out why scattergl causes problems plotly/plotly.js#2284
-    if 'bb_lowerband' in data and 'bb_upperband' in data:
-        bb_lower = go.Scatter(
-            x=data.date,
-            y=data.bb_lowerband,
-            showlegend=False,
-            line={'color': 'rgba(255,255,255,0)'},
-        )
-        bb_upper = go.Scatter(
-            x=data.date,
-            y=data.bb_upperband,
-            name='Bollinger Band',
-            fill="tonexty",
-            fillcolor="rgba(0,176,246,0.2)",
-            line={'color': 'rgba(255,255,255,0)'},
-        )
-        fig.add_trace(bb_lower, 1, 1)
-        fig.add_trace(bb_upper, 1, 1)
-        if ('bb_upperband' in plot_config['main_plot']
-           and 'bb_lowerband' in plot_config['main_plot']):
-            del plot_config['main_plot']['bb_upperband']
-            del plot_config['main_plot']['bb_lowerband']
+    # if 'bb_lowerband' in data and 'bb_upperband' in data:
+    #     bb_lower = go.Scatter(
+    #         x=data.date,
+    #         y=data.bb_lowerband,
+    #         showlegend=False,
+    #         line={'color': 'rgba(255,255,255,0)'},
+    #     )
+    #     bb_upper = go.Scatter(
+    #         x=data.date,
+    #         y=data.bb_upperband,
+    #         name='Bollinger Band',
+    #         fill="tonexty",
+    #         fillcolor="rgba(0,176,246,0.2)",
+    #         line={'color': 'rgba(255,255,255,0)'},
+    #     )
+    #     fig.add_trace(bb_lower, 1, 1)
+    #     fig.add_trace(bb_upper, 1, 1)
+    #     if ('bb_upperband' in plot_config['main_plot']
+    #        and 'bb_lowerband' in plot_config['main_plot']):
+    #         del plot_config['main_plot']['bb_upperband']
+    #         del plot_config['main_plot']['bb_lowerband']
 
     # Add indicators to main plot
-    fig = add_indicators(fig=fig, row=1, indicators=plot_config['main_plot'], data=data)
+    # fig = add_indicators(fig=fig, row=1, indicators=plot_config['main_plot'], data=data)
 
-    fig = plot_trades(fig, trades)
+    # fig = plot_trades(fig, trades)
 
     # Volume goes to row 2
-    volume = go.Bar(
-        x=data['date'],
-        y=data['volume'],
-        name='Volume',
-        marker_color='DarkSlateGrey',
-        marker_line_color='DarkSlateGrey'
-    )
-    fig.add_trace(volume, 2, 1)
+    volume = figure(x_axis_type="datetime", plot_width=1900, plot_height=100, x_range=fig.x_range)
+
+    volume.xaxis.visible = False
+    volume.legend.click_policy = "hide"
+    fig.yaxis.axis_label = 'Volume'
+
+    volume.vbar('date', w, 'volume',
+                line_color='grey',
+                line_width=1,
+                legend_label='Volume',
+                source=columnds,
+                )
 
     # Add indicators to separate row
+    add_rows = []
     for i, name in enumerate(plot_config['subplots']):
-        fig = add_indicators(fig=fig, row=3 + i,
-                             indicators=plot_config['subplots'][name],
-                             data=data)
+        row = figure(x_axis_type="datetime", plot_width=1900, plot_height=100, x_range=fig.x_range)
 
-    return fig
+        row.legend.click_policy = "hide"
+        row.yaxis.axis_label = name
+        add_indicators(row=row, indicators=plot_config['subplots'][name],
+                       data=data, 
+                       columnds=columnds)
+        add_rows.append(row)
+
+    chart = gridplot([[fig, None], [volume, None]] + [[r, None] for r in add_rows],
+                     toolbar_location='right')
+
+    return chart
 
 
 def generate_profit_graph(pairs: str, data: Dict[str, pd.DataFrame],
@@ -430,7 +462,7 @@ def generate_plot_filename(pair: str, timeframe: str) -> str:
     Generate filenames per pair/timeframe to be used for storing plots
     """
     pair_s = pair_to_filename(pair)
-    file_name = 'freqtrade-plot-' + pair_s + '-' + timeframe + '.html'
+    file_name = 'freqtrade-plot-bokeh' + pair_s + '-' + timeframe + '.html'
 
     logger.info('Generate plot file for %s', pair)
 
@@ -449,8 +481,7 @@ def store_plot_file(fig, filename: str, directory: Path, auto_open: bool = False
     directory.mkdir(parents=True, exist_ok=True)
 
     _filename = directory.joinpath(filename)
-    plot(fig, filename=str(_filename),
-         auto_open=auto_open)
+    save(fig, str(_filename))
     logger.info(f"Stored plot as {_filename}")
 
 
@@ -484,7 +515,8 @@ def load_and_plot_trades(config: Dict[str, Any]):
             trades=trades_pair,
             indicators1=config.get("indicators1", []),
             indicators2=config.get("indicators2", []),
-            plot_config=strategy.plot_config if hasattr(strategy, 'plot_config') else {}
+            plot_config=strategy.plot_config if hasattr(strategy, 'plot_config') else {},
+            timeframe=config['ticker_interval'],
         )
 
         store_plot_file(fig, filename=generate_plot_filename(pair, config['ticker_interval']),
