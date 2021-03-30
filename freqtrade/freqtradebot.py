@@ -1,6 +1,7 @@
 """
 Freqtrade is the main module of this bot. It contains the class Freqtrade()
 """
+import asyncio
 import copy
 import logging
 import traceback
@@ -663,31 +664,42 @@ class FreqtradeBot(LoggingMixin):
 # SELL / exit positions / close trades logic and methods
 #
 
-    def exit_positions(self, trades: List[Any]) -> int:
+    def exit_positions(self, trades: List[Trade]) -> int:
         """
         Tries to execute sell orders for open trades (positions)
         """
+        tasks = [self.exit_position(trade) for trade in trades]
+        print(len(tasks))
         trades_closed = 0
-        for trade in trades:
-            try:
-
-                if (self.strategy.order_types.get('stoploss_on_exchange') and
-                        self.handle_stoploss_on_exchange(trade)):
-                    trades_closed += 1
-                    Trade.commit()
-                    continue
-                # Check if we can sell our current pair
-                if trade.open_order_id is None and trade.is_open and self.handle_trade(trade):
-                    trades_closed += 1
-
-            except DependencyException as exception:
-                logger.warning('Unable to sell trade %s: %s', trade.pair, exception)
+        if tasks:
+            done, _ = asyncio.get_event_loop().run_until_complete(
+                asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED))
+            trades_closed = sum(t._result for t in done)
 
         # Updating wallets if any trade occurred
         if trades_closed:
             self.wallets.update()
 
         return trades_closed
+
+    async def exit_position(self, trade: Trade) -> int:
+        """
+        Check open trade for sell possibilities
+        """
+        try:
+
+            if (self.strategy.order_types.get('stoploss_on_exchange') and
+                    self.handle_stoploss_on_exchange(trade)):
+                Trade.commit()
+                return 1
+            # Check if we can sell our current pair
+            if trade.open_order_id is None and trade.is_open and self.handle_trade(trade):
+                return 1
+
+        except DependencyException as exception:
+            logger.warning('Unable to sell trade %s: %s', trade.pair, exception)
+
+        return 0
 
     def handle_trade(self, trade: Trade) -> bool:
         """
