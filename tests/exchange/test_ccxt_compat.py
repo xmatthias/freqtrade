@@ -5,6 +5,7 @@ However, these tests should give a good idea to determine if a new exchange is
 suitable to run with freqtrade.
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -48,6 +49,17 @@ EXCHANGES = {
         'timeframe': '5m',
     },
 }
+
+
+@pytest.fixture(scope="class")
+def event_loop():
+    """
+    Module based event loop, so it doesn't reset after one test.
+    """
+    loop = asyncio.get_event_loop()
+    yield loop
+    if not loop.is_closed:
+        loop.close()
 
 
 @pytest.fixture(scope="class")
@@ -120,6 +132,29 @@ class TestCCXTExchange():
                 next_limit = exchange.get_next_limit_in_list(
                     val, l2_limit_range, l2_limit_range_required)
                 if next_limit is None or next_limit > 200:
+                    # Large orderbook sizes can be a problem for some exchanges (bitrex ...)
+                    assert len(l2['asks']) > 200
+                    assert len(l2['asks']) > 200
+                else:
+                    assert len(l2['asks']) == next_limit
+                    assert len(l2['asks']) == next_limit
+
+    @pytest.mark.asyncio
+    async def test_ccxt_fetch_l2_orderbook_async(self, exchange):
+        exchange, exchangename = exchange
+        pair = EXCHANGES[exchangename]['pair']
+        l2 = await exchange.fetch_l2_order_book_async(pair)
+        assert 'asks' in l2
+        assert 'bids' in l2
+        l2_limit_range = exchange._ft_has['l2_limit_range']
+        for val in [1, 2, 5, 25, 100]:
+            l2 = await exchange.fetch_l2_order_book_async(pair, val)
+            if not l2_limit_range or val in l2_limit_range:
+                assert len(l2['asks']) == val
+                assert len(l2['bids']) == val
+            else:
+                next_limit = exchange.get_next_limit_in_list(val, l2_limit_range)
+                if next_limit > 200:
                     # Large orderbook sizes can be a problem for some exchanges (bitrex ...)
                     assert len(l2['asks']) > 200
                     assert len(l2['asks']) > 200

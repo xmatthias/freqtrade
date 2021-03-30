@@ -985,6 +985,30 @@ class Exchange:
             return None
         return result
 
+    @retrier_async
+    async def fetch_l2_order_book_async(self, pair: str, limit: int = 100) -> dict:
+        """
+        Get L2 order book from exchange.
+        Can be limited to a certain amount (if supported).
+        Returns a dict in the format
+        {'asks': [price, volume], 'bids': [price, volume]}
+        """
+        limit1 = self.get_next_limit_in_list(limit, self._ft_has['l2_limit_range'])
+        try:
+
+            return await self._api_async.fetch_l2_order_book(pair, limit1)
+        except ccxt.NotSupported as e:
+            raise OperationalException(
+                f'Exchange {self._api.name} does not support fetching order book.'
+                f'Message: {e}') from e
+        except ccxt.DDoSProtection as e:
+            raise DDosProtection(e) from e
+        except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+            raise TemporaryError(
+                f'Could not get order book due to {e.__class__.__name__}. Message: {e}') from e
+        except ccxt.BaseError as e:
+            raise OperationalException(e) from e
+
     @retrier
     def fetch_l2_order_book(self, pair: str, limit: int = 100) -> dict:
         """
