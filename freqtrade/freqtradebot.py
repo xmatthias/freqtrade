@@ -693,7 +693,7 @@ class FreqtradeBot(LoggingMixin):
                 Trade.commit()
                 return 1
             # Check if we can sell our current pair
-            if trade.open_order_id is None and trade.is_open and self.handle_trade(trade):
+            if trade.open_order_id is None and trade.is_open and await self.handle_trade(trade):
                 return 1
 
         except DependencyException as exception:
@@ -701,7 +701,7 @@ class FreqtradeBot(LoggingMixin):
 
         return 0
 
-    def handle_trade(self, trade: Trade) -> bool:
+    async def handle_trade(self, trade: Trade) -> bool:
         """
         Sells the current pair if the threshold is reached and updates the trade record.
         :return: True if trade has been sold, False otherwise

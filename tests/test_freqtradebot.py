@@ -28,6 +28,9 @@ from tests.conftest_trades import (MOCK_TRADE_COUNT, mock_order_1, mock_order_2,
                                    mock_order_5_stoploss, mock_order_6_sell)
 
 
+pytestmark = pytest.mark.asyncio
+
+
 def patch_RPCManager(mocker) -> MagicMock:
     """
     This function mock RPC manager to avoid repeating this code in almost every tests
@@ -219,7 +222,7 @@ def test_edge_overrides_stake_amount(mocker, edge_conf) -> None:
         'LTC/BTC', freqtrade.edge) == (999.9 * 0.5 * 0.01) / 0.21
 
 
-def test_edge_overrides_stoploss(limit_buy_order, fee, caplog, mocker, edge_conf) -> None:
+async def test_edge_overrides_stoploss(limit_buy_order, fee, caplog, mocker, edge_conf) -> None:
 
     patch_RPCManager(mocker)
     patch_exchange(mocker)
@@ -253,13 +256,13 @@ def test_edge_overrides_stoploss(limit_buy_order, fee, caplog, mocker, edge_conf
     #############################################
 
     # stoploss shoud be hit
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert log_has('Executing Sell for NEO/BTC. Reason: stop_loss', caplog)
     assert trade.sell_reason == SellType.STOP_LOSS.value
 
 
-def test_edge_should_ignore_strategy_stoploss(limit_buy_order, fee,
-                                              mocker, edge_conf) -> None:
+async def test_edge_should_ignore_strategy_stoploss(limit_buy_order, fee,
+                                                    mocker, edge_conf) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     patch_edge(mocker)
@@ -292,7 +295,7 @@ def test_edge_should_ignore_strategy_stoploss(limit_buy_order, fee,
     #############################################
 
     # stoploss shoud not be hit
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
 
 def test_total_open_trades_stakes(mocker, default_conf, ticker, fee) -> None:
@@ -975,7 +978,8 @@ def test_execute_entry_confirm_error(mocker, default_conf, fee, limit_buy_order)
 def test_add_stoploss_on_exchange(mocker, default_conf, limit_buy_order) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_trade', MagicMock(return_value=True))
+    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_trade',
+                 get_mock_coro(return_value=True))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order', return_value=limit_buy_order)
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=[])
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.get_real_amount',
@@ -1318,7 +1322,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
     mocker.patch('freqtrade.exchange.Binance.fetch_stoploss_order', stoploss_order_hanging)
 
     # stoploss initially at 5%
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
 
     # price jumped 2x
@@ -1334,12 +1338,12 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss_order_mock)
 
     # stoploss should not be updated as the interval is 60 seconds
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
     cancel_order_mock.assert_not_called()
     stoploss_order_mock.assert_not_called()
 
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert trade.stop_loss == 0.00002346 * 0.95
 
     # setting stoploss_on_exchange_interval to 0 seconds
@@ -1359,7 +1363,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
         'ask': 0.00002146,
         'last': 0.00002144
     }))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
 
 
 @pytest.mark.asyncio
@@ -1438,7 +1442,6 @@ async def test_handle_stoploss_on_exchange_trailing_error(
     assert log_has_re(r"Could not create trailing stoploss order for pair ETH/BTC\..*", caplog)
 
 
-@pytest.mark.asyncio
 @pytest.mark.usefixtures("init_persistence")
 async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee,
                                                        limit_buy_order, limit_sell_order) -> None:
@@ -1502,7 +1505,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
 
     mocker.patch('freqtrade.exchange.Binance.fetch_stoploss_order', stoploss_order_hanging)
 
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
 
     # price jumped 2x
@@ -1518,12 +1521,12 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss_order_mock)
 
     # stoploss should not be updated as the interval is 60 seconds
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
     cancel_order_mock.assert_not_called()
     stoploss_order_mock.assert_not_called()
 
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert trade.stop_loss == 0.00002346 * 0.96
     assert trade.stop_loss_pct == -0.04
 
@@ -1544,10 +1547,9 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
         'ask': 0.00002146,
         'last': 0.00002144
     }))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
 
 
-@pytest.mark.asyncio
 async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, caplog,
                                                     limit_buy_order, limit_sell_order) -> None:
 
@@ -1617,7 +1619,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
     mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order', stoploss_order_hanging)
 
     # stoploss initially at 20% as edge dictated it.
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
     assert trade.stop_loss == 0.000009384
 
@@ -1633,7 +1635,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
         'last': 0.00001172 * 0.95
     }))
 
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
 
     # stoploss should remain the same
@@ -1649,7 +1651,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
         'last': 0.00002344
     }))
 
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
 
     # stoploss should be set to 1% as trailing is on
@@ -1897,8 +1899,8 @@ def test_update_trade_state_sell(default_conf, trades_for_order, limit_sell_orde
     assert order.status == 'closed'
 
 
-def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open, limit_sell_order,
-                      fee, mocker) -> None:
+async def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open, limit_sell_order,
+                            fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -1928,7 +1930,7 @@ def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open, limi
     freqtrade.wallets.update()
 
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert trade.open_order_id == limit_sell_order['id']
 
     # Simulate fulfilled LIMIT_SELL order for trade
@@ -1940,8 +1942,8 @@ def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open, limi
     assert trade.close_date is not None
 
 
-def test_handle_overlapping_signals(default_conf, ticker, limit_buy_order_open,
-                                    fee, mocker) -> None:
+async def test_handle_overlapping_signals(default_conf, ticker, limit_buy_order_open,
+                                          fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -1975,7 +1977,7 @@ def test_handle_overlapping_signals(default_conf, ticker, limit_buy_order_open,
 
     # Buy and Sell are not triggering, so doing nothing ...
     patch_get_signal(freqtrade, value=(False, False, None))
-    assert freqtrade.handle_trade(trades[0]) is False
+    assert await freqtrade.handle_trade(trades[0]) is False
     trades = Trade.query.all()
     nb_trades = len(trades)
     assert nb_trades == 1
@@ -1983,7 +1985,7 @@ def test_handle_overlapping_signals(default_conf, ticker, limit_buy_order_open,
 
     # Buy and Sell are triggering, so doing nothing ...
     patch_get_signal(freqtrade, value=(True, True, None))
-    assert freqtrade.handle_trade(trades[0]) is False
+    assert await freqtrade.handle_trade(trades[0]) is False
     trades = Trade.query.all()
     nb_trades = len(trades)
     assert nb_trades == 1
@@ -1992,11 +1994,11 @@ def test_handle_overlapping_signals(default_conf, ticker, limit_buy_order_open,
     # Sell is triggering, guess what : we are Selling!
     patch_get_signal(freqtrade, value=(False, True, None))
     trades = Trade.query.all()
-    assert freqtrade.handle_trade(trades[0]) is True
+    assert await freqtrade.handle_trade(trades[0]) is True
 
 
-def test_handle_trade_roi(default_conf, ticker, limit_buy_order_open,
-                          fee, mocker, caplog) -> None:
+async def test_handle_trade_roi(default_conf, ticker, limit_buy_order_open,
+                                fee, mocker, caplog) -> None:
     caplog.set_level(logging.DEBUG)
 
     patch_RPCManager(mocker)
@@ -2025,13 +2027,13 @@ def test_handle_trade_roi(default_conf, ticker, limit_buy_order_open,
     #      executing
     # if ROI is reached we must sell
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade)
+    assert await freqtrade.handle_trade(trade)
     assert log_has("ETH/BTC - Required profit reached. sell_type=SellType.ROI",
                    caplog)
 
 
-def test_handle_trade_use_sell_signal(default_conf, ticker, limit_buy_order_open,
-                                      limit_sell_order_open, fee, mocker, caplog) -> None:
+async def test_handle_trade_use_sell_signal(default_conf, ticker, limit_buy_order_open,
+                                            limit_sell_order_open, fee, mocker, caplog) -> None:
     # use_sell_signal is True buy default
     caplog.set_level(logging.DEBUG)
     patch_RPCManager(mocker)
@@ -2054,16 +2056,16 @@ def test_handle_trade_use_sell_signal(default_conf, ticker, limit_buy_order_open
     trade.is_open = True
 
     patch_get_signal(freqtrade, value=(False, False, None))
-    assert not freqtrade.handle_trade(trade)
+    assert not await freqtrade.handle_trade(trade)
 
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade)
+    assert await freqtrade.handle_trade(trade)
     assert log_has("ETH/BTC - Sell signal received. sell_type=SellType.SELL_SIGNAL",
                    caplog)
 
 
-def test_close_trade(default_conf, ticker, limit_buy_order, limit_buy_order_open, limit_sell_order,
-                     fee, mocker) -> None:
+async def test_close_trade(default_conf, ticker, limit_buy_order, limit_buy_order_open,
+                           limit_sell_order, fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -2086,7 +2088,7 @@ def test_close_trade(default_conf, ticker, limit_buy_order, limit_buy_order_open
     assert trade.is_open is False
 
     with pytest.raises(DependencyException, match=r'.*closed trade.*'):
-        freqtrade.handle_trade(trade)
+        await freqtrade.handle_trade(trade)
 
 
 def test_bot_loop_start_called_once(mocker, default_conf, caplog):
@@ -3136,8 +3138,8 @@ def test_execute_trade_exit_insufficient_funds_error(default_conf, ticker, fee,
     assert mock_insuf.call_count == 1
 
 
-def test_sell_profit_only_enable_profit(default_conf, limit_buy_order, limit_buy_order_open,
-                                        fee, mocker) -> None:
+async def test_sell_profit_only_enable_profit(default_conf, limit_buy_order, limit_buy_order_open,
+                                              fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3168,16 +3170,16 @@ def test_sell_profit_only_enable_profit(default_conf, limit_buy_order, limit_buy
     trade.update(limit_buy_order)
     freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     freqtrade.strategy.sell_profit_offset = 0.0
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
 
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
 
 
-def test_sell_profit_only_disable_profit(default_conf, limit_buy_order, limit_buy_order_open,
-                                         fee, mocker) -> None:
+async def test_sell_profit_only_disable_profit(default_conf, limit_buy_order, limit_buy_order_open,
+                                               fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3206,12 +3208,12 @@ def test_sell_profit_only_disable_profit(default_conf, limit_buy_order, limit_bu
     trade.update(limit_buy_order)
     freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
 
 
-def test_sell_profit_only_enable_loss(default_conf, limit_buy_order, limit_buy_order_open,
-                                      fee, mocker) -> None:
+async def test_sell_profit_only_enable_loss(default_conf, limit_buy_order, limit_buy_order_open,
+                                            fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3240,11 +3242,11 @@ def test_sell_profit_only_enable_loss(default_conf, limit_buy_order, limit_buy_o
     trade = Trade.query.first()
     trade.update(limit_buy_order)
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
 
-def test_sell_profit_only_disable_loss(default_conf, limit_buy_order, limit_buy_order_open,
-                                       fee, mocker) -> None:
+async def test_sell_profit_only_disable_loss(default_conf, limit_buy_order, limit_buy_order_open,
+                                             fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3275,12 +3277,12 @@ def test_sell_profit_only_disable_loss(default_conf, limit_buy_order, limit_buy_
     trade.update(limit_buy_order)
     freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
 
 
-def test_sell_not_enough_balance(default_conf, limit_buy_order, limit_buy_order_open,
-                                 fee, mocker, caplog) -> None:
+async def test_sell_not_enough_balance(default_conf, limit_buy_order, limit_buy_order_open,
+                                       fee, mocker, caplog) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3309,7 +3311,7 @@ def test_sell_not_enough_balance(default_conf, limit_buy_order, limit_buy_order_
     patch_get_signal(freqtrade, value=(False, True, None))
     mocker.patch('freqtrade.wallets.Wallets.get_free', MagicMock(return_value=trade.amount * 0.985))
 
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert log_has_re(r'.*Falling back to wallet-amount.', caplog)
     assert trade.amount != amnt
 
@@ -3400,8 +3402,8 @@ def test_locked_pairs(default_conf, ticker, fee, ticker_sell_down, mocker, caplo
     assert log_has_re(f"Pair {trade.pair} is still locked.*", caplog)
 
 
-def test_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy_order_open,
-                                  fee, mocker) -> None:
+async def test_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy_order_open,
+                                        fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3429,16 +3431,16 @@ def test_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy_order
     trade.update(limit_buy_order)
     freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(True, True, None))
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     # Test if buy-signal is absent (should sell due to roi = true)
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert trade.sell_reason == SellType.ROI.value
 
 
-def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_order,
-                            fee, caplog, mocker) -> None:
+async def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_order,
+                                  fee, caplog, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3462,7 +3464,7 @@ def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_order,
 
     freqtrade.enter_positions()
     trade = Trade.query.first()
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
@@ -3473,7 +3475,7 @@ def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_order,
                  }))
 
     # Stoploss should be adjusted
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     # Price fell
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
@@ -3485,14 +3487,14 @@ def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_order,
 
     caplog.set_level(logging.DEBUG)
     # Sell as trailing-stop is reached
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert log_has("ETH/BTC - HIT STOP: current price at 0.000012, stoploss is 0.000015, "
                    "initial stoploss was at 0.000010, trade opened at 0.000011", caplog)
     assert trade.sell_reason == SellType.TRAILING_STOP_LOSS.value
 
 
-def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_buy_order_open, fee,
-                                     caplog, mocker) -> None:
+async def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_buy_order_open, fee,
+                                           caplog, mocker) -> None:
     buy_price = limit_buy_order['price']
     patch_RPCManager(mocker)
     patch_exchange(mocker)
@@ -3522,7 +3524,7 @@ def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_buy_or
     trade.update(limit_buy_order)
     caplog.set_level(logging.DEBUG)
     # stop-loss not reached
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
@@ -3532,7 +3534,7 @@ def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_buy_or
                      'last': buy_price + 0.000003
                  }))
     # stop-loss not reached, adjusted stoploss
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert log_has("ETH/BTC - Using positive stoploss: 0.01 offset: 0 profit: 0.2666%", caplog)
     assert log_has("ETH/BTC - Adjusting stoploss...", caplog)
     assert trade.stop_loss == 0.0000138501
@@ -3545,15 +3547,15 @@ def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_buy_or
                      'last': buy_price + 0.000002
                  }))
     # Lower price again (but still positive)
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert log_has(
         f"ETH/BTC - HIT STOP: current price at {buy_price + 0.000002:.6f}, "
         f"stoploss is {trade.stop_loss:.6f}, "
         f"initial stoploss was at 0.000010, trade opened at 0.000011", caplog)
 
 
-def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_buy_order_open, fee,
-                                   caplog, mocker) -> None:
+async def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_buy_order_open, fee,
+                                         caplog, mocker) -> None:
     buy_price = limit_buy_order['price']
     patch_RPCManager(mocker)
     patch_exchange(mocker)
@@ -3583,7 +3585,7 @@ def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_buy_orde
     trade.update(limit_buy_order)
     caplog.set_level(logging.DEBUG)
     # stop-loss not reached
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
@@ -3593,7 +3595,7 @@ def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_buy_orde
                      'last': buy_price + 0.000003
                  }))
     # stop-loss not reached, adjusted stoploss
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert log_has("ETH/BTC - Using positive stoploss: 0.01 offset: 0.011 profit: 0.2666%", caplog)
     assert log_has("ETH/BTC - Adjusting stoploss...", caplog)
     assert trade.stop_loss == 0.0000138501
@@ -3606,7 +3608,7 @@ def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_buy_orde
                      'last': buy_price + 0.000002
                  }))
     # Lower price again (but still positive)
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert log_has(
         f"ETH/BTC - HIT STOP: current price at {buy_price + 0.000002:.6f}, "
         f"stoploss is {trade.stop_loss:.6f}, "
@@ -3614,8 +3616,8 @@ def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_buy_orde
     assert trade.sell_reason == SellType.TRAILING_STOP_LOSS.value
 
 
-def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_order_open, fee,
-                                 caplog, mocker) -> None:
+async def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_order_open, fee,
+                                       caplog, mocker) -> None:
     buy_price = limit_buy_order['price']
     # buy_price: 0.00001099
 
@@ -3646,7 +3648,7 @@ def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_order_
     trade.update(limit_buy_order)
     caplog.set_level(logging.DEBUG)
     # stop-loss not reached
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert trade.stop_loss == 0.0000098910
 
     # Raise ticker above buy price
@@ -3658,7 +3660,7 @@ def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_order_
                  }))
 
     # stop-loss should not be adjusted as offset is not reached yet
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
 
     assert not log_has("ETH/BTC - Adjusting stoploss...", caplog)
     assert trade.stop_loss == 0.0000098910
@@ -3672,14 +3674,14 @@ def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_order_
                      'last': buy_price + 0.0000014
                  }))
 
-    assert freqtrade.handle_trade(trade) is False
+    assert await freqtrade.handle_trade(trade) is False
     assert log_has("ETH/BTC - Using positive stoploss: 0.05 offset: 0.055 profit: 0.1218%", caplog)
     assert log_has("ETH/BTC - Adjusting stoploss...", caplog)
     assert trade.stop_loss == 0.0000117705
 
 
-def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy_order_open,
-                                          fee, mocker) -> None:
+async def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy_order_open,
+                                                fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3710,11 +3712,11 @@ def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_b
     trade.update(limit_buy_order)
     # Sell due to min_roi_reached
     patch_get_signal(freqtrade, value=(True, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
 
     # Test if buy-signal is absent
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
 
 
@@ -4205,8 +4207,9 @@ def test_check_depth_of_market_buy(default_conf, mocker, order_book_l2) -> None:
     assert freqtrade._check_depth_of_market_buy('ETH/BTC', conf) is False
 
 
-def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit_buy_order, fee,
-                                 limit_sell_order_open, mocker, order_book_l2, caplog) -> None:
+async def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit_buy_order, fee,
+                                       limit_sell_order_open, mocker, order_book_l2,
+                                       caplog) -> None:
     """
     test order book ask strategy
     """
@@ -4244,16 +4247,15 @@ def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit_buy_o
     assert trade.is_open is True
 
     patch_get_signal(freqtrade, value=(False, True, None))
-    assert freqtrade.handle_trade(trade) is True
+    assert await freqtrade.handle_trade(trade) is True
     assert trade.close_rate_requested == order_book_l2.return_value['asks'][0][0]
 
     mocker.patch('freqtrade.exchange.Exchange.fetch_l2_order_book',
                  return_value={'bids': [[]], 'asks': [[]]})
     with pytest.raises(PricingError):
-        freqtrade.handle_trade(trade)
+        await freqtrade.handle_trade(trade)
     assert log_has_re(r'Sell Price at location 1 from orderbook could not be determined\..*',
                       caplog)
-
 
 def test_startup_state(default_conf, mocker):
     default_conf['pairlist'] = {'method': 'VolumePairList',
