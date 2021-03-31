@@ -49,25 +49,25 @@ def ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
     assert api_mock.__dict__[mock_ccxt_fun].call_count == 1
 
 
-async def async_ccxt_exception(mocker, default_conf, api_mock, fun, mock_ccxt_fun,
-                               retries=API_RETRY_COUNT + 1, **kwargs):
+async def async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               fun, mock_ccxt_fun, retries=API_RETRY_COUNT + 1, **kwargs):
 
     with patch('freqtrade.exchange.common.asyncio.sleep', get_mock_coro(None)):
         with pytest.raises(DDosProtection):
             api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.DDoSProtection("Dooh"))
-            exchange = get_patched_exchange(mocker, default_conf, api_mock)
+            exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
             await getattr(exchange, fun)(**kwargs)
         assert api_mock.__dict__[mock_ccxt_fun].call_count == retries
 
     with pytest.raises(TemporaryError):
         api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.NetworkError("DeadBeef"))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock)
+        exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await getattr(exchange, fun)(**kwargs)
     assert api_mock.__dict__[mock_ccxt_fun].call_count == retries
 
     with pytest.raises(OperationalException):
         api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.BaseError("DeadBeef"))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock)
+        exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await getattr(exchange, fun)(**kwargs)
     assert api_mock.__dict__[mock_ccxt_fun].call_count == 1
 
@@ -1672,7 +1672,7 @@ async def test__async_get_candle_history(default_conf, mocker, caplog, exchange_
     assert not log_has(f"Using cached candle (OHLCV) data for {pair} ...", caplog)
 
     # exchange = Exchange(default_conf)
-    await async_ccxt_exception(mocker, default_conf, MagicMock(),
+    await async_ccxt_exception(mocker, default_conf, MagicMock(), 'bittrex',
                                "_async_get_candle_history", "fetch_ohlcv",
                                pair='ABCD/BTC', timeframe=default_conf['timeframe'])
 
@@ -2098,7 +2098,7 @@ async def test__async_fetch_trades(default_conf, mocker, caplog, exchange_name,
     assert log_has_re(f"Fetching trades for pair {pair}, params: .*", caplog)
 
     exchange = Exchange(default_conf)
-    await async_ccxt_exception(mocker, default_conf, MagicMock(),
+    await async_ccxt_exception(mocker, default_conf, MagicMock(), 'bittrex',
                                "_async_fetch_trades", "fetch_trades",
                                pair='ABCD/BTC', since=None)
 
@@ -2604,10 +2604,11 @@ def test_get_fee(default_conf, mocker, exchange_name):
     assert api_mock.calculate_fee.call_count == 0
 
 
-def test_stoploss_order_unsupported_exchange(default_conf, mocker):
+@pytest.mark.asyncio
+async def test_stoploss_order_unsupported_exchange(default_conf, mocker):
     exchange = get_patched_exchange(mocker, default_conf, id='bittrex')
     with pytest.raises(OperationalException, match=r"stoploss is not implemented .*"):
-        exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
+        await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
     with pytest.raises(OperationalException, match=r"stoploss is not implemented .*"):
         exchange.stoploss_adjust(1, {})

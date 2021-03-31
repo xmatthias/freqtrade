@@ -7,7 +7,7 @@ import ccxt
 from freqtrade.exceptions import (DDosProtection, InsufficientFundsError, InvalidOrderException,
                                   OperationalException, TemporaryError)
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import retrier
+from freqtrade.exchange.common import retrier, retrier_async
 
 
 logger = logging.getLogger(__name__)
@@ -75,8 +75,9 @@ class Kraken(Exchange):
         return (order['type'] in ('stop-loss', 'stop-loss-limit')
                 and stop_loss > float(order['price']))
 
-    @retrier(retries=0)
-    def stoploss(self, pair: str, amount: float, stop_price: float, order_types: Dict) -> Dict:
+    @retrier_async(retries=0)
+    async def stoploss(self, pair: str, amount: float, stop_price: float,
+                       order_types: Dict) -> Dict:
         """
         Creates a stoploss market order.
         Stoploss market orders is the only stoploss type supported by kraken.
@@ -101,8 +102,9 @@ class Kraken(Exchange):
         try:
             amount = self.amount_to_precision(pair, amount)
 
-            order = self._api.create_order(symbol=pair, type=ordertype, side='sell',
-                                           amount=amount, price=stop_price, params=params)
+            order = await self._api_async.create_order(symbol=pair, type=ordertype, side='sell',
+                                                       amount=amount, price=stop_price,
+                                                       params=params)
             self._log_exchange_response('create_stoploss_order', order)
             logger.info('stoploss order added for %s. '
                         'stop price: %s.', pair, stop_price)

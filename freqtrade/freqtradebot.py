@@ -670,12 +670,11 @@ class FreqtradeBot(LoggingMixin):
         """
         loop = asyncio.get_event_loop()
         tasks = [loop.create_task(self.exit_position(trade)) for trade in trades]
-        print(len(tasks))
         trades_closed = 0
         if tasks:
             done, _ = loop.run_until_complete(
                 asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED))
-            trades_closed = sum(t._result for t in done)
+            trades_closed = sum(t.result() for t in done)
 
         # Updating wallets if any trade occurred
         if trades_closed:
@@ -690,7 +689,7 @@ class FreqtradeBot(LoggingMixin):
         try:
 
             if (self.strategy.order_types.get('stoploss_on_exchange') and
-                    self.handle_stoploss_on_exchange(trade)):
+                    await self.handle_stoploss_on_exchange(trade)):
                 Trade.commit()
                 return 1
             # Check if we can sell our current pair
@@ -733,7 +732,7 @@ class FreqtradeBot(LoggingMixin):
         logger.debug('Found no sell signal for %s.', trade)
         return False
 
-    def create_stoploss_order(self, trade: Trade, stop_price: float) -> bool:
+    async def create_stoploss_order(self, trade: Trade, stop_price: float) -> bool:
         """
         Abstracts creating stoploss orders from the logic.
         Handles errors and updates the trade database object.
@@ -741,9 +740,9 @@ class FreqtradeBot(LoggingMixin):
         :return: True if the order succeeded, and False in case of problems.
         """
         try:
-            stoploss_order = self.exchange.stoploss(pair=trade.pair, amount=trade.amount,
-                                                    stop_price=stop_price,
-                                                    order_types=self.strategy.order_types)
+            stoploss_order = await self.exchange.stoploss(pair=trade.pair, amount=trade.amount,
+                                                          stop_price=stop_price,
+                                                          order_types=self.strategy.order_types)
 
             order_obj = Order.parse_from_ccxt_object(stoploss_order, trade.pair, 'stoploss')
             trade.orders.append(order_obj)
@@ -766,7 +765,7 @@ class FreqtradeBot(LoggingMixin):
             logger.exception('Unable to place a stoploss order on exchange.')
         return False
 
-    def handle_stoploss_on_exchange(self, trade: Trade) -> bool:
+    async def handle_stoploss_on_exchange(self, trade: Trade) -> bool:
         """
         Check if trade is fulfilled in which case the stoploss
         on exchange should be added immediately if stoploss on exchange
@@ -809,13 +808,13 @@ class FreqtradeBot(LoggingMixin):
             stoploss = self.edge.stoploss(pair=trade.pair) if self.edge else self.strategy.stoploss
             stop_price = trade.open_rate * (1 + stoploss)
 
-            if self.create_stoploss_order(trade=trade, stop_price=stop_price):
+            if await self.create_stoploss_order(trade=trade, stop_price=stop_price):
                 trade.stoploss_last_update = datetime.utcnow()
                 return False
 
         # If stoploss order is canceled for some reason we add it
         if stoploss_order and stoploss_order['status'] in ('canceled', 'cancelled'):
-            if self.create_stoploss_order(trade=trade, stop_price=trade.stop_loss):
+            if await self.create_stoploss_order(trade=trade, stop_price=trade.stop_loss):
                 return False
             else:
                 trade.stoploss_order_id = None
@@ -832,11 +831,11 @@ class FreqtradeBot(LoggingMixin):
             # if trailing stoploss is enabled we check if stoploss value has changed
             # in which case we cancel stoploss order and put another one with new
             # value immediately
-            self.handle_trailing_stoploss_on_exchange(trade, stoploss_order)
+            await self.handle_trailing_stoploss_on_exchange(trade, stoploss_order)
 
         return False
 
-    def handle_trailing_stoploss_on_exchange(self, trade: Trade, order: dict) -> None:
+    async def handle_trailing_stoploss_on_exchange(self, trade: Trade, order: dict) -> None:
         """
         Check to see if stoploss on exchange should be updated
         in case of trailing stoploss on exchange
@@ -860,7 +859,7 @@ class FreqtradeBot(LoggingMixin):
                                      f"for pair {trade.pair}")
 
                 # Create new stoploss order
-                if not self.create_stoploss_order(trade=trade, stop_price=trade.stop_loss):
+                if not (await self.create_stoploss_order(trade=trade, stop_price=trade.stop_loss)):
                     logger.warning(f"Could not create trailing stoploss order "
                                    f"for pair {trade.pair}.")
 

@@ -8,7 +8,7 @@ import ccxt
 from freqtrade.exceptions import (DDosProtection, InsufficientFundsError, InvalidOrderException,
                                   OperationalException, TemporaryError)
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import retrier
+from freqtrade.exchange.common import retrier_async
 
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,9 @@ class Binance(Exchange):
         """
         return order['type'] == 'stop_loss_limit' and stop_loss > float(order['info']['stopPrice'])
 
-    @retrier(retries=0)
-    def stoploss(self, pair: str, amount: float, stop_price: float, order_types: Dict) -> Dict:
+    @retrier_async(retries=0)
+    async def stoploss(self, pair: str, amount: float, stop_price: float,
+                       order_types: Dict) -> Dict:
         """
         creates a stoploss limit order.
         this stoploss-limit is binance-specific.
@@ -66,8 +67,8 @@ class Binance(Exchange):
 
             rate = self.price_to_precision(pair, rate)
 
-            order = self._api.create_order(symbol=pair, type=ordertype, side='sell',
-                                           amount=amount, price=rate, params=params)
+            order = await self._api_async.create_order(symbol=pair, type=ordertype, side='sell',
+                                                       amount=amount, price=rate, params=params)
             logger.info('stoploss limit order added for %s. '
                         'stop price: %s. limit: %s', pair, stop_price, rate)
             self._log_exchange_response('create_stoploss_order', order)

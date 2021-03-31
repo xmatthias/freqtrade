@@ -764,7 +764,8 @@ class Exchange:
         """
         raise OperationalException(f"stoploss is not implemented for {self.name}.")
 
-    def stoploss(self, pair: str, amount: float, stop_price: float, order_types: Dict) -> Dict:
+    async def stoploss(self, pair: str, amount: float, stop_price: float,
+                       order_types: Dict) -> Dict:
         """
         creates a stoploss order.
         The precise ordertype is determined by the order_types dict or exchange default.

@@ -7,7 +7,7 @@ import ccxt
 from freqtrade.exceptions import (DDosProtection, InsufficientFundsError, InvalidOrderException,
                                   OperationalException, TemporaryError)
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import API_FETCH_ORDER_RETRY_COUNT, retrier
+from freqtrade.exchange.common import API_FETCH_ORDER_RETRY_COUNT, retrier, retrier_async
 from freqtrade.misc import safe_value_fallback2
 
 
@@ -38,8 +38,9 @@ class Ftx(Exchange):
         """
         return order['type'] == 'stop' and stop_loss > float(order['price'])
 
-    @retrier(retries=0)
-    def stoploss(self, pair: str, amount: float, stop_price: float, order_types: Dict) -> Dict:
+    @retrier_async(retries=0)
+    async def stoploss(self, pair: str, amount: float, stop_price: float,
+                       order_types: Dict) -> Dict:
         """
         Creates a stoploss order.
         depending on order_types.stoploss configuration, uses 'market' or limit order.
@@ -67,8 +68,8 @@ class Ftx(Exchange):
             params['stopPrice'] = stop_price
             amount = self.amount_to_precision(pair, amount)
 
-            order = self._api.create_order(symbol=pair, type=ordertype, side='sell',
-                                           amount=amount, params=params)
+            order = await self._api_async.create_order(symbol=pair, type=ordertype, side='sell',
+                                                       amount=amount, params=params)
             self._log_exchange_response('create_stoploss_order', order)
             logger.info('stoploss order added for %s. '
                         'stop price: %s.', pair, stop_price)
