@@ -668,11 +668,12 @@ class FreqtradeBot(LoggingMixin):
         """
         Tries to execute sell orders for open trades (positions)
         """
-        tasks = [self.exit_position(trade) for trade in trades]
+        loop = asyncio.get_event_loop()
+        tasks = [loop.create_task(self.exit_position(trade)) for trade in trades]
         print(len(tasks))
         trades_closed = 0
         if tasks:
-            done, _ = asyncio.get_event_loop().run_until_complete(
+            done, _ = loop.run_until_complete(
                 asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED))
             trades_closed = sum(t._result for t in done)
 
