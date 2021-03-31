@@ -130,8 +130,8 @@ def forcebuy(payload: ForceBuyPayload, rpc: RPC = Depends(get_rpc)):
 
 
 @router.post('/forcesell', response_model=ResultMsg, tags=['trading'])
-def forcesell(payload: ForceSellPayload, rpc: RPC = Depends(get_rpc)):
-    return rpc._rpc_forcesell(payload.tradeid)
+async def forcesell(payload: ForceSellPayload, rpc: RPC = Depends(get_rpc)):
+    return await rpc._rpc_forcesell(payload.tradeid)
 
 
 @router.get('/blacklist', response_model=BlacklistResponse, tags=['info', 'pairlist'])

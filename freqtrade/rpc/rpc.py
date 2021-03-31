@@ -536,12 +536,12 @@ class RPC:
 
         return {'status': 'No more buy will occur from now. Run /reload_config to reset.'}
 
-    def _rpc_forcesell(self, trade_id: str) -> Dict[str, str]:
+    async def _rpc_forcesell(self, trade_id: str) -> Dict[str, str]:
         """
         Handler for forcesell <id>.
         Sells the given trade at current price
         """
-        def _exec_forcesell(trade: Trade) -> None:
+        async def _exec_forcesell(trade: Trade) -> None:
             # Check if there is there is an open order
             fully_canceled = False
             if trade.open_order_id:
@@ -560,7 +560,7 @@ class RPC:
                 current_rate = self._freqtrade.exchange.get_rate(
                     trade.pair, refresh=False, side="sell")
                 sell_reason = SellCheckTuple(sell_type=SellType.FORCE_SELL)
-                self._freqtrade.execute_trade_exit(trade, current_rate, sell_reason)
+                await self._freqtrade.execute_trade_exit(trade, current_rate, sell_reason)
         # ---- EOF def _exec_forcesell ----
 
         if self._freqtrade.state != State.RUNNING:
@@ -570,7 +570,8 @@ class RPC:
             if trade_id == 'all':
                 # Execute sell for all open orders
                 for trade in Trade.get_open_trades():
-                    _exec_forcesell(trade)
+                    # TODO: This should be spawned in tasks
+                    await _exec_forcesell(trade)
                 Trade.commit()
                 self._freqtrade.wallets.update()
                 return {'result': 'Created sell orders for all open trades.'}
@@ -583,7 +584,7 @@ class RPC:
                 logger.warning('forcesell: Invalid argument received')
                 raise RPCException('invalid argument')
 
-            _exec_forcesell(trade)
+            await _exec_forcesell(trade)
             Trade.commit()
             self._freqtrade.wallets.update()
             return {'result': f'Created sell order for trade {trade_id}.'}

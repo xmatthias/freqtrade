@@ -3,6 +3,7 @@
 """
 This module manage Telegram communication
 """
+import asyncio
 import json
 import logging
 import re
@@ -60,11 +61,7 @@ def authorized_only(command_handler: Callable[..., None]) -> Callable[..., Any]:
             )
             return wrapper
 
-        logger.debug(
-            'Executing handler: %s for chat_id: %s',
-            command_handler.__name__,
-            chat_id
-        )
+        logger.debug(f'Executing handler: {command_handler.__name__} for chat_id: {chat_id}')
         try:
             return command_handler(self, *args, **kwargs)
         except BaseException:
@@ -706,13 +703,12 @@ class Telegram(RPCHandler):
         :param update: message update
         :return: None
         """
-
         trade_id = context.args[0] if context.args and len(context.args) > 0 else None
         if not trade_id:
             self._send_msg("You must specify a trade-id or 'all'.")
             return
         try:
-            msg = self._rpc._rpc_forcesell(trade_id)
+            msg = asyncio.new_event_loop().run_until_complete(self._rpc._rpc_forcesell(trade_id))
             self._send_msg('Forcesell Result: `{result}`'.format(**msg))
 
         except RPCException as e:

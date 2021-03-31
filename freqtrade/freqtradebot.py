@@ -726,7 +726,7 @@ class FreqtradeBot(LoggingMixin):
 
         logger.debug('checking sell')
         exit_rate = self.exchange.get_rate(trade.pair, refresh=True, side="sell")
-        if self._check_and_execute_exit(trade, exit_rate, buy, sell):
+        if await self._check_and_execute_exit(trade, exit_rate, buy, sell):
             return True
 
         logger.debug('Found no sell signal for %s.', trade)
@@ -757,7 +757,7 @@ class FreqtradeBot(LoggingMixin):
             trade.stoploss_order_id = None
             logger.error(f'Unable to place a stoploss order on exchange. {e}')
             logger.warning('Exiting the trade forcefully')
-            self.execute_trade_exit(trade, trade.stop_loss, sell_reason=SellCheckTuple(
+            await self.execute_trade_exit(trade, trade.stop_loss, sell_reason=SellCheckTuple(
                 sell_type=SellType.EMERGENCY_SELL))
 
         except ExchangeError:
@@ -863,8 +863,8 @@ class FreqtradeBot(LoggingMixin):
                     logger.warning(f"Could not create trailing stoploss order "
                                    f"for pair {trade.pair}.")
 
-    def _check_and_execute_exit(self, trade: Trade, exit_rate: float,
-                                buy: bool, sell: bool) -> bool:
+    async def _check_and_execute_exit(self, trade: Trade, exit_rate: float,
+                                      buy: bool, sell: bool) -> bool:
         """
         Check and execute exit
         """
@@ -875,7 +875,7 @@ class FreqtradeBot(LoggingMixin):
 
         if should_sell.sell_flag:
             logger.info(f'Executing Sell for {trade.pair}. Reason: {should_sell.sell_type}')
-            self.execute_trade_exit(trade, exit_rate, should_sell)
+            await self.execute_trade_exit(trade, exit_rate, should_sell)
             return True
         return False
 
@@ -1076,7 +1076,8 @@ class FreqtradeBot(LoggingMixin):
             raise DependencyException(
                 f"Not enough amount to sell. Trade-amount: {amount}, Wallet: {wallet_amount}")
 
-    def execute_trade_exit(self, trade: Trade, limit: float, sell_reason: SellCheckTuple) -> bool:
+    async def execute_trade_exit(self, trade: Trade, limit: float,
+                                 sell_reason: SellCheckTuple) -> bool:
         """
         Executes a trade exit for the given trade and limit
         :param trade: Trade instance
