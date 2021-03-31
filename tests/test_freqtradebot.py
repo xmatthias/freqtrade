@@ -1271,7 +1271,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': limit_buy_order['id']},
             {'id': limit_sell_order['id']},
         ]),
@@ -1455,7 +1455,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': limit_buy_order['id']},
             {'id': limit_sell_order['id']},
         ]),
@@ -1910,7 +1910,7 @@ async def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order,
             limit_sell_order_open,
         ]),
@@ -2893,7 +2893,7 @@ async def test_execute_trade_exit_sloe_cancel_exception(mocker, default_conf, ti
     mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order',
                  side_effect=InvalidOrderException())
     mocker.patch('freqtrade.wallets.Wallets.get_free', MagicMock(return_value=300))
-    create_order_mock = MagicMock(side_effect=[
+    create_order_mock = get_mock_coro(side_effect=[
         {'id': '12345554'},
         {'id': '12345555'},
     ])
@@ -3112,7 +3112,7 @@ async def test_execute_trade_exit_insufficient_funds_error(default_conf, ticker,
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': 1234553382},
             InsufficientFundsError(),
         ]),
@@ -4226,7 +4226,7 @@ async def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             limit_sell_order_open,
         ]),

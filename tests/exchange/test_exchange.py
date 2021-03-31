@@ -1043,11 +1043,13 @@ def test_create_dry_run_order_market_fill(default_conf, mocker, side, rate, amou
     ("stop_loss_limit", 200, None)
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_create_order(default_conf, mocker, side, ordertype, rate, marketprice, exchange_name):
+@pytest.mark.asyncio
+async def test_create_order(default_conf, mocker, side, ordertype, rate, marketprice,
+                            exchange_name):
     api_mock = MagicMock()
     order_id = 'test_prod_{}_{}'.format(side, randint(0, 10 ** 6))
     api_mock.options = {} if not marketprice else {"createMarketBuyOrderRequiresPrice": True}
-    api_mock.create_order = MagicMock(return_value={
+    api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
         'info': {
             'foo': 'bar'
@@ -1058,7 +1060,7 @@ def test_create_order(default_conf, mocker, side, ordertype, rate, marketprice, 
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
-    order = exchange.create_order(
+    order = await exchange.create_order(
         pair='ETH/BTC', ordertype=ordertype, side=side, amount=1, rate=200)
 
     assert 'id' in order
@@ -1209,23 +1211,25 @@ def test_buy_considers_time_in_force(default_conf, mocker, exchange_name):
     assert "timeInForce" not in api_mock.create_order.call_args[0][5]
 
 
-def test_sell_dry_run(default_conf, mocker):
+@pytest.mark.asyncio
+async def test_sell_dry_run(default_conf, mocker):
     default_conf['dry_run'] = True
     exchange = get_patched_exchange(mocker, default_conf)
 
-    order = exchange.create_order(pair='ETH/BTC', ordertype='limit',
-                                  side="sell", amount=1, rate=200)
+    order = await exchange.create_order(pair='ETH/BTC', ordertype='limit',
+                                        side="sell", amount=1, rate=200)
     assert 'id' in order
     assert 'dry_run_sell_' in order['id']
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_sell_prod(default_conf, mocker, exchange_name):
+@pytest.mark.asyncio
+async def test_sell_prod(default_conf, mocker, exchange_name):
     api_mock = MagicMock()
     order_id = 'test_prod_sell_{}'.format(randint(0, 10 ** 6))
     order_type = 'market'
     api_mock.options = {}
-    api_mock.create_order = MagicMock(return_value={
+    api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
         'info': {
             'foo': 'bar'
@@ -1237,8 +1241,8 @@ def test_sell_prod(default_conf, mocker, exchange_name):
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
-    order = exchange.create_order(pair='ETH/BTC', ordertype=order_type,
-                                  side="sell", amount=1, rate=200)
+    order = await exchange.create_order(pair='ETH/BTC', ordertype=order_type,
+                                        side="sell", amount=1, rate=200)
 
     assert 'id' in order
     assert 'info' in order
@@ -1251,8 +1255,8 @@ def test_sell_prod(default_conf, mocker, exchange_name):
 
     api_mock.create_order.reset_mock()
     order_type = 'limit'
-    order = exchange.create_order(pair='ETH/BTC', ordertype=order_type,
-                                  side="sell", amount=1, rate=200)
+    order = await exchange.create_order(pair='ETH/BTC', ordertype=order_type,
+                                        side="sell", amount=1, rate=200)
     assert api_mock.create_order.call_args[0][0] == 'ETH/BTC'
     assert api_mock.create_order.call_args[0][1] == order_type
     assert api_mock.create_order.call_args[0][2] == 'sell'
@@ -1263,35 +1267,41 @@ def test_sell_prod(default_conf, mocker, exchange_name):
     with pytest.raises(DependencyException):
         api_mock.create_order = MagicMock(side_effect=ccxt.InsufficientFunds("0 balance"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell", amount=1, rate=200)
+        await exchange.create_order(pair='ETH/BTC', ordertype=order_type,
+                                    side="sell", amount=1, rate=200)
 
     with pytest.raises(DependencyException):
         api_mock.create_order = MagicMock(side_effect=ccxt.InvalidOrder("Order not found"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.create_order(pair='ETH/BTC', ordertype='limit', side="sell", amount=1, rate=200)
+        await exchange.create_order(pair='ETH/BTC', ordertype='limit',
+                                    side="sell", amount=1, rate=200)
 
     # Market orders don't require price, so the behaviour is slightly different
     with pytest.raises(DependencyException):
         api_mock.create_order = MagicMock(side_effect=ccxt.InvalidOrder("Order not found"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.create_order(pair='ETH/BTC', ordertype='market', side="sell", amount=1, rate=200)
+        await exchange.create_order(pair='ETH/BTC', ordertype='market',
+                                    side="sell", amount=1, rate=200)
 
     with pytest.raises(TemporaryError):
         api_mock.create_order = MagicMock(side_effect=ccxt.NetworkError("No Connection"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell", amount=1, rate=200)
+        await exchange.create_order(pair='ETH/BTC', ordertype=order_type,
+                                    side="sell", amount=1, rate=200)
 
     with pytest.raises(OperationalException):
         api_mock.create_order = MagicMock(side_effect=ccxt.BaseError("DeadBeef"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell", amount=1, rate=200)
+        await exchange.create_order(pair='ETH/BTC', ordertype=order_type,
+                                    side="sell", amount=1, rate=200)
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_sell_considers_time_in_force(default_conf, mocker, exchange_name):
+@pytest.mark.asyncio
+async def test_sell_considers_time_in_force(default_conf, mocker, exchange_name):
     api_mock = MagicMock()
     order_id = 'test_prod_sell_{}'.format(randint(0, 10 ** 6))
-    api_mock.create_order = MagicMock(return_value={
+    api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
         'info': {
             'foo': 'bar'
@@ -1306,8 +1316,8 @@ def test_sell_considers_time_in_force(default_conf, mocker, exchange_name):
     order_type = 'limit'
     time_in_force = 'ioc'
 
-    order = exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell",
-                                  amount=1, rate=200, time_in_force=time_in_force)
+    order = await exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell",
+                                        amount=1, rate=200, time_in_force=time_in_force)
 
     assert 'id' in order
     assert 'info' in order
@@ -1322,8 +1332,8 @@ def test_sell_considers_time_in_force(default_conf, mocker, exchange_name):
 
     order_type = 'market'
     time_in_force = 'ioc'
-    order = exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell",
-                                  amount=1, rate=200, time_in_force=time_in_force)
+    order = await exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="sell",
+                                        amount=1, rate=200, time_in_force=time_in_force)
 
     assert 'id' in order
     assert 'info' in order
