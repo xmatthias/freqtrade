@@ -177,7 +177,7 @@ class FreqtradeBot(LoggingMixin):
         with self._exit_lock:
             trades = Trade.get_open_trades()
             # First process current opened trades (positions)
-            self.exit_positions(trades)
+            asyncio.get_event_loop().run_until_complete(self.exit_positions(trades))
 
         # Then looking for buy opportunities
         if self.get_free_open_trades():
@@ -664,16 +664,14 @@ class FreqtradeBot(LoggingMixin):
 # SELL / exit positions / close trades logic and methods
 #
 
-    def exit_positions(self, trades: List[Trade]) -> int:
+    async def exit_positions(self, trades: List[Trade]) -> int:
         """
         Tries to execute sell orders for open trades (positions)
         """
-        loop = asyncio.get_event_loop()
-        tasks = [loop.create_task(self.exit_position(trade)) for trade in trades]
+        tasks = [asyncio.create_task(self.exit_position(trade)) for trade in trades]
         trades_closed = 0
         if tasks:
-            done, _ = loop.run_until_complete(
-                asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED))
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             trades_closed = sum(t.result() for t in done)
 
         # Updating wallets if any trade occurred

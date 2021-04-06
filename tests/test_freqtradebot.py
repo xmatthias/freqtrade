@@ -975,7 +975,7 @@ def test_execute_entry_confirm_error(mocker, default_conf, fee, limit_buy_order)
     assert not freqtrade.execute_entry(pair, stake_amount)
 
 
-def test_add_stoploss_on_exchange(mocker, default_conf, limit_buy_order) -> None:
+async def test_add_stoploss_on_exchange(mocker, default_conf, limit_buy_order) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_trade',
@@ -997,7 +997,7 @@ def test_add_stoploss_on_exchange(mocker, default_conf, limit_buy_order) -> None
     trade.is_open = True
     trades = [trade]
 
-    freqtrade.exit_positions(trades)
+    await freqtrade.exit_positions(trades)
     assert trade.stoploss_order_id == '13434334'
     assert stoploss.call_count == 1
     assert trade.is_open is True
@@ -1689,7 +1689,7 @@ def test_enter_positions_exception(mocker, default_conf, caplog) -> None:
     assert log_has('Unable to create trade for ETH/BTC: ', caplog)
 
 
-def test_exit_positions(mocker, default_conf, limit_buy_order, caplog) -> None:
+async def test_exit_positions(mocker, default_conf, limit_buy_order, caplog) -> None:
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_trade', MagicMock(return_value=True))
@@ -1702,7 +1702,7 @@ def test_exit_positions(mocker, default_conf, limit_buy_order, caplog) -> None:
     trade.open_order_id = '123'
     trade.open_fee = 0.001
     trades = [trade]
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 0
     # Test amount not modified by fee-logic
     assert not log_has(
@@ -1711,11 +1711,11 @@ def test_exit_positions(mocker, default_conf, limit_buy_order, caplog) -> None:
 
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.get_real_amount', return_value=90.81)
     # test amount modified by fee-logic
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 0
 
 
-def test_exit_positions_exception(mocker, default_conf, limit_buy_order, caplog) -> None:
+async def test_exit_positions_exception(mocker, default_conf, limit_buy_order, caplog) -> None:
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
     mocker.patch('freqtrade.exchange.Exchange.fetch_order', return_value=limit_buy_order)
 
@@ -1730,7 +1730,7 @@ def test_exit_positions_exception(mocker, default_conf, limit_buy_order, caplog)
         'freqtrade.freqtradebot.FreqtradeBot.handle_trade',
         side_effect=DependencyException()
     )
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 0
     assert log_has('Unable to sell trade ETH/BTC: ', caplog)
 
@@ -2974,8 +2974,8 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
     assert rpc_mock.call_count == 3
 
 
-def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_conf, ticker, fee,
-                                                               mocker) -> None:
+async def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_conf, ticker, fee,
+                                                                     mocker) -> None:
     default_conf['exchange']['name'] = 'binance'
     rpc_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
@@ -3008,7 +3008,7 @@ def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_conf, tic
     trades = [trade]
     assert trade.stoploss_order_id is None
 
-    freqtrade.exit_positions(trades)
+    await freqtrade.exit_positions(trades)
     assert trade
     assert trade.stoploss_order_id == '123'
     assert trade.open_order_id is None
@@ -3036,7 +3036,7 @@ def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_conf, tic
     })
     mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order', stoploss_executed)
 
-    freqtrade.exit_positions(trades)
+    await freqtrade.exit_positions(trades)
     assert trade.stoploss_order_id is None
     assert trade.is_open is False
     assert trade.sell_reason == SellType.STOPLOSS_ON_EXCHANGE.value

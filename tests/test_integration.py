@@ -9,8 +9,9 @@ from freqtrade.strategy.interface import SellCheckTuple
 from tests.conftest import get_mock_coro, get_patched_freqtradebot, patch_get_signal
 
 
-def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker, fee,
-                                                     limit_buy_order, mocker) -> None:
+@pytest.mark.asyncio
+async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker, fee,
+                                                           limit_buy_order, mocker) -> None:
     """
     Tests workflow of selling stoploss_on_exchange.
     Sells
@@ -97,7 +98,7 @@ def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker, fee,
         trade.stoploss_order_id = 3
         trade.open_order_id = None
 
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 2
     assert should_sell_mock.call_count == 2
     assert freqtrade.strategy.confirm_trade_entry.call_count == 0
@@ -127,8 +128,9 @@ def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker, fee,
                         (1, 200),
                         (0.99, 198),
 ])
-def test_forcebuy_last_unlimited(default_conf, ticker, fee, limit_buy_order, mocker, balance_ratio,
-                                 result1) -> None:
+@pytest.mark.asyncio
+async def test_forcebuy_last_unlimited(default_conf, ticker, fee, limit_buy_order, mocker,
+                                       balance_ratio, result1) -> None:
     """
     Tests workflow unlimited stake-amount
     Buy 4 trades, forcebuy a 5th trade
@@ -193,7 +195,7 @@ def test_forcebuy_last_unlimited(default_conf, ticker, fee, limit_buy_order, moc
     assert len(trades) == 5
     bals = freqtrade.wallets.get_all_balances()
 
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 1
     trades = Trade.get_open_trades()
     # One trade sold

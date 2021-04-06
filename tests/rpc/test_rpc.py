@@ -25,8 +25,8 @@ def prec_satoshi(a, b) -> float:
     return abs(a - b) < 0.00000001
 
 
-# Unit tests
-def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
+@pytest.mark.asyncio
+async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -45,7 +45,7 @@ def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
     freqtradebot.enter_positions()
     trades = Trade.get_open_trades()
     trades[0].open_order_id = None
-    freqtradebot.exit_positions(trades)
+    await freqtradebot.exit_positions(trades)
 
     results = rpc._rpc_trade_status()
     assert results[0] == {
