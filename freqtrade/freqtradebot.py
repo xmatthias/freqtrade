@@ -169,7 +169,7 @@ class FreqtradeBot(LoggingMixin):
 
         with self._exit_lock:
             # Check and handle any timed out open orders
-            self.check_handle_timedout()
+            asyncio.get_event_loop().run_until_complete(self.check_handle_timedout())
 
         # Protect from collisions with forcesell.
         # Without this, freqtrade my try to recreate stoploss_on_exchange orders
@@ -891,7 +891,7 @@ class FreqtradeBot(LoggingMixin):
                     and ordertime < timeout_threshold)
         return False
 
-    def check_handle_timedout(self) -> None:
+    async def check_handle_timedout(self) -> None:
         """
         Check if any orders are timed out and cancel if necessary
         :param timeoutvalue: Number of minutes until order is considered timed out

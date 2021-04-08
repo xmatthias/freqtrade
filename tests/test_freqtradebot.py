@@ -2104,8 +2104,8 @@ def test_bot_loop_start_called_once(mocker, default_conf, caplog):
     assert ftbot.strategy.analyze.call_count == 1
 
 
-def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_buy_order_old, open_trade,
-                                              fee, mocker) -> None:
+async def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_buy_order_old,
+                                                    open_trade, fee, mocker) -> None:
     default_conf["unfilledtimeout"] = {"buy": 1400, "sell": 30}
 
     rpc_mock = patch_RPCManager(mocker)
@@ -2128,12 +2128,12 @@ def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_buy_or
     Trade.query.session.add(open_trade)
 
     # Ensure default is to return empty (so not mocked yet)
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
 
     # Return false - trade remains open
     freqtrade.strategy.check_buy_timeout = MagicMock(return_value=False)
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
     nb_trades = len(trades)
@@ -2142,7 +2142,7 @@ def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_buy_or
 
     # Raise Keyerror ... (no impact on trade)
     freqtrade.strategy.check_buy_timeout = MagicMock(side_effect=KeyError)
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
     nb_trades = len(trades)
@@ -2151,7 +2151,7 @@ def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_buy_or
 
     freqtrade.strategy.check_buy_timeout = MagicMock(return_value=True)
     # Trade should be closed since the function returns true
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_wr_mock.call_count == 1
     assert rpc_mock.call_count == 1
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
@@ -2160,8 +2160,8 @@ def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_buy_or
     assert freqtrade.strategy.check_buy_timeout.call_count == 1
 
 
-def test_check_handle_timedout_buy(default_conf, ticker, limit_buy_order_old, open_trade,
-                                   fee, mocker) -> None:
+async def test_check_handle_timedout_buy(default_conf, ticker, limit_buy_order_old, open_trade,
+                                         fee, mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
     limit_buy_cancel = deepcopy(limit_buy_order_old)
     limit_buy_cancel['status'] = 'canceled'
@@ -2180,7 +2180,7 @@ def test_check_handle_timedout_buy(default_conf, ticker, limit_buy_order_old, op
 
     freqtrade.strategy.check_buy_timeout = MagicMock(return_value=False)
     # check it does cancel buy orders over the time limit
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 1
     assert rpc_mock.call_count == 1
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
@@ -2190,8 +2190,8 @@ def test_check_handle_timedout_buy(default_conf, ticker, limit_buy_order_old, op
     assert freqtrade.strategy.check_buy_timeout.call_count == 0
 
 
-def test_check_handle_cancelled_buy(default_conf, ticker, limit_buy_order_old, open_trade,
-                                    fee, mocker, caplog) -> None:
+async def test_check_handle_cancelled_buy(default_conf, ticker, limit_buy_order_old, open_trade,
+                                          fee, mocker, caplog) -> None:
     """ Handle Buy order cancelled on exchange"""
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock()
@@ -2209,7 +2209,7 @@ def test_check_handle_cancelled_buy(default_conf, ticker, limit_buy_order_old, o
     Trade.query.session.add(open_trade)
 
     # check it does cancel buy orders over the time limit
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     assert rpc_mock.call_count == 1
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
@@ -2218,8 +2218,8 @@ def test_check_handle_cancelled_buy(default_conf, ticker, limit_buy_order_old, o
     assert log_has_re("Buy order cancelled on exchange for Trade.*", caplog)
 
 
-def test_check_handle_timedout_buy_exception(default_conf, ticker, limit_buy_order_old, open_trade,
-                                             fee, mocker) -> None:
+async def test_check_handle_timedout_buy_exception(default_conf, ticker, limit_buy_order_old,
+                                                   open_trade, fee, mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock()
     patch_exchange(mocker)
@@ -2236,7 +2236,7 @@ def test_check_handle_timedout_buy_exception(default_conf, ticker, limit_buy_ord
     Trade.query.session.add(open_trade)
 
     # check it does cancel buy orders over the time limit
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     assert rpc_mock.call_count == 0
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
@@ -2244,8 +2244,8 @@ def test_check_handle_timedout_buy_exception(default_conf, ticker, limit_buy_ord
     assert nb_trades == 1
 
 
-def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit_sell_order_old, mocker,
-                                               open_trade) -> None:
+async def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit_sell_order_old,
+                                                     mocker, open_trade) -> None:
     default_conf["unfilledtimeout"] = {"buy": 1440, "sell": 1440}
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock()
@@ -2265,12 +2265,12 @@ def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit_sell_
 
     Trade.query.session.add(open_trade)
     # Ensure default is false
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
 
     freqtrade.strategy.check_sell_timeout = MagicMock(return_value=False)
     # Return false - No impact
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     assert rpc_mock.call_count == 0
     assert open_trade.is_open is False
@@ -2278,7 +2278,7 @@ def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit_sell_
 
     freqtrade.strategy.check_sell_timeout = MagicMock(side_effect=KeyError)
     # Return Error - No impact
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     assert rpc_mock.call_count == 0
     assert open_trade.is_open is False
@@ -2286,15 +2286,15 @@ def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit_sell_
 
     # Return True - sells!
     freqtrade.strategy.check_sell_timeout = MagicMock(return_value=True)
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 1
     assert rpc_mock.call_count == 1
     assert open_trade.is_open is True
     assert freqtrade.strategy.check_sell_timeout.call_count == 1
 
 
-def test_check_handle_timedout_sell(default_conf, ticker, limit_sell_order_old, mocker,
-                                    open_trade) -> None:
+async def test_check_handle_timedout_sell(default_conf, ticker, limit_sell_order_old, mocker,
+                                          open_trade) -> None:
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock()
     patch_exchange(mocker)
@@ -2315,7 +2315,7 @@ def test_check_handle_timedout_sell(default_conf, ticker, limit_sell_order_old, 
 
     freqtrade.strategy.check_sell_timeout = MagicMock(return_value=False)
     # check it does cancel sell orders over the time limit
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 1
     assert rpc_mock.call_count == 1
     assert open_trade.is_open is True
@@ -2323,8 +2323,8 @@ def test_check_handle_timedout_sell(default_conf, ticker, limit_sell_order_old, 
     assert freqtrade.strategy.check_sell_timeout.call_count == 0
 
 
-def test_check_handle_cancelled_sell(default_conf, ticker, limit_sell_order_old, open_trade,
-                                     mocker, caplog) -> None:
+async def test_check_handle_cancelled_sell(default_conf, ticker, limit_sell_order_old, open_trade,
+                                           mocker, caplog) -> None:
     """ Handle sell order cancelled on exchange"""
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock()
@@ -2345,15 +2345,15 @@ def test_check_handle_cancelled_sell(default_conf, ticker, limit_sell_order_old,
     Trade.query.session.add(open_trade)
 
     # check it does cancel sell orders over the time limit
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 0
     assert rpc_mock.call_count == 1
     assert open_trade.is_open is True
     assert log_has_re("Sell order cancelled on exchange for Trade.*", caplog)
 
 
-def test_check_handle_timedout_partial(default_conf, ticker, limit_buy_order_old_partial,
-                                       open_trade, mocker) -> None:
+async def test_check_handle_timedout_partial(default_conf, ticker, limit_buy_order_old_partial,
+                                             open_trade, mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
     limit_buy_canceled = deepcopy(limit_buy_order_old_partial)
     limit_buy_canceled['status'] = 'canceled'
@@ -2372,7 +2372,7 @@ def test_check_handle_timedout_partial(default_conf, ticker, limit_buy_order_old
 
     # check it does cancel buy orders over the time limit
     # note this is for a partially-complete buy order
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert cancel_order_mock.call_count == 1
     assert rpc_mock.call_count == 2
     trades = Trade.query.filter(Trade.open_order_id.is_(open_trade.open_order_id)).all()
@@ -2381,9 +2381,10 @@ def test_check_handle_timedout_partial(default_conf, ticker, limit_buy_order_old
     assert trades[0].stake_amount == open_trade.open_rate * trades[0].amount
 
 
-def test_check_handle_timedout_partial_fee(default_conf, ticker, open_trade, caplog, fee,
-                                           limit_buy_order_old_partial, trades_for_order,
-                                           limit_buy_order_old_partial_canceled, mocker) -> None:
+async def test_check_handle_timedout_partial_fee(default_conf, ticker, open_trade, caplog, fee,
+                                                 limit_buy_order_old_partial, trades_for_order,
+                                                 limit_buy_order_old_partial_canceled,
+                                                 mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock(return_value=limit_buy_order_old_partial_canceled)
     mocker.patch('freqtrade.wallets.Wallets.get_free', MagicMock(return_value=0))
@@ -2404,7 +2405,7 @@ def test_check_handle_timedout_partial_fee(default_conf, ticker, open_trade, cap
     Trade.query.session.add(open_trade)
     # cancelling a half-filled order should update the amount to the bought amount
     # and apply fees if necessary.
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
 
     assert log_has_re(r"Applying fee on amount for Trade.*", caplog)
 
@@ -2420,9 +2421,10 @@ def test_check_handle_timedout_partial_fee(default_conf, ticker, open_trade, cap
     assert pytest.approx(trades[0].fee_open) == 0.001
 
 
-def test_check_handle_timedout_partial_except(default_conf, ticker, open_trade, caplog, fee,
-                                              limit_buy_order_old_partial, trades_for_order,
-                                              limit_buy_order_old_partial_canceled, mocker) -> None:
+async def test_check_handle_timedout_partial_except(default_conf, ticker, open_trade, caplog, fee,
+                                                    limit_buy_order_old_partial, trades_for_order,
+                                                    limit_buy_order_old_partial_canceled,
+                                                    mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
     cancel_order_mock = MagicMock(return_value=limit_buy_order_old_partial_canceled)
     patch_exchange(mocker)
@@ -2444,7 +2446,7 @@ def test_check_handle_timedout_partial_except(default_conf, ticker, open_trade, 
     Trade.query.session.add(open_trade)
     # cancelling a half-filled order should update the amount to the bought amount
     # and apply fees if necessary.
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
 
     assert log_has_re(r"Could not update trade amount: .*", caplog)
 
@@ -2460,7 +2462,8 @@ def test_check_handle_timedout_partial_except(default_conf, ticker, open_trade, 
     assert trades[0].fee_open == fee()
 
 
-def test_check_handle_timedout_exception(default_conf, ticker, open_trade, mocker, caplog) -> None:
+async def test_check_handle_timedout_exception(default_conf, ticker, open_trade, mocker,
+                                               caplog) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     cancel_order_mock = MagicMock()
@@ -2480,7 +2483,7 @@ def test_check_handle_timedout_exception(default_conf, ticker, open_trade, mocke
 
     Trade.query.session.add(open_trade)
 
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     assert log_has_re(r"Cannot query order for Trade\(id=1, pair=ETH/BTC, amount=90.99181073, "
                       r"open_rate=0.00001099, open_since="
                       f"{open_trade.open_date.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -2956,7 +2959,7 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
     trade = Trade.query.first()
     assert trade
 
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     await freqtrade.exit_position(trade)
 
     # Increase the price and sell it
@@ -3003,7 +3006,7 @@ async def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_con
 
     # Create some test data
     freqtrade.enter_positions()
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
     trade = Trade.query.first()
     trades = [trade]
     assert trade.stoploss_order_id is None
