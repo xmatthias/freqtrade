@@ -181,7 +181,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Then looking for buy opportunities
         if self.get_free_open_trades():
-            self.enter_positions()
+            asyncio.get_event_loop().run_until_complete(self.enter_positions())
 
         Trade.commit()
 
@@ -349,7 +349,7 @@ class FreqtradeBot(LoggingMixin):
 # BUY / enter positions / open trades logic and methods
 #
 
-    def enter_positions(self) -> int:
+    async def enter_positions(self) -> int:
         """
         Tries to execute buy orders for new trades (positions)
         """

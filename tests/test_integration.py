@@ -86,7 +86,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     patch_get_signal(freqtrade)
 
     # Create some test data
-    freqtrade.enter_positions()
+    await freqtrade.enter_positions()
     assert freqtrade.strategy.confirm_trade_entry.call_count == 3
     freqtrade.strategy.confirm_trade_entry.reset_mock()
     assert freqtrade.strategy.confirm_trade_exit.call_count == 0
@@ -175,7 +175,7 @@ async def test_forcebuy_last_unlimited(default_conf, ticker, fee, limit_buy_orde
     patch_get_signal(freqtrade)
 
     # Create 4 trades
-    n = freqtrade.enter_positions()
+    n = await freqtrade.enter_positions()
     assert n == 4
 
     trades = Trade.query.all()
