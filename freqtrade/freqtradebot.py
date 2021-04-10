@@ -381,7 +381,7 @@ class FreqtradeBot(LoggingMixin):
         # Create entity and execute trade for each pair from whitelist
         for pair in whitelist:
             try:
-                trades_created += self.create_trade(pair)
+                trades_created += await self.create_trade(pair)
             except DependencyException as exception:
                 logger.warning('Unable to create trade for %s: %s', pair, exception)
 
@@ -390,7 +390,7 @@ class FreqtradeBot(LoggingMixin):
 
         return trades_created
 
-    def create_trade(self, pair: str) -> bool:
+    async def create_trade(self, pair: str) -> bool:
         """
         Check the implemented trading strategy for buy signals.
 

@@ -330,7 +330,7 @@ async def test_total_open_trades_stakes(mocker, default_conf, ticker, fee) -> No
     assert Trade.total_open_trades_stakes() == 1.97502e-03
 
 
-def test_create_trade(default_conf, ticker, limit_buy_order, fee, mocker) -> None:
+async def test_create_trade(default_conf, ticker, limit_buy_order, fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -344,7 +344,7 @@ def test_create_trade(default_conf, ticker, limit_buy_order, fee, mocker) -> Non
     whitelist = deepcopy(default_conf['exchange']['pair_whitelist'])
     freqtrade = FreqtradeBot(default_conf)
     patch_get_signal(freqtrade)
-    freqtrade.create_trade('ETH/BTC')
+    await freqtrade.create_trade('ETH/BTC')
 
     trade = Trade.query.first()
     assert trade is not None
@@ -362,8 +362,8 @@ def test_create_trade(default_conf, ticker, limit_buy_order, fee, mocker) -> Non
     assert whitelist == default_conf['exchange']['pair_whitelist']
 
 
-def test_create_trade_no_stake_amount(default_conf, ticker, limit_buy_order,
-                                      fee, mocker) -> None:
+async def test_create_trade_no_stake_amount(default_conf, ticker,
+                                            fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     patch_wallet(mocker, free=default_conf['stake_amount'] * 0.5)
@@ -376,11 +376,11 @@ def test_create_trade_no_stake_amount(default_conf, ticker, limit_buy_order,
     patch_get_signal(freqtrade)
 
     with pytest.raises(DependencyException, match=r'.*stake amount.*'):
-        freqtrade.create_trade('ETH/BTC')
+        await freqtrade.create_trade('ETH/BTC')
 
 
-def test_create_trade_minimal_amount(default_conf, ticker, limit_buy_order_open,
-                                     fee, mocker) -> None:
+async def test_create_trade_minimal_amount(default_conf, ticker, limit_buy_order_open,
+                                           fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     buy_mock = MagicMock(return_value=limit_buy_order_open)
@@ -394,13 +394,13 @@ def test_create_trade_minimal_amount(default_conf, ticker, limit_buy_order_open,
     freqtrade = FreqtradeBot(default_conf)
     patch_get_signal(freqtrade)
 
-    freqtrade.create_trade('ETH/BTC')
+    await freqtrade.create_trade('ETH/BTC')
     rate, amount = buy_mock.call_args[1]['rate'], buy_mock.call_args[1]['amount']
     assert rate * amount <= default_conf['stake_amount']
 
 
-def test_create_trade_too_small_stake_amount(default_conf, ticker, limit_buy_order_open,
-                                             fee, mocker, caplog) -> None:
+async def test_create_trade_too_small_stake_amount(default_conf, ticker, limit_buy_order_open,
+                                                   fee, mocker, caplog) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     buy_mock = get_mock_coro(return_value=limit_buy_order_open)
@@ -416,12 +416,12 @@ def test_create_trade_too_small_stake_amount(default_conf, ticker, limit_buy_ord
 
     patch_get_signal(freqtrade)
 
-    assert freqtrade.create_trade('ETH/BTC')
+    assert await freqtrade.create_trade('ETH/BTC')
     assert log_has_re(r"Stake amount for pair .* is too small.*", caplog)
 
 
-def test_create_trade_zero_stake_amount(default_conf, ticker, limit_buy_order_open,
-                                        fee, mocker) -> None:
+async def test_create_trade_zero_stake_amount(default_conf, ticker, limit_buy_order_open,
+                                              fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     buy_mock = MagicMock(return_value=limit_buy_order_open)
@@ -437,11 +437,11 @@ def test_create_trade_zero_stake_amount(default_conf, ticker, limit_buy_order_op
 
     patch_get_signal(freqtrade)
 
-    assert not freqtrade.create_trade('ETH/BTC')
+    assert not await freqtrade.create_trade('ETH/BTC')
 
 
-def test_create_trade_limit_reached(default_conf, ticker, limit_buy_order_open,
-                                    fee, mocker) -> None:
+async def test_create_trade_limit_reached(default_conf, ticker, limit_buy_order_open,
+                                          fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -456,7 +456,7 @@ def test_create_trade_limit_reached(default_conf, ticker, limit_buy_order_open,
     freqtrade = FreqtradeBot(default_conf)
     patch_get_signal(freqtrade)
 
-    assert not freqtrade.create_trade('ETH/BTC')
+    assert not await freqtrade.create_trade('ETH/BTC')
     assert freqtrade.wallets.get_trade_stake_amount('ETH/BTC', freqtrade.edge) == 0
 
 
@@ -529,7 +529,7 @@ async def test_enter_positions_global_pairlock(default_conf, ticker, limit_buy_o
     assert log_has_re(message, caplog)
 
 
-def test_create_trade_no_signal(default_conf, fee, mocker) -> None:
+async def test_create_trade_no_signal(default_conf, fee, mocker) -> None:
     default_conf['dry_run'] = True
 
     patch_RPCManager(mocker)
@@ -544,7 +544,7 @@ def test_create_trade_no_signal(default_conf, fee, mocker) -> None:
 
     Trade.query = MagicMock()
     Trade.query.filter = MagicMock()
-    assert not freqtrade.create_trade('ETH/BTC')
+    assert not await freqtrade.create_trade('ETH/BTC')
 
 
 @pytest.mark.parametrize("max_open", range(0, 5))
@@ -575,7 +575,8 @@ async def test_create_trades_multiple_trades(default_conf, ticker, fee, mocker,
     assert len(trades) == max(int(max_open * modifier), 0)
 
 
-def test_create_trades_preopen(default_conf, ticker, fee, mocker, limit_buy_order_open) -> None:
+async def test_create_trades_preopen(default_conf, ticker, fee, mocker,
+                                     limit_buy_order_open) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     default_conf['max_open_trades'] = 4
@@ -598,8 +599,8 @@ def test_create_trades_preopen(default_conf, ticker, fee, mocker, limit_buy_orde
     limit_buy_order_open['id'] = '123444'
 
     # Create 2 new trades using create_trades
-    assert freqtrade.create_trade('ETH/BTC')
-    assert freqtrade.create_trade('NEO/BTC')
+    assert await freqtrade.create_trade('ETH/BTC')
+    assert await freqtrade.create_trade('NEO/BTC')
 
     trades = Trade.get_open_trades()
     assert len(trades) == 4
@@ -1668,7 +1669,7 @@ async def test_enter_positions(mocker, default_conf, caplog) -> None:
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     mock_ct = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.create_trade',
-                           MagicMock(return_value=False))
+                           get_mock_coro(return_value=False))
     n = await freqtrade.enter_positions()
     assert n == 0
     assert log_has('Found no buy signals for whitelisted currencies. Trying again...', caplog)
