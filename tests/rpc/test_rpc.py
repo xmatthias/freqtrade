@@ -229,7 +229,7 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
 
 async def test_rpc_daily_profit(default_conf, update, ticker, fee,
-                          limit_buy_order, limit_sell_order, markets, mocker) -> None:
+                                limit_buy_order, limit_sell_order, markets, mocker) -> None:
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
