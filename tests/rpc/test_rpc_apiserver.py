@@ -1058,7 +1058,7 @@ def test_api_forcesell(botclient, mocker, ticker, fee, markets):
     assert_response(rc, 502)
     assert rc.json() == {"error": "Error querying /api/v1/forcesell: invalid argument"}
 
-    ftbot.enter_positions()
+    create_mock_trades(fee)
 
     rc = client_post(client, f"{BASE_URI}/forcesell",
                      data='{"tradeid": "1"}')

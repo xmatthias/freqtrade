@@ -15,7 +15,7 @@ from freqtrade.configuration.timerange import TimeRange
 from freqtrade.constants import CANCEL_REASON, DATETIME_PRINT_FORMAT
 from freqtrade.data.history import load_data
 from freqtrade.enums import SellType, State
-from freqtrade.exceptions import ExchangeError, PricingError
+from freqtrade.exceptions import ExchangeError, InvalidOrderException, PricingError
 from freqtrade.exchange import timeframe_to_minutes, timeframe_to_msecs
 from freqtrade.loggers import bufferHandler
 from freqtrade.misc import decimals_per_coin, shorten_date
@@ -545,15 +545,20 @@ class RPC:
             # Check if there is there is an open order
             fully_canceled = False
             if trade.open_order_id:
-                order = self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
+                try:
+                    order = self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
+                except InvalidOrderException:
+                    logger.warning(f"Order {trade.open_order_id} not found.")
+                    order = None
+                if order:
+                    if order['side'] == 'buy':
+                        fully_canceled = self._freqtrade.handle_cancel_enter(
+                            trade, order, CANCEL_REASON['FORCE_SELL'])
 
-                if order['side'] == 'buy':
-                    fully_canceled = self._freqtrade.handle_cancel_enter(
-                        trade, order, CANCEL_REASON['FORCE_SELL'])
-
-                if order['side'] == 'sell':
-                    # Cancel order - so it is placed anew with a fresh price.
-                    self._freqtrade.handle_cancel_exit(trade, order, CANCEL_REASON['FORCE_SELL'])
+                    if order['side'] == 'sell':
+                        # Cancel order - so it is placed anew with a fresh price.
+                        self._freqtrade.handle_cancel_exit(trade, order,
+                                                           CANCEL_REASON['FORCE_SELL'])
 
             if not fully_canceled:
                 # Get current rate and execute sell
