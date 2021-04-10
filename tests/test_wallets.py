@@ -132,9 +132,10 @@ def test_get_trade_stake_amount_no_stake_amount(default_conf, mocker) -> None:
                         (0.50, 50, 25, 0.0),
                         (0.50, 10, 5, 0.0),
 ])
-def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, balance_ratio, capital,
-                                                 result1, result2, limit_buy_order_open,
-                                                 fee, mocker) -> None:
+@pytest.mark.asyncio
+async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, balance_ratio, capital,
+                                                       result1, result2, limit_buy_order_open,
+                                                       fee, mocker) -> None:
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
@@ -157,13 +158,13 @@ def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, balance_r
     assert result == result1
 
     # create one trade, order amount should be 'balance / (max_open_trades - num_open_trades)'
-    freqtrade.execute_entry('ETH/USDT', result)
+    await freqtrade.execute_entry('ETH/USDT', result)
 
     result = freqtrade.wallets.get_trade_stake_amount('LTC/USDT')
     assert result == result1
 
     # create 2 trades, order amount should be None
-    freqtrade.execute_entry('LTC/BTC', result)
+    await freqtrade.execute_entry('LTC/BTC', result)
 
     result = freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
     assert result == 0

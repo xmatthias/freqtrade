@@ -182,7 +182,7 @@ async def test_forcebuy_last_unlimited(default_conf, ticker, fee, limit_buy_orde
     assert len(trades) == 4
     assert freqtrade.wallets.get_trade_stake_amount('XRP/BTC') == result1
 
-    rpc._rpc_forcebuy('TKN/BTC', None)
+    await rpc._rpc_forcebuy('TKN/BTC', None)
 
     trades = Trade.query.all()
     assert len(trades) == 5

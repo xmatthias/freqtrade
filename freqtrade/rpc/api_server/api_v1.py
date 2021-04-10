@@ -120,8 +120,8 @@ def show_config(rpc: Optional[RPC] = Depends(get_rpc_optional), config=Depends(g
 
 
 @router.post('/forcebuy', response_model=ForceBuyResponse, tags=['trading'])
-def forcebuy(payload: ForceBuyPayload, rpc: RPC = Depends(get_rpc)):
-    trade = rpc._rpc_forcebuy(payload.pair, payload.price)
+async def forcebuy(payload: ForceBuyPayload, rpc: RPC = Depends(get_rpc)):
+    trade = await rpc._rpc_forcebuy(payload.pair, payload.price)
 
     if trade:
         return ForceBuyResponse.parse_obj(trade.to_json())

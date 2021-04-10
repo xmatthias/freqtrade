@@ -592,7 +592,7 @@ class RPC:
             self._freqtrade.wallets.update()
             return {'result': f'Created sell order for trade {trade_id}.'}
 
-    def _rpc_forcebuy(self, pair: str, price: Optional[float]) -> Optional[Trade]:
+    async def _rpc_forcebuy(self, pair: str, price: Optional[float]) -> Optional[Trade]:
         """
         Handler for forcebuy <asset> <price>
         Buys a pair trade at the given or current price
@@ -620,7 +620,7 @@ class RPC:
         stakeamount = self._freqtrade.wallets.get_trade_stake_amount(pair)
 
         # execute buy
-        if self._freqtrade.execute_entry(pair, stakeamount, price, forcebuy=True):
+        if await self._freqtrade.execute_entry(pair, stakeamount, price, forcebuy=True):
             Trade.commit()
             trade = Trade.get_trades([Trade.is_open.is_(True), Trade.pair == pair]).first()
             return trade

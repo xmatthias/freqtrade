@@ -17,6 +17,9 @@ from freqtrade.rpc.fiat_convert import CryptoToFiatConverter
 from tests.conftest import create_mock_trades, get_patched_freqtradebot, patch_get_signal
 
 
+pytestmark = pytest.mark.asyncio
+
+
 # Functions for recurrent object patching
 def prec_satoshi(a, b) -> float:
     """
@@ -851,7 +854,7 @@ async def test_rpc_count(mocker, default_conf, ticker, fee) -> None:
     assert counts["current"] == 1
 
 
-def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_open) -> None:
+async def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_open) -> None:
     default_conf['forcebuy_enable'] = True
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
     buy_mm = MagicMock(return_value=limit_buy_order_open)
@@ -867,16 +870,16 @@ def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_open) ->
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
     pair = 'ETH/BTC'
-    trade = rpc._rpc_forcebuy(pair, None)
+    trade = await rpc._rpc_forcebuy(pair, None)
     assert isinstance(trade, Trade)
     assert trade.pair == pair
     assert trade.open_rate == ticker()['bid']
 
     # Test buy duplicate
     with pytest.raises(RPCException, match=r'position for ETH/BTC already open - id: 1'):
-        rpc._rpc_forcebuy(pair, 0.0001)
+        await rpc._rpc_forcebuy(pair, 0.0001)
     pair = 'XRP/BTC'
-    trade = rpc._rpc_forcebuy(pair, 0.0001)
+    trade = await rpc._rpc_forcebuy(pair, 0.0001)
     assert isinstance(trade, Trade)
     assert trade.pair == pair
     assert trade.open_rate == 0.0001
@@ -884,7 +887,7 @@ def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_open) ->
     # Test buy pair not with stakes
     with pytest.raises(RPCException,
                        match=r'Wrong pair selected. Only pairs with stake-currency.*'):
-        rpc._rpc_forcebuy('LTC/ETH', 0.0001)
+        await rpc._rpc_forcebuy('LTC/ETH', 0.0001)
     pair = 'XRP/BTC'
 
     # Test not buying
@@ -893,11 +896,11 @@ def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_open) ->
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
     pair = 'TKN/BTC'
-    trade = rpc._rpc_forcebuy(pair, None)
+    trade = await rpc._rpc_forcebuy(pair, None)
     assert trade is None
 
 
-def test_rpcforcebuy_stopped(mocker, default_conf) -> None:
+async def test_rpcforcebuy_stopped(mocker, default_conf) -> None:
     default_conf['forcebuy_enable'] = True
     default_conf['initial_state'] = 'stopped'
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
@@ -907,10 +910,10 @@ def test_rpcforcebuy_stopped(mocker, default_conf) -> None:
     rpc = RPC(freqtradebot)
     pair = 'ETH/BTC'
     with pytest.raises(RPCException, match=r'trader is not running'):
-        rpc._rpc_forcebuy(pair, None)
+        await rpc._rpc_forcebuy(pair, None)
 
 
-def test_rpcforcebuy_disabled(mocker, default_conf) -> None:
+async def test_rpcforcebuy_disabled(mocker, default_conf) -> None:
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
 
     freqtradebot = get_patched_freqtradebot(mocker, default_conf)
@@ -918,7 +921,7 @@ def test_rpcforcebuy_disabled(mocker, default_conf) -> None:
     rpc = RPC(freqtradebot)
     pair = 'ETH/BTC'
     with pytest.raises(RPCException, match=r'Forcebuy not enabled.'):
-        rpc._rpc_forcebuy(pair, None)
+        await rpc._rpc_forcebuy(pair, None)
 
 
 @pytest.mark.usefixtures("init_persistence")

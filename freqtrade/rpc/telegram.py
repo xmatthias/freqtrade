@@ -716,7 +716,7 @@ class Telegram(RPCHandler):
 
     def _forcebuy_action(self, pair, price=None):
         try:
-            self._rpc._rpc_forcebuy(pair, price)
+            asyncio.new_event_loop().run_until_complete(self._rpc._rpc_forcebuy(pair, price))
         except RPCException as e:
             self._send_msg(str(e))
 

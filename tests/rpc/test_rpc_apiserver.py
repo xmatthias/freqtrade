@@ -961,7 +961,7 @@ def test_api_forcebuy(botclient, mocker, fee):
     # enable forcebuy
     ftbot.config['forcebuy_enable'] = True
 
-    fbuy_mock = MagicMock(return_value=None)
+    fbuy_mock = get_mock_coro(return_value=None)
     mocker.patch("freqtrade.rpc.RPC._rpc_forcebuy", fbuy_mock)
     rc = client_post(client, f"{BASE_URI}/forcebuy",
                      data='{"pair": "ETH/BTC"}')
@@ -969,7 +969,7 @@ def test_api_forcebuy(botclient, mocker, fee):
     assert rc.json() == {"status": "Error buying pair ETH/BTC."}
 
     # Test creating trade
-    fbuy_mock = MagicMock(return_value=Trade(
+    fbuy_mock = get_mock_coro(return_value=Trade(
         pair='ETH/ETH',
         amount=1,
         amount_requested=1,
