@@ -164,7 +164,7 @@ def test_get_trade_stake_amount(default_conf, ticker, mocker) -> None:
                         (True, 0.0022, 3, 0.5, [0.001, 0.001, 0.0]),
                         (True, 0.0027, 3, 0.5, [0.001, 0.001, 0.000673]),
                         (True, 0.0022, 3, 1, [0.001, 0.001, 0.0]),
-                        ])
+])
 async def test_check_available_stake_amount(default_conf, ticker, mocker, fee, limit_buy_order_open,
                                             amend_last, wallet, max_open, lsamr, expected) -> None:
     patch_RPCManager(mocker)
@@ -172,7 +172,7 @@ async def test_check_available_stake_amount(default_conf, ticker, mocker, fee, l
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee
     )
     default_conf['dry_run_wallet'] = wallet
@@ -383,7 +383,7 @@ async def test_create_trade_minimal_amount(default_conf, ticker, limit_buy_order
                                            fee, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
-    buy_mock = MagicMock(return_value=limit_buy_order_open)
+    buy_mock = get_mock_coro(return_value=limit_buy_order_open)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
@@ -467,7 +467,7 @@ async def test_enter_positions_no_pairs_left(default_conf, ticker, limit_buy_ord
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
 
@@ -490,7 +490,7 @@ async def test_enter_positions_no_pairs_in_whitelist(default_conf, ticker, limit
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value={'id': limit_buy_order['id']}),
+        create_order=get_mock_coro(return_value={'id': limit_buy_order['id']}),
         get_fee=fee,
     )
     default_conf['exchange']['pair_whitelist'] = []
@@ -510,7 +510,7 @@ async def test_enter_positions_global_pairlock(default_conf, ticker, limit_buy_o
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value={'id': limit_buy_order['id']}),
+        create_order=get_mock_coro(return_value={'id': limit_buy_order['id']}),
         get_fee=fee,
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -561,7 +561,7 @@ async def test_create_trades_multiple_trades(default_conf, ticker, fee, mocker,
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -583,7 +583,7 @@ async def test_create_trades_preopen(default_conf, ticker, fee, mocker,
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
     mocker.patch('freqtrade.wallets.Wallets.get_available_stake_amount', return_value=1)
@@ -613,7 +613,7 @@ def test_process_trade_creation(default_conf, ticker, limit_buy_order, limit_buy
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         fetch_order=MagicMock(return_value=limit_buy_order),
         get_fee=fee,
     )
@@ -683,7 +683,7 @@ def test_process_trade_handling(default_conf, ticker, limit_buy_order_open, fee,
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         fetch_order=MagicMock(return_value=limit_buy_order_open),
         get_fee=fee,
     )
@@ -710,7 +710,7 @@ def test_process_trade_no_whitelist_pair(default_conf, ticker, limit_buy_order,
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value={'id': limit_buy_order['id']}),
+        create_order=get_mock_coro(return_value={'id': limit_buy_order['id']}),
         fetch_order=MagicMock(return_value=limit_buy_order),
         get_fee=fee,
     )
@@ -792,7 +792,7 @@ async def test_execute_entry(mocker, default_conf, fee, limit_buy_order,
     stake_amount = 2
     bid = 0.11
     buy_rate_mock = MagicMock(return_value=bid)
-    buy_mm = MagicMock(return_value=limit_buy_order_open)
+    buy_mm = get_mock_coro(return_value=limit_buy_order_open)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         get_rate=buy_rate_mock,
@@ -957,7 +957,7 @@ async def test_execute_entry_confirm_error(mocker, default_conf, fee, limit_buy_
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(return_value=limit_buy_order),
+        create_order=get_mock_coro(return_value=limit_buy_order),
         get_rate=MagicMock(return_value=0.11),
         get_min_pair_stake_amount=MagicMock(return_value=1),
         get_fee=fee,
@@ -1021,7 +1021,7 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf, fee, caplog,
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': limit_buy_order['id']},
             {'id': limit_sell_order['id']},
         ]),
@@ -1141,7 +1141,7 @@ async def test_handle_sle_cancel_cant_recreate(mocker, default_conf, fee, caplog
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': limit_buy_order['id']},
             {'id': limit_sell_order['id']},
         ]),
@@ -1172,7 +1172,7 @@ async def test_create_stoploss_order_invalid_order(mocker, default_conf, caplog,
                                                    limit_buy_order_open, limit_sell_order):
     rpc_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
-    create_order_mock = MagicMock(side_effect=[
+    create_order_mock = get_mock_coro(side_effect=[
         limit_buy_order_open,
         {'id': limit_sell_order['id']}
     ])
@@ -1230,7 +1230,7 @@ async def test_create_stoploss_order_insufficient_funds(mocker, default_conf, ca
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             sell_mock,
         ]),
@@ -1382,7 +1382,7 @@ async def test_handle_stoploss_on_exchange_trailing_error(
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': limit_buy_order['id']},
             {'id': limit_sell_order['id']},
         ]),
@@ -1570,7 +1570,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             {'id': limit_buy_order['id']},
             {'id': limit_sell_order['id']},
         ]),
@@ -1951,7 +1951,7 @@ async def test_handle_overlapping_signals(default_conf, ticker, limit_buy_order_
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -2007,7 +2007,7 @@ async def test_handle_trade_roi(default_conf, ticker, limit_buy_order_open,
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -2042,7 +2042,7 @@ async def test_handle_trade_use_sell_signal(default_conf, ticker, limit_buy_orde
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             limit_sell_order_open,
         ]),
@@ -2073,7 +2073,7 @@ async def test_close_trade(default_conf, ticker, limit_buy_order, limit_buy_orde
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -3153,7 +3153,7 @@ async def test_sell_profit_only_enable_profit(default_conf, limit_buy_order, lim
             'ask': 0.00001173,
             'last': 0.00001172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3193,7 +3193,7 @@ async def test_sell_profit_only_disable_profit(default_conf, limit_buy_order, li
             'ask': 0.00002173,
             'last': 0.00002172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3227,7 +3227,7 @@ async def test_sell_profit_only_enable_loss(default_conf, limit_buy_order, limit
             'ask': 0.00000173,
             'last': 0.00000172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3260,7 +3260,7 @@ async def test_sell_profit_only_disable_loss(default_conf, limit_buy_order, limi
             'ask': 0.0000173,
             'last': 0.0000172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3296,7 +3296,7 @@ async def test_sell_not_enough_balance(default_conf, limit_buy_order, limit_buy_
             'ask': 0.00002173,
             'last': 0.00002172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3417,7 +3417,7 @@ async def test_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy
             'ask': 0.0000173,
             'last': 0.0000172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3454,7 +3454,7 @@ async def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_
             'ask': 0.00001099,
             'last': 0.00001099
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3509,7 +3509,7 @@ async def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_
             'ask': buy_price - 0.000001,
             'last': buy_price - 0.000001
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3570,7 +3570,7 @@ async def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_bu
             'ask': buy_price - 0.000001,
             'last': buy_price - 0.000001
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
         ]),
@@ -3634,7 +3634,7 @@ async def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_
             'ask': buy_price,
             'last': buy_price
         }),
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
     patch_whitelist(mocker, default_conf)
@@ -3695,7 +3695,7 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, l
             'ask': 0.00000173,
             'last': 0.00000172
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             limit_buy_order_open,
             {'id': 1234553382},
             {'id': 1234553383}
@@ -4096,7 +4096,7 @@ async def test_order_book_depth_of_market(default_conf, ticker, limit_buy_order_
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
 
@@ -4133,7 +4133,7 @@ async def test_order_book_depth_of_market_high_delta(default_conf, ticker, limit
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value={'id': limit_buy_order['id']}),
+        create_order=get_mock_coro(return_value={'id': limit_buy_order['id']}),
         get_fee=fee,
     )
     # Save state of current whitelist
@@ -4299,7 +4299,7 @@ async def test_sync_wallet_dry_run(mocker, default_conf, ticker, fee, limit_buy_
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
 

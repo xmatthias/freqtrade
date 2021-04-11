@@ -13,13 +13,14 @@ STOPLOSS_ORDERTYPE = 'stop-loss'
 STOPLOSS_LIMIT_ORDERTYPE = 'stop-loss-limit'
 
 
-def test_buy_kraken_trading_agreement(default_conf, mocker):
+@pytest.mark.asyncio
+async def test_buy_kraken_trading_agreement(default_conf, mocker):
     api_mock = MagicMock()
     order_id = 'test_prod_buy_{}'.format(randint(0, 10 ** 6))
     order_type = 'limit'
     time_in_force = 'ioc'
     api_mock.options = {}
-    api_mock.create_order = MagicMock(return_value={
+    api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
         'info': {
             'foo': 'bar'
@@ -31,8 +32,8 @@ def test_buy_kraken_trading_agreement(default_conf, mocker):
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id="kraken")
 
-    order = exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="buy",
-                                  amount=1, rate=200, time_in_force=time_in_force)
+    order = await exchange.create_order(pair='ETH/BTC', ordertype=order_type, side="buy",
+                                        amount=1, rate=200, time_in_force=time_in_force)
 
     assert 'id' in order
     assert 'info' in order

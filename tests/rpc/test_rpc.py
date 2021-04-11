@@ -14,7 +14,8 @@ from freqtrade.persistence import Trade
 from freqtrade.persistence.pairlock_middleware import PairLocks
 from freqtrade.rpc import RPC, RPCException
 from freqtrade.rpc.fiat_convert import CryptoToFiatConverter
-from tests.conftest import create_mock_trades, get_patched_freqtradebot, patch_get_signal
+from tests.conftest import (create_mock_trades, get_mock_coro, get_patched_freqtradebot,
+                            patch_get_signal)
 
 
 pytestmark = pytest.mark.asyncio
@@ -857,7 +858,7 @@ async def test_rpc_count(mocker, default_conf, ticker, fee) -> None:
 async def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_open) -> None:
     default_conf['forcebuy_enable'] = True
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
-    buy_mm = MagicMock(return_value=limit_buy_order_open)
+    buy_mm = get_mock_coro(return_value=limit_buy_order_open)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         get_balances=MagicMock(return_value=ticker),

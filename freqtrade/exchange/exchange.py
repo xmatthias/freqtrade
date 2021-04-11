@@ -714,7 +714,6 @@ class Exchange:
                 f'Tried to get an invalid dry-run-order (id: {order_id}). Message: {e}') from e
 
     # Order handling
-
     async def create_order(self, pair: str, ordertype: str, side: str, amount: float,
                            rate: float, time_in_force: str = 'gtc') -> Dict:
 
@@ -737,49 +736,6 @@ class Exchange:
 
             order = await self._api_async.create_order(pair, ordertype, side,
                                                        amount, rate_for_order, params)
-            self._log_exchange_response('create_order', order)
-            return order
-
-        except ccxt.InsufficientFunds as e:
-            raise InsufficientFundsError(
-                f'Insufficient funds to create {ordertype} {side} order on market {pair}. '
-                f'Tried to {side} amount {amount} at rate {rate}.'
-                f'Message: {e}') from e
-        except ccxt.InvalidOrder as e:
-            raise ExchangeError(
-                f'Could not create {ordertype} {side} order on market {pair}. '
-                f'Tried to {side} amount {amount} at rate {rate}. '
-                f'Message: {e}') from e
-        except ccxt.DDoSProtection as e:
-            raise DDosProtection(e) from e
-        except (ccxt.NetworkError, ccxt.ExchangeError) as e:
-            raise TemporaryError(
-                f'Could not place {side} order due to {e.__class__.__name__}. Message: {e}') from e
-        except ccxt.BaseError as e:
-            raise OperationalException(e) from e
-
-    # TODO: Remove this method
-    def create_order_sync(self, pair: str, ordertype: str, side: str, amount: float,
-                          rate: float, time_in_force: str = 'gtc') -> Dict:
-
-        if self._config['dry_run']:
-            dry_order = self.create_dry_run_order(pair, ordertype, side, amount, rate)
-            return dry_order
-
-        params = self._params.copy()
-        if time_in_force != 'gtc' and ordertype != 'market':
-            params.update({'timeInForce': time_in_force})
-
-        try:
-            # Set the precision for amount and price(rate) as accepted by the exchange
-            amount = self.amount_to_precision(pair, amount)
-            needs_price = (
-                ordertype != 'market'
-                or self._api.options.get("createMarketBuyOrderRequiresPrice", False))
-            rate_for_order = self.price_to_precision(pair, rate) if needs_price else None
-
-            order = self._api.create_order(pair, ordertype, side,
-                                           amount, rate_for_order, params)
             self._log_exchange_response('create_order', order)
             return order
 

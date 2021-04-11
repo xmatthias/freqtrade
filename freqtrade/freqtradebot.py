@@ -521,9 +521,9 @@ class FreqtradeBot(LoggingMixin):
             logger.info(f"User requested abortion of buying {pair}")
             return False
         amount = self.exchange.amount_to_precision(pair, amount)
-        order = self.exchange.create_order_sync(pair=pair, ordertype=order_type, side="buy",
-                                                amount=amount, rate=enter_limit_requested,
-                                                time_in_force=time_in_force)
+        order = await self.exchange.create_order(pair=pair, ordertype=order_type, side="buy",
+                                                 amount=amount, rate=enter_limit_requested,
+                                                 time_in_force=time_in_force)
         order_obj = Order.parse_from_ccxt_object(order, pair, 'buy')
         order_id = order['id']
         order_status = order.get('status', None)
