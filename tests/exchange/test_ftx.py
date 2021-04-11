@@ -8,7 +8,7 @@ from freqtrade.exceptions import DependencyException, InvalidOrderException
 from freqtrade.exchange.common import API_FETCH_ORDER_RETRY_COUNT
 from tests.conftest import get_mock_coro, get_patched_exchange
 
-from .test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
+from .test_exchange import async_ccxt_exception
 
 
 STOPLOSS_ORDERTYPE = 'stop'

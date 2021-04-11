@@ -150,7 +150,8 @@ class RPC:
             for trade in trades:
                 order = None
                 if trade.open_order_id:
-                    order = await self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
+                    order = await self._freqtrade.exchange.fetch_order(trade.open_order_id,
+                                                                       trade.pair)
                 # calculate profit and send message to user
                 if trade.is_open:
                     try:

@@ -664,6 +664,7 @@ def test_reload_config_handle(default_conf, update, mocker) -> None:
     assert msg_mock.call_count == 1
     assert 'Reloading config' in msg_mock.call_args_list[0][0][0]
 
+
 def test_telegram_forcesell_handle(default_conf, update, ticker, fee,
                                    ticker_sell_up, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)

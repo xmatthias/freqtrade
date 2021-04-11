@@ -254,8 +254,8 @@ class FreqtradeBot(LoggingMixin):
         # TODO: Asyncio - parallelize this properly
         for order in orders:
             try:
-                fo = await self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
-                                                                       order.ft_order_side == 'stoploss')
+                fo = await self.exchange.fetch_order_or_stoploss_order(
+                    order.order_id, order.ft_pair, order.ft_order_side == 'stoploss')
 
                 await self.update_trade_state(order.trade, order.order_id, fo)
 
@@ -331,8 +331,8 @@ class FreqtradeBot(LoggingMixin):
                 # Skip buy side - this is handled by reupdate_buy_order_fees
                 continue
             try:
-                fo = await self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
-                                                                       order.ft_order_side == 'stoploss')
+                fo = await self.exchange.fetch_order_or_stoploss_order(
+                    order.order_id, order.ft_pair, order.ft_order_side == 'stoploss')
                 if order.ft_order_side == 'stoploss':
                     if fo and fo['status'] == 'open':
                         # Assume this as the open stoploss order
@@ -945,10 +945,12 @@ class FreqtradeBot(LoggingMixin):
                 continue
 
             if order['side'] == 'buy':
-                await self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['ALL_CANCELLED'])
+                await self.handle_cancel_enter(trade, order,
+                                               constants.CANCEL_REASON['ALL_CANCELLED'])
 
             elif order['side'] == 'sell':
-                await self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['ALL_CANCELLED'])
+                await self.handle_cancel_exit(trade, order,
+                                              constants.CANCEL_REASON['ALL_CANCELLED'])
         Trade.commit()
 
     async def handle_cancel_enter(self, trade: Trade, order: Dict, reason: str) -> bool:

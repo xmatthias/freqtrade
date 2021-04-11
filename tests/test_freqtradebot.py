@@ -2624,12 +2624,12 @@ async def test_handle_cancel_exit_limit(mocker, default_conf, fee) -> None:
 
     order['amount'] = 2
     assert await freqtrade.handle_cancel_exit(trade, order, reason
-                                        ) == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
+                                              ) == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
     # Assert cancel_order was not called (callcount remains unchanged)
     assert cancel_order_mock.call_count == 1
     assert send_msg_mock.call_count == 1
     assert await freqtrade.handle_cancel_exit(trade, order, reason
-                                        ) == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
+                                              ) == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
     # Message should not be iterated again
     assert trade.sell_order_status == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
     assert send_msg_mock.call_count == 1
