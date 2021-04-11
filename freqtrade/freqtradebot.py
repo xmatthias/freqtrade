@@ -898,38 +898,43 @@ class FreqtradeBot(LoggingMixin):
     async def check_handle_timedout(self) -> None:
         """
         Check if any orders are timed out and cancel if necessary
-        :param timeoutvalue: Number of minutes until order is considered timed out
         :return: None
         """
 
-        for trade in Trade.get_open_order_trades():
-            try:
-                if not trade.open_order_id:
-                    continue
-                order = await self.exchange.fetch_order(trade.open_order_id, trade.pair)
-            except (ExchangeError):
-                logger.info('Cannot query order for %s due to %s', trade, traceback.format_exc())
-                continue
+        tasks = [asyncio.create_task(self.handle_timedout(trade))
+                 for trade in Trade.get_open_order_trades()]
+        if tasks:
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
-            fully_cancelled = await self.update_trade_state(trade, trade.open_order_id, order)
+    async def handle_timedout(self, trade: Trade) -> None:
+        """
+        Check and handle timeouts for one trade
+        :param trade: Trade object to check
+        :return: None
+        """
+        try:
+            if not trade.open_order_id:
+                return
+            order = await self.exchange.fetch_order(trade.open_order_id, trade.pair)
+        except (ExchangeError):
+            logger.info('Cannot query order for %s due to %s', trade, traceback.format_exc())
+            return
 
-            if (order['side'] == 'buy' and (order['status'] == 'open' or fully_cancelled) and (
-                    fully_cancelled
-                    or self._check_timed_out('buy', order)
-                    or strategy_safe_wrapper(self.strategy.check_buy_timeout,
-                                             default_retval=False)(pair=trade.pair,
-                                                                   trade=trade,
-                                                                   order=order))):
-                await self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['TIMEOUT'])
+        fully_cancelled = await self.update_trade_state(trade, trade.open_order_id, order)
 
-            elif (order['side'] == 'sell' and (order['status'] == 'open' or fully_cancelled) and (
-                  fully_cancelled
-                  or self._check_timed_out('sell', order)
-                  or strategy_safe_wrapper(self.strategy.check_sell_timeout,
-                                           default_retval=False)(pair=trade.pair,
-                                                                 trade=trade,
-                                                                 order=order))):
-                await self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['TIMEOUT'])
+        if (order['side'] == 'buy' and (order['status'] == 'open' or fully_cancelled) and (
+                fully_cancelled
+                or self._check_timed_out('buy', order)
+                or strategy_safe_wrapper(self.strategy.check_buy_timeout, default_retval=False
+                                         )(pair=trade.pair, trade=trade, order=order))):
+            await self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['TIMEOUT'])
+
+        elif (order['side'] == 'sell' and (order['status'] == 'open' or fully_cancelled) and (
+                fully_cancelled
+                or self._check_timed_out('sell', order)
+                or strategy_safe_wrapper(self.strategy.check_sell_timeout, default_retval=False
+                                         )(pair=trade.pair, trade=trade, order=order))):
+            await self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['TIMEOUT'])
 
     async def cancel_all_open_orders(self) -> None:
         """
