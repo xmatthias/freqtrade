@@ -92,13 +92,13 @@ class Ftx(Exchange):
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier(retries=API_FETCH_ORDER_RETRY_COUNT)
-    def fetch_stoploss_order(self, order_id: str, pair: str) -> Dict:
+    @retrier_async(retries=API_FETCH_ORDER_RETRY_COUNT)
+    async def fetch_stoploss_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
             return self.fetch_dry_run_order(order_id)
 
         try:
-            orders = self._api.fetch_orders(pair, None, params={'type': 'stop'})
+            orders = await self._api_async.fetch_orders(pair, None, params={'type': 'stop'})
 
             order = [order for order in orders if order['id'] == order_id]
             self._log_exchange_response('fetch_stoploss_order', order)
@@ -107,7 +107,7 @@ class Ftx(Exchange):
                     # Trigger order was triggered ...
                     real_order_id = order[0].get('info', {}).get('orderId')
 
-                    order1 = self._api.fetch_order(real_order_id, pair)
+                    order1 = await self._api_async.fetch_order(real_order_id, pair)
                     self._log_exchange_response('fetch_stoploss_order1', order1)
                     # Fake type to stop - as this was really a stop order.
                     order1['id_stop'] = order1['id']
@@ -131,11 +131,11 @@ class Ftx(Exchange):
             raise OperationalException(e) from e
 
     @retrier
-    def cancel_stoploss_order(self, order_id: str, pair: str) -> Dict:
+    async def cancel_stoploss_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
             return {}
         try:
-            order = self._api.cancel_order(order_id, pair, params={'type': 'stop'})
+            order = await self._api_api.cancel_order(order_id, pair, params={'type': 'stop'})
             self._log_exchange_response('cancel_stoploss_order', order)
             return order
         except ccxt.InvalidOrder as e:

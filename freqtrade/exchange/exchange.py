@@ -778,12 +778,12 @@ class Exchange:
 
         raise OperationalException(f"stoploss is not implemented for {self.name}.")
 
-    @retrier(retries=API_FETCH_ORDER_RETRY_COUNT)
-    def fetch_order(self, order_id: str, pair: str) -> Dict:
+    @retrier_async(retries=API_FETCH_ORDER_RETRY_COUNT)
+    async def fetch_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
             return self.fetch_dry_run_order(order_id)
         try:
-            order = self._api.fetch_order(order_id, pair)
+            order = await self._api_async.fetch_order(order_id, pair)
             self._log_exchange_response('fetch_order', order)
             return order
         except ccxt.OrderNotFound as e:
@@ -803,8 +803,8 @@ class Exchange:
     # Assign method to fetch_stoploss_order to allow easy overriding in other classes
     fetch_stoploss_order = fetch_order
 
-    def fetch_order_or_stoploss_order(self, order_id: str, pair: str,
-                                      stoploss_order: bool = False) -> Dict:
+    async def fetch_order_or_stoploss_order(self, order_id: str, pair: str,
+                                            stoploss_order: bool = False) -> Dict:
         """
         Simple wrapper calling either fetch_order or fetch_stoploss_order depending on
         the stoploss_order parameter
@@ -813,8 +813,8 @@ class Exchange:
         :param stoploss_order: If true, uses fetch_stoploss_order, otherwise fetch_order.
         """
         if stoploss_order:
-            return self.fetch_stoploss_order(order_id, pair)
-        return self.fetch_order(order_id, pair)
+            return await self.fetch_stoploss_order(order_id, pair)
+        return await self.fetch_order(order_id, pair)
 
     def check_order_canceled_empty(self, order: Dict) -> bool:
         """
@@ -825,19 +825,18 @@ class Exchange:
         return (order.get('status') in NON_OPEN_EXCHANGE_STATES
                 and order.get('filled') == 0.0)
 
-    @retrier
-    def cancel_order(self, order_id: str, pair: str) -> Dict:
+    @retrier_async
+    async def cancel_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
-            try:
-                order = self.fetch_dry_run_order(order_id)
-
+            order = self.fetch_dry_run_order(order_id)
+            if order:
                 order.update({'status': 'canceled', 'filled': 0.0, 'remaining': order['amount']})
                 return order
-            except InvalidOrderException:
+            else:
                 return {}
 
         try:
-            order = self._api.cancel_order(order_id, pair)
+            order = await self._api_async.cancel_order(order_id, pair)
             self._log_exchange_response('cancel_order', order)
             return order
         except ccxt.InvalidOrder as e:
@@ -861,7 +860,7 @@ class Exchange:
         required = ('fee', 'status', 'amount')
         return all(k in corder for k in required)
 
-    def cancel_order_with_result(self, order_id: str, pair: str, amount: float) -> Dict:
+    async def cancel_order_with_result(self, order_id: str, pair: str, amount: float) -> Dict:
         """
         Cancel order returning a result.
         Creates a fake result if cancel order returns a non-usable result
@@ -872,20 +871,21 @@ class Exchange:
         :return: Result from either cancel_order if usable, or fetch_order
         """
         try:
-            corder = self.cancel_order(order_id, pair)
+            corder = await self.cancel_order(order_id, pair)
             if self.is_cancel_order_result_suitable(corder):
                 return corder
         except InvalidOrderException:
             logger.warning(f"Could not cancel order {order_id} for {pair}.")
         try:
-            order = self.fetch_order(order_id, pair)
+            order = await self.fetch_order(order_id, pair)
         except InvalidOrderException:
             logger.warning(f"Could not fetch cancelled order {order_id}.")
             order = {'fee': {}, 'status': 'canceled', 'amount': amount, 'info': {}}
 
         return order
 
-    def cancel_stoploss_order_with_result(self, order_id: str, pair: str, amount: float) -> Dict:
+    async def cancel_stoploss_order_with_result(self, order_id: str, pair: str,
+                                                amount: float) -> Dict:
         """
         Cancel stoploss order returning a result.
         Creates a fake result if cancel order returns a non-usable result
@@ -895,11 +895,11 @@ class Exchange:
         :param amount: Amount to use for fake response
         :return: Result from either cancel_order if usable, or fetch_order
         """
-        corder = self.cancel_stoploss_order(order_id, pair)
+        corder = await self.cancel_stoploss_order(order_id, pair)
         if self.is_cancel_order_result_suitable(corder):
             return corder
         try:
-            order = self.fetch_stoploss_order(order_id, pair)
+            order = await self.fetch_stoploss_order(order_id, pair)
         except InvalidOrderException:
             logger.warning(f"Could not fetch cancelled stoploss order {order_id}.")
             order = {'fee': {}, 'status': 'canceled', 'amount': amount, 'info': {}}

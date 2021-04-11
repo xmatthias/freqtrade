@@ -254,8 +254,8 @@ class FreqtradeBot(LoggingMixin):
         # TODO: Asyncio - parallelize this properly
         for order in orders:
             try:
-                fo = self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
-                                                                 order.ft_order_side == 'stoploss')
+                fo = await self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
+                                                                       order.ft_order_side == 'stoploss')
 
                 await self.update_trade_state(order.trade, order.order_id, fo)
 
@@ -331,8 +331,8 @@ class FreqtradeBot(LoggingMixin):
                 # Skip buy side - this is handled by reupdate_buy_order_fees
                 continue
             try:
-                fo = self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
-                                                                 order.ft_order_side == 'stoploss')
+                fo = await self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
+                                                                       order.ft_order_side == 'stoploss')
                 if order.ft_order_side == 'stoploss':
                     if fo and fo['status'] == 'open':
                         # Assume this as the open stoploss order
@@ -780,7 +780,7 @@ class FreqtradeBot(LoggingMixin):
 
         try:
             # First we check if there is already a stoploss on exchange
-            stoploss_order = self.exchange.fetch_stoploss_order(
+            stoploss_order = await self.exchange.fetch_stoploss_order(
                 trade.stoploss_order_id, trade.pair) if trade.stoploss_order_id else None
         except InvalidOrderException as exception:
             logger.warning('Unable to fetch stoploss order: %s', exception)
@@ -853,8 +853,8 @@ class FreqtradeBot(LoggingMixin):
                 logger.info(f"Cancelling current stoploss on exchange for pair {trade.pair} "
                             f"(orderid:{order['id']}) in order to add another one ...")
                 try:
-                    co = self.exchange.cancel_stoploss_order_with_result(order['id'], trade.pair,
-                                                                         trade.amount)
+                    co = await self.exchange.cancel_stoploss_order_with_result(order['id'], trade.pair,
+                                                                               trade.amount)
                     trade.update_order(co)
                 except InvalidOrderException:
                     logger.exception(f"Could not cancel stoploss order {order['id']} "
@@ -906,7 +906,7 @@ class FreqtradeBot(LoggingMixin):
             try:
                 if not trade.open_order_id:
                     continue
-                order = self.exchange.fetch_order(trade.open_order_id, trade.pair)
+                order = await self.exchange.fetch_order(trade.open_order_id, trade.pair)
             except (ExchangeError):
                 logger.info('Cannot query order for %s due to %s', trade, traceback.format_exc())
                 continue
@@ -939,7 +939,7 @@ class FreqtradeBot(LoggingMixin):
 
         for trade in Trade.get_open_order_trades():
             try:
-                order = self.exchange.fetch_order(trade.open_order_id, trade.pair)
+                order = await self.exchange.fetch_order(trade.open_order_id, trade.pair)
             except (ExchangeError):
                 logger.info('Cannot query order for %s due to %s', trade, traceback.format_exc())
                 continue
@@ -970,8 +970,8 @@ class FreqtradeBot(LoggingMixin):
                     f"Order {trade.open_order_id} for {trade.pair} not cancelled, "
                     f"as the filled amount of {filled_val} would result in an unsellable trade.")
                 return False
-            corder = self.exchange.cancel_order_with_result(trade.open_order_id, trade.pair,
-                                                            trade.amount)
+            corder = await self.exchange.cancel_order_with_result(trade.open_order_id, trade.pair,
+                                                                  trade.amount)
             # Avoid race condition where the order could not be cancelled coz its already filled.
             # Simply bailing here is the only safe way - as this order will then be
             # handled in the next iteration.
@@ -1022,8 +1022,8 @@ class FreqtradeBot(LoggingMixin):
             if not self.exchange.check_order_canceled_empty(order):
                 try:
                     # if trade is not partially completed, just delete the order
-                    co = self.exchange.cancel_order_with_result(trade.open_order_id, trade.pair,
-                                                                trade.amount)
+                    co = await self.exchange.cancel_order_with_result(trade.open_order_id,
+                                                                      trade.pair, trade.amount)
                     trade.update_order(co)
                 except InvalidOrderException:
                     logger.exception(f"Could not cancel sell order {trade.open_order_id}")
@@ -1111,8 +1111,8 @@ class FreqtradeBot(LoggingMixin):
         # First cancelling stoploss on exchange ...
         if self.strategy.order_types.get('stoploss_on_exchange') and trade.stoploss_order_id:
             try:
-                co = self.exchange.cancel_stoploss_order_with_result(trade.stoploss_order_id,
-                                                                     trade.pair, trade.amount)
+                co = await self.exchange.cancel_stoploss_order_with_result(trade.stoploss_order_id,
+                                                                           trade.pair, trade.amount)
                 trade.update_order(co)
             except InvalidOrderException:
                 logger.exception(f"Could not cancel stoploss order {trade.stoploss_order_id}")
@@ -1277,9 +1277,8 @@ class FreqtradeBot(LoggingMixin):
         # Update trade with order values
         logger.info('Found open order for %s', trade)
         try:
-            order = action_order or self.exchange.fetch_order_or_stoploss_order(order_id,
-                                                                                trade.pair,
-                                                                                stoploss_order)
+            order = action_order or await self.exchange.fetch_order_or_stoploss_order(
+                order_id, trade.pair, stoploss_order)
         except InvalidOrderException as exception:
             logger.warning('Unable to fetch order %s: %s', order_id, exception)
             return False
