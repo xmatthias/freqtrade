@@ -140,7 +140,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Only update open orders on startup
         # This will update the database after the initial migration
-        self.update_open_orders()
+        asyncio.get_event_loop().run_until_complete(self.update_open_orders())
 
     def process(self) -> None:
         """
@@ -152,7 +152,9 @@ class FreqtradeBot(LoggingMixin):
         # Check whether markets have to be reloaded and reload them when it's needed
         self.exchange.reload_markets()
 
-        self.update_closed_trades_without_assigned_fees()
+        asyncio.get_event_loop().run_until_complete(
+            self.update_closed_trades_without_assigned_fees()
+            )
 
         # Query trades from persistence layer
         trades = Trade.get_open_trades()
@@ -238,7 +240,7 @@ class FreqtradeBot(LoggingMixin):
         open_trades = len(Trade.get_open_trades())
         return max(0, self.config['max_open_trades'] - open_trades)
 
-    def update_open_orders(self):
+    async def update_open_orders(self):
         """
         Updates open orders based on order list kept in the database.
         Mainly updates the state of orders - but may also close trades
@@ -249,18 +251,19 @@ class FreqtradeBot(LoggingMixin):
 
         orders = Order.get_open_orders()
         logger.info(f"Updating {len(orders)} open orders.")
+        # TODO: Asyncio - parallelize this properly
         for order in orders:
             try:
                 fo = self.exchange.fetch_order_or_stoploss_order(order.order_id, order.ft_pair,
                                                                  order.ft_order_side == 'stoploss')
 
-                self.update_trade_state(order.trade, order.order_id, fo)
+                await self.update_trade_state(order.trade, order.order_id, fo)
 
             except ExchangeError as e:
 
                 logger.warning(f"Error updating Order {order.order_id} due to {e}")
 
-    def update_closed_trades_without_assigned_fees(self):
+    async def update_closed_trades_without_assigned_fees(self):
         """
         Update closed trades without close fees assigned.
         Only acts when Orders are in the database, otherwise the last order-id is unknown.
@@ -269,6 +272,7 @@ class FreqtradeBot(LoggingMixin):
             # Updating open orders in dry-run does not make sense and will fail.
             return
 
+        # TODO: Asyncio - this should be parallelized properly!
         trades: List[Trade] = Trade.get_sold_trades_without_assigned_fees()
         for trade in trades:
 
@@ -277,8 +281,8 @@ class FreqtradeBot(LoggingMixin):
                 order = trade.select_order('sell', False)
                 if order:
                     logger.info(f"Updating sell-fee on trade {trade} for order {order.order_id}.")
-                    self.update_trade_state(trade, order.order_id,
-                                            stoploss_order=order.ft_order_side == 'stoploss')
+                    await self.update_trade_state(trade, order.order_id,
+                                                  stoploss_order=order.ft_order_side == 'stoploss')
 
         trades: List[Trade] = Trade.get_open_trades_without_assigned_fees()
         for trade in trades:
@@ -286,20 +290,20 @@ class FreqtradeBot(LoggingMixin):
                 order = trade.select_order('buy', False)
                 if order:
                     logger.info(f"Updating buy-fee on trade {trade} for order {order.order_id}.")
-                    self.update_trade_state(trade, order.order_id)
+                    await self.update_trade_state(trade, order.order_id)
 
-    def handle_insufficient_funds(self, trade: Trade):
+    async def handle_insufficient_funds(self, trade: Trade):
         """
         Determine if we ever opened a sell order for this trade.
         If not, try update buy fees - otherwise "refind" the open order we obviously lost.
         """
         sell_order = trade.select_order('sell', None)
         if sell_order:
-            self.refind_lost_order(trade)
+            await self.refind_lost_order(trade)
         else:
-            self.reupdate_enter_order_fees(trade)
+            await self.reupdate_enter_order_fees(trade)
 
-    def reupdate_enter_order_fees(self, trade: Trade):
+    async def reupdate_enter_order_fees(self, trade: Trade):
         """
         Get buy order from database, and try to reupdate.
         Handles trades where the initial fee-update did not work.
@@ -308,9 +312,9 @@ class FreqtradeBot(LoggingMixin):
         order = trade.select_order('buy', False)
         if order:
             logger.info(f"Updating buy-fee on trade {trade} for order {order.order_id}.")
-            self.update_trade_state(trade, order.order_id)
+            await self.update_trade_state(trade, order.order_id)
 
-    def refind_lost_order(self, trade):
+    async def refind_lost_order(self, trade):
         """
         Try refinding a lost trade.
         Only used when InsufficientFunds appears on sell orders (stoploss or sell).
@@ -339,8 +343,8 @@ class FreqtradeBot(LoggingMixin):
                         trade.open_order_id = order.order_id
                 if fo:
                     logger.info(f"Found {order} for trade {trade}.")
-                    self.update_trade_state(trade, order.order_id, fo,
-                                            stoploss_order=order.ft_order_side == 'stoploss')
+                    await self.update_trade_state(trade, order.order_id, fo,
+                                                  stoploss_order=order.ft_order_side == 'stoploss')
 
             except ExchangeError:
                 logger.warning(f"Error updating {order.order_id}.")
@@ -583,7 +587,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Update fees if order is closed
         if order_status == 'closed':
-            self.update_trade_state(trade, order_id, order)
+            await self.update_trade_state(trade, order_id, order)
 
         Trade.query.session.add(trade)
         Trade.commit()
@@ -749,7 +753,7 @@ class FreqtradeBot(LoggingMixin):
         except InsufficientFundsError as e:
             logger.warning(f"Unable to place stoploss order {e}.")
             # Try to figure out what went wrong
-            self.handle_insufficient_funds(trade)
+            await self.handle_insufficient_funds(trade)
 
         except InvalidOrderException as e:
             trade.stoploss_order_id = None
@@ -787,8 +791,8 @@ class FreqtradeBot(LoggingMixin):
         # We check if stoploss order is fulfilled
         if stoploss_order and stoploss_order['status'] in ('closed', 'triggered'):
             trade.sell_reason = SellType.STOPLOSS_ON_EXCHANGE.value
-            self.update_trade_state(trade, trade.stoploss_order_id, stoploss_order,
-                                    stoploss_order=True)
+            await self.update_trade_state(trade, trade.stoploss_order_id, stoploss_order,
+                                          stoploss_order=True)
             # Lock pair for one candle to prevent immediate rebuys
             self.strategy.lock_pair(trade.pair, datetime.now(timezone.utc),
                                     reason='Auto lock')
@@ -907,7 +911,7 @@ class FreqtradeBot(LoggingMixin):
                 logger.info('Cannot query order for %s due to %s', trade, traceback.format_exc())
                 continue
 
-            fully_cancelled = self.update_trade_state(trade, trade.open_order_id, order)
+            fully_cancelled = await self.update_trade_state(trade, trade.open_order_id, order)
 
             if (order['side'] == 'buy' and (order['status'] == 'open' or fully_cancelled) and (
                     fully_cancelled
@@ -1142,7 +1146,7 @@ class FreqtradeBot(LoggingMixin):
         except InsufficientFundsError as e:
             logger.warning(f"Unable to place order {e}.")
             # Try to figure out what went wrong
-            self.handle_insufficient_funds(trade)
+            await self.handle_insufficient_funds(trade)
             return False
 
         order_obj = Order.parse_from_ccxt_object(order, trade.pair, 'sell')
@@ -1154,7 +1158,7 @@ class FreqtradeBot(LoggingMixin):
         trade.sell_reason = sell_reason.sell_reason
         # In case of market sell orders the order can be closed immediately
         if order.get('status', 'unknown') in ('closed', 'expired'):
-            self.update_trade_state(trade, trade.open_order_id, order)
+            await self.update_trade_state(trade, trade.open_order_id, order)
         Trade.commit()
 
         # Lock pair for one candle to prevent immediate re-buys
@@ -1255,8 +1259,9 @@ class FreqtradeBot(LoggingMixin):
 # Common update trade state methods
 #
 
-    def update_trade_state(self, trade: Trade, order_id: str, action_order: Dict[str, Any] = None,
-                           stoploss_order: bool = False) -> bool:
+    async def update_trade_state(self, trade: Trade, order_id: str,
+                                 action_order: Dict[str, Any] = None,
+                                 stoploss_order: bool = False) -> bool:
         """
         Checks trades with open orders and updates the amount if necessary
         Handles closing both buy and sell orders.
