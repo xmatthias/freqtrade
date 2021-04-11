@@ -217,7 +217,7 @@ def test_telegram_status(default_conf, update, mocker) -> None:
     assert status_table.call_count == 1
 
 
-async def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
+def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
     default_conf['max_open_trades'] = 3
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -249,7 +249,7 @@ async def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
     msg_mock.reset_mock()
 
     # Create some test data
-    await freqtradebot.enter_positions()
+    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
     # Trigger status while we have a fulfilled order for the open trade
     telegram._status(update=update, context=MagicMock())
 
