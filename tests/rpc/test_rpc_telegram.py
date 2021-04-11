@@ -2,6 +2,7 @@
 # pragma pylint: disable=protected-access, unused-argument, invalid-name
 # pragma pylint: disable=too-many-lines, too-many-arguments
 
+import asyncio
 import logging
 import re
 from datetime import datetime
@@ -663,9 +664,8 @@ def test_reload_config_handle(default_conf, update, mocker) -> None:
     assert msg_mock.call_count == 1
     assert 'Reloading config' in msg_mock.call_args_list[0][0][0]
 
-
-async def test_telegram_forcesell_handle(default_conf, update, ticker, fee,
-                                         ticker_sell_up, mocker) -> None:
+def test_telegram_forcesell_handle(default_conf, update, ticker, fee,
+                                   ticker_sell_up, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
     msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
     mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
@@ -684,7 +684,7 @@ async def test_telegram_forcesell_handle(default_conf, update, ticker, fee,
     patch_get_signal(freqtradebot)
 
     # Create some test data
-    await freqtradebot.enter_positions()
+    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
 
     trade = Trade.query.first()
     assert trade
@@ -721,8 +721,8 @@ async def test_telegram_forcesell_handle(default_conf, update, ticker, fee,
     } == last_msg
 
 
-async def test_telegram_forcesell_down_handle(default_conf, update, ticker, fee,
-                                              ticker_sell_down, mocker) -> None:
+def test_telegram_forcesell_down_handle(default_conf, update, ticker, fee,
+                                        ticker_sell_down, mocker) -> None:
     mocker.patch('freqtrade.rpc.fiat_convert.CryptoToFiatConverter._find_price',
                  return_value=15000.0)
     msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
@@ -743,7 +743,7 @@ async def test_telegram_forcesell_down_handle(default_conf, update, ticker, fee,
     patch_get_signal(freqtradebot)
 
     # Create some test data
-    await freqtradebot.enter_positions()
+    asyncio.get_event_loop().run_until_complete(freqtradebot.enter_positions())
 
     # Decrease the price and sell it
     mocker.patch.multiple(
@@ -784,7 +784,7 @@ async def test_telegram_forcesell_down_handle(default_conf, update, ticker, fee,
     } == last_msg
 
 
-async def test_forcesell_all_handle(default_conf, update, ticker, fee, mocker) -> None:
+def test_forcesell_all_handle(default_conf, update, ticker, fee, mocker) -> None:
     patch_exchange(mocker)
     mocker.patch('freqtrade.rpc.fiat_convert.CryptoToFiatConverter._find_price',
                  return_value=15000.0)
@@ -804,7 +804,7 @@ async def test_forcesell_all_handle(default_conf, update, ticker, fee, mocker) -
     patch_get_signal(freqtradebot)
 
     # Create some test data
-    await freqtradebot.enter_positions()
+    asyncio.get_event_loop().run_until_complete(freqtradebot.enter_positions())
     msg_mock.reset_mock()
 
     # /forcesell all
