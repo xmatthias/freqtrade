@@ -1052,7 +1052,7 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf, fee, caplog,
     trade.open_order_id = None
     trade.stoploss_order_id = 100
 
-    hanging_stoploss_order = MagicMock(return_value={'status': 'open'})
+    hanging_stoploss_order = get_mock_coro(return_value={'status': 'open'})
     mocker.patch('freqtrade.exchange.Binance.fetch_stoploss_order', hanging_stoploss_order)
 
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
@@ -1065,7 +1065,7 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf, fee, caplog,
     trade.open_order_id = None
     trade.stoploss_order_id = 100
 
-    canceled_stoploss_order = MagicMock(return_value={'status': 'canceled'})
+    canceled_stoploss_order = get_mock_coro(return_value={'status': 'canceled'})
     mocker.patch('freqtrade.exchange.Binance.fetch_stoploss_order', canceled_stoploss_order)
     stoploss.reset_mock()
 
@@ -1084,7 +1084,7 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf, fee, caplog,
     trade.stoploss_order_id = 100
     assert trade
 
-    stoploss_order_hit = MagicMock(return_value={
+    stoploss_order_hit = get_mock_coro(return_value={
         'id': 100,
         'status': 'closed',
         'type': 'stop_loss_limit',
@@ -1149,7 +1149,7 @@ async def test_handle_sle_cancel_cant_recreate(mocker, default_conf, fee, caplog
     )
     mocker.patch.multiple(
         'freqtrade.exchange.Binance',
-        fetch_stoploss_order=MagicMock(return_value={'status': 'canceled', 'id': 100}),
+        fetch_stoploss_order=get_mock_coro(return_value={'status': 'canceled', 'id': 100}),
         stoploss=MagicMock(side_effect=ExchangeError()),
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -3020,7 +3020,7 @@ async def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_con
     # Assuming stoploss on exchnage is hit
     # stoploss_order_id should become None
     # and trade should be sold at the price of stoploss
-    stoploss_executed = MagicMock(return_value={
+    stoploss_executed = get_mock_coro(return_value={
         "id": "123",
         "timestamp": 1542707426845,
         "datetime": "2018-11-20T09:50:26.845Z",

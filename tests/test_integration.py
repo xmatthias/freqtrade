@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -49,14 +49,14 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     stoploss_order_closed['filled'] = stoploss_order_closed['amount']
 
     # Sell first trade based on stoploss, keep 2nd and 3rd trade open
-    stoploss_order_mock = MagicMock(
+    stoploss_order_mock = AsyncMock(
         side_effect=[stoploss_order_closed, stoploss_order_open, stoploss_order_open])
     # Sell 3rd trade (not called for the first trade)
     should_sell_mock = MagicMock(side_effect=[
         SellCheckTuple(sell_type=SellType.NONE),
         SellCheckTuple(sell_type=SellType.SELL_SIGNAL)]
     )
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = AsyncMock()
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -70,7 +70,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
 
     mocker.patch.multiple(
         'freqtrade.freqtradebot.FreqtradeBot',
-        create_stoploss_order=MagicMock(return_value=True),
+        create_stoploss_order=AsyncMock(return_value=True),
         _notify_exit=MagicMock(),
     )
     mocker.patch("freqtrade.strategy.interface.IStrategy.should_sell", should_sell_mock)

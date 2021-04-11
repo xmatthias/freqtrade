@@ -132,7 +132,7 @@ class RPC:
         }
         return val
 
-    def _rpc_trade_status(self, trade_ids: List[int] = []) -> List[Dict[str, Any]]:
+    async def _rpc_trade_status(self, trade_ids: List[int] = []) -> List[Dict[str, Any]]:
         """
         Below follows the RPC backend it is prefixed with rpc_ to raise awareness that it is
         a remotely exposed function
@@ -150,7 +150,7 @@ class RPC:
             for trade in trades:
                 order = None
                 if trade.open_order_id:
-                    order = self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
+                    order = await self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
                 # calculate profit and send message to user
                 if trade.is_open:
                     try:
@@ -546,7 +546,8 @@ class RPC:
             fully_canceled = False
             if trade.open_order_id:
                 try:
-                    order = self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
+                    order = await self._freqtrade.exchange.fetch_order(trade.open_order_id,
+                                                                       trade.pair)
                 except InvalidOrderException:
                     logger.warning(f"Order {trade.open_order_id} not found.")
                     order = None
@@ -628,7 +629,7 @@ class RPC:
         else:
             return None
 
-    def _rpc_delete(self, trade_id: int) -> Dict[str, Union[str, int]]:
+    async def _rpc_delete(self, trade_id: int) -> Dict[str, Union[str, int]]:
         """
         Handler for delete <id>.
         Delete the given trade and close eventually existing open orders.
@@ -643,7 +644,7 @@ class RPC:
             # Try cancelling regular order if that exists
             if trade.open_order_id:
                 try:
-                    self._freqtrade.exchange.cancel_order(trade.open_order_id, trade.pair)
+                    await self._freqtrade.exchange.cancel_order(trade.open_order_id, trade.pair)
                     c_count += 1
                 except (ExchangeError):
                     pass
@@ -652,8 +653,8 @@ class RPC:
             if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
                     and trade.stoploss_order_id):
                 try:
-                    self._freqtrade.exchange.cancel_stoploss_order(trade.stoploss_order_id,
-                                                                   trade.pair)
+                    await self._freqtrade.exchange.cancel_stoploss_order(trade.stoploss_order_id,
+                                                                         trade.pair)
                     c_count += 1
                 except (ExchangeError):
                     pass

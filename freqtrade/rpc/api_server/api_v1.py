@@ -78,9 +78,9 @@ def daily(timescale: int = 7, rpc: RPC = Depends(get_rpc), config=Depends(get_co
 
 
 @router.get('/status', response_model=List[OpenTradeSchema], tags=['info'])
-def status(rpc: RPC = Depends(get_rpc)):
+async def status(rpc: RPC = Depends(get_rpc)):
     try:
-        return rpc._rpc_trade_status()
+        return await rpc._rpc_trade_status()
     except RPCException:
         return []
 
@@ -101,8 +101,8 @@ def trade(tradeid: int = 0, rpc: RPC = Depends(get_rpc)):
 
 
 @router.delete('/trades/{tradeid}', response_model=DeleteTrade, tags=['info', 'trading'])
-def trades_delete(tradeid: int, rpc: RPC = Depends(get_rpc)):
-    return rpc._rpc_delete(tradeid)
+async def trades_delete(tradeid: int, rpc: RPC = Depends(get_rpc)):
+    return await rpc._rpc_delete(tradeid)
 
 
 # TODO: Missing response model

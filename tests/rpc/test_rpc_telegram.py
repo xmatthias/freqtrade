@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import reduce
 from random import choice, randint
 from string import ascii_uppercase
-from unittest.mock import ANY, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 import arrow
 import pytest
@@ -173,12 +173,12 @@ def test_telegram_status(default_conf, update, mocker) -> None:
     default_conf['telegram']['enabled'] = False
     default_conf['telegram']['chat_id'] = "123"
 
-    status_table = MagicMock()
+    status_table = AsyncMock()
     mocker.patch('freqtrade.rpc.telegram.Telegram._status_table', status_table)
 
     mocker.patch.multiple(
         'freqtrade.rpc.rpc.RPC',
-        _rpc_trade_status=MagicMock(return_value=[{
+        _rpc_trade_status=AsyncMock(return_value=[{
             'trade_id': 1,
             'pair': 'ETH/BTC',
             'base_currency': 'BTC',
@@ -225,7 +225,7 @@ async def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
         get_fee=fee,
         _is_dry_limit_order_filled=MagicMock(return_value=True),
     )
-    status_table = MagicMock()
+    status_table = AsyncMock()
     mocker.patch.multiple(
         'freqtrade.rpc.telegram.Telegram',
         _status_table=status_table,

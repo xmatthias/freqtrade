@@ -351,7 +351,9 @@ class Telegram(RPCHandler):
             if context.args and len(context.args) > 0:
                 trade_ids = [int(i) for i in context.args if i.isnumeric()]
 
-            results = self._rpc._rpc_trade_status(trade_ids=trade_ids)
+            results = asyncio.new_event_loop().run_until_complete(
+                self._rpc._rpc_trade_status(trade_ids=trade_ids)
+            )
 
             messages = []
             for r in results:
@@ -801,7 +803,7 @@ class Telegram(RPCHandler):
             if not context.args or len(context.args) == 0:
                 raise RPCException("Trade-id not set.")
             trade_id = int(context.args[0])
-            msg = self._rpc._rpc_delete(trade_id)
+            msg = asyncio.new_event_loop().run_until_complete(self._rpc._rpc_delete(trade_id))
             self._send_msg((
                 '`{result_msg}`\n'
                 'Please make sure to take care of this asset on the exchange manually.'

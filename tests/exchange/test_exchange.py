@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from math import isclose
 from random import randint
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
 import arrow
 import ccxt
@@ -2278,12 +2278,12 @@ async def test_cancel_order_dry_run(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = True
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
     mocker.patch('freqtrade.exchange.Exchange._is_dry_limit_order_filled', return_value=True)
-    assert exchange.cancel_order(order_id='123', pair='TKN/BTC') == {}
-    assert exchange.cancel_stoploss_order(order_id='123', pair='TKN/BTC') == {}
+    assert await exchange.cancel_order(order_id='123', pair='TKN/BTC') == {}
+    assert await exchange.cancel_stoploss_order(order_id='123', pair='TKN/BTC') == {}
 
     order = await exchange.create_order('ETH/BTC', 'limit', "buy", 5, 0.55, 'gtc')
 
-    cancel_order = exchange.cancel_order(order_id=order['id'], pair='ETH/BTC')
+    cancel_order = await exchange.cancel_order(order_id=order['id'], pair='ETH/BTC')
     assert order['id'] == cancel_order['id']
     assert order['amount'] == cancel_order['amount']
     assert order['symbol'] == cancel_order['symbol']
@@ -2355,42 +2355,44 @@ async def test_cancel_order_with_result_error(default_conf, mocker, exchange_nam
 
 
 # Ensure that if not dry_run, we should call API
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_cancel_order(default_conf, mocker, exchange_name):
+async def test_cancel_order(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.cancel_order = MagicMock(return_value={'id': '123'})
+    api_mock.cancel_order = AsyncMock(return_value={'id': '123'})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.cancel_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
+    assert await exchange.cancel_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
 
     with pytest.raises(InvalidOrderException):
-        api_mock.cancel_order = MagicMock(side_effect=ccxt.InvalidOrder("Did not find order"))
+        api_mock.cancel_order = AsyncMock(side_effect=ccxt.InvalidOrder("Did not find order"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.cancel_order(order_id='_', pair='TKN/BTC')
+        await exchange.cancel_order(order_id='_', pair='TKN/BTC')
     assert api_mock.cancel_order.call_count == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "cancel_order", "cancel_order",
-                           order_id='_', pair='TKN/BTC')
+    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                         "cancel_order", "cancel_order",
+                         order_id='_', pair='TKN/BTC')
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
+async def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.cancel_order = MagicMock(return_value={'id': '123'})
+    api_mock.cancel_order = AsyncMock(return_value={'id': '123'})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
+    assert await exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
 
     with pytest.raises(InvalidOrderException):
-        api_mock.cancel_order = MagicMock(side_effect=ccxt.InvalidOrder("Did not find order"))
+        api_mock.cancel_order = AsyncMock(side_effect=ccxt.InvalidOrder("Did not find order"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC')
+        await exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC')
     assert api_mock.cancel_order.call_count == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "cancel_stoploss_order", "cancel_order",
-                           order_id='_', pair='TKN/BTC')
+    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                         "cancel_stoploss_order", "cancel_order",
+                         order_id='_', pair='TKN/BTC')
 
 
 @pytest.mark.asyncio

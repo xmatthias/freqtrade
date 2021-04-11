@@ -5,7 +5,7 @@ Unit test file for rpc/api_server.py
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, PropertyMock
+from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock
 
 import pytest
 import uvicorn
@@ -594,8 +594,8 @@ def test_api_trade_single(botclient, mocker, fee, ticker, markets):
 def test_api_delete_trade(botclient, mocker, fee, markets):
     ftbot, client = botclient
     patch_get_signal(ftbot)
-    stoploss_mock = MagicMock()
-    cancel_mock = MagicMock()
+    stoploss_mock = AsyncMock()
+    cancel_mock = AsyncMock()
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         markets=PropertyMock(return_value=markets),
@@ -815,7 +815,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets):
         fetch_ticker=ticker,
         get_fee=fee,
         markets=PropertyMock(return_value=markets),
-        fetch_order=MagicMock(return_value={}),
+        fetch_order=AsyncMock(return_value={}),
     )
 
     rc = client_get(client, f"{BASE_URI}/status")
