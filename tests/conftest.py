@@ -66,7 +66,7 @@ def get_args(args):
 
 
 # Source: https://stackoverflow.com/questions/29881236/how-to-mock-asyncio-coroutines
-def get_mock_coro(return_value):
+def get_mock_coro(return_value=None):
     async def mock_coro(*args, **kwargs):
         return return_value
 

@@ -6,7 +6,7 @@ import pytest
 
 from freqtrade.constants import UNLIMITED_STAKE_AMOUNT
 from freqtrade.exceptions import DependencyException
-from tests.conftest import get_patched_freqtradebot, patch_wallet
+from tests.conftest import get_mock_coro, get_patched_freqtradebot, patch_wallet
 
 
 def test_sync_wallet_at_boot(mocker, default_conf):
@@ -139,7 +139,7 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        create_order=MagicMock(return_value=limit_buy_order_open),
+        create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee
     )
 

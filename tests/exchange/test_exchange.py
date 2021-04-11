@@ -2319,33 +2319,35 @@ def test_is_cancel_order_result_suitable(mocker, default_conf, exchange_name, or
     assert exchange.is_cancel_order_result_suitable(order) == result
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 @pytest.mark.parametrize("corder,call_corder,call_forder", [
     ({'status': 'closed', 'amount': 10, 'fee': {}}, 1, 0),
     ({'amount': 10, 'fee': {}}, 1, 1),
 ])
-def test_cancel_order_with_result(default_conf, mocker, exchange_name, corder,
-                                  call_corder, call_forder):
+async def test_cancel_order_with_result(default_conf, mocker, exchange_name, corder,
+                                        call_corder, call_forder):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.cancel_order = MagicMock(return_value=corder)
-    api_mock.fetch_order = MagicMock(return_value={})
+    api_mock.cancel_order = get_mock_coro(return_value=corder)
+    api_mock.fetch_order = get_mock_coro(return_value={})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    res = exchange.cancel_order_with_result('1234', 'ETH/BTC', 1234)
+    res = await exchange.cancel_order_with_result('1234', 'ETH/BTC', 1234)
     assert isinstance(res, dict)
     assert api_mock.cancel_order.call_count == call_corder
     assert api_mock.fetch_order.call_count == call_forder
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_cancel_order_with_result_error(default_conf, mocker, exchange_name, caplog):
+@pytest.mark.asyncio
+async def test_cancel_order_with_result_error(default_conf, mocker, exchange_name, caplog):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
     api_mock.cancel_order = MagicMock(side_effect=ccxt.InvalidOrder("Did not find order"))
     api_mock.fetch_order = MagicMock(side_effect=ccxt.InvalidOrder("Did not find order"))
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
-    res = exchange.cancel_order_with_result('1234', 'ETH/BTC', 1541)
+    res = await exchange.cancel_order_with_result('1234', 'ETH/BTC', 1541)
     assert isinstance(res, dict)
     assert log_has("Could not cancel order 1234 for ETH/BTC.", caplog)
     assert log_has("Could not fetch cancelled order 1234.", caplog)
@@ -2391,26 +2393,27 @@ def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
                            order_id='_', pair='TKN/BTC')
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_name):
+async def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = False
-    mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order', return_value={'for': 123})
-    mocker.patch('freqtrade.exchange.Ftx.fetch_stoploss_order', return_value={'for': 123})
+    mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order', get_mock_coro({'for': 123}))
+    mocker.patch('freqtrade.exchange.Ftx.fetch_stoploss_order', get_mock_coro({'for': 123}))
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
 
     mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order',
-                 return_value={'fee': {}, 'status': 'canceled', 'amount': 1234})
+                 get_mock_coro({'fee': {}, 'status': 'canceled', 'amount': 1234}))
     mocker.patch('freqtrade.exchange.Ftx.cancel_stoploss_order',
-                 return_value={'fee': {}, 'status': 'canceled', 'amount': 1234})
-    co = exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
+                 get_mock_coro({'fee': {}, 'status': 'canceled', 'amount': 1234}))
+    co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
     assert co == {'fee': {}, 'status': 'canceled', 'amount': 1234}
 
     mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order',
-                 return_value='canceled')
+                 get_mock_coro('canceled'))
     mocker.patch('freqtrade.exchange.Ftx.cancel_stoploss_order',
-                 return_value='canceled')
+                 get_mock_coro('canceled'))
     # Fall back to fetch_stoploss_order
-    co = exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
+    co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
     assert co == {'for': 123}
 
     mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order',
@@ -2418,7 +2421,7 @@ def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_name):
     mocker.patch('freqtrade.exchange.Ftx.fetch_stoploss_order',
                  side_effect=InvalidOrderException(""))
 
-    co = exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
+    co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
     assert co['amount'] == 555
     assert co == {'fee': {}, 'status': 'canceled', 'amount': 555, 'info': {}}
 
@@ -2428,40 +2431,41 @@ def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_name):
         mocker.patch('freqtrade.exchange.Ftx.cancel_stoploss_order',
                      side_effect=InvalidOrderException("Did not find order"))
         exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
-        exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=123)
+        await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=123)
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_fetch_order(default_conf, mocker, exchange_name, caplog):
+async def test_fetch_order(default_conf, mocker, exchange_name, caplog):
     default_conf['dry_run'] = True
     default_conf['exchange']['log_responses'] = True
     order = MagicMock()
     order.myid = 123
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
     exchange._dry_run_open_orders['X'] = order
-    assert exchange.fetch_order('X', 'TKN/BTC').myid == 123
+    assert (await exchange.fetch_order('X', 'TKN/BTC')).myid == 123
 
     with pytest.raises(InvalidOrderException, match=r'Tried to get an invalid dry-run-order.*'):
-        exchange.fetch_order('Y', 'TKN/BTC')
+        await exchange.fetch_order('Y', 'TKN/BTC')
 
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.fetch_order = MagicMock(return_value=456)
+    api_mock.fetch_order = get_mock_coro(return_value=456)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.fetch_order('X', 'TKN/BTC') == 456
+    assert await exchange.fetch_order('X', 'TKN/BTC') == 456
     assert log_has("API fetch_order: 456", caplog)
 
     with pytest.raises(InvalidOrderException):
         api_mock.fetch_order = MagicMock(side_effect=ccxt.InvalidOrder("Order not found"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.fetch_order(order_id='_', pair='TKN/BTC')
+        await exchange.fetch_order(order_id='_', pair='TKN/BTC')
     assert api_mock.fetch_order.call_count == 1
 
     api_mock.fetch_order = MagicMock(side_effect=ccxt.OrderNotFound("Order not found"))
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    with patch('freqtrade.exchange.common.time.sleep') as tm:
+    with patch('freqtrade.exchange.common.asyncio.sleep') as tm:
         with pytest.raises(InvalidOrderException):
-            exchange.fetch_order(order_id='_', pair='TKN/BTC')
+            await exchange.fetch_order(order_id='_', pair='TKN/BTC')
         # Ensure backoff is called
         assert tm.call_args_list[0][0][0] == 1
         assert tm.call_args_list[1][0][0] == 2
@@ -2471,13 +2475,14 @@ def test_fetch_order(default_conf, mocker, exchange_name, caplog):
             assert tm.call_args_list[3][0][0] == 10
     assert api_mock.fetch_order.call_count == API_FETCH_ORDER_RETRY_COUNT + 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           'fetch_order', 'fetch_order', retries=API_FETCH_ORDER_RETRY_COUNT + 1,
-                           order_id='_', pair='TKN/BTC')
+    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                         'fetch_order', 'fetch_order', retries=API_FETCH_ORDER_RETRY_COUNT + 1,
+                         order_id='_', pair='TKN/BTC')
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_fetch_stoploss_order(default_conf, mocker, exchange_name):
+async def test_fetch_stoploss_order(default_conf, mocker, exchange_name):
     # Don't test FTX here - that needs a seperate test
     if exchange_name == 'ftx':
         return
@@ -2486,39 +2491,40 @@ def test_fetch_stoploss_order(default_conf, mocker, exchange_name):
     order.myid = 123
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
     exchange._dry_run_open_orders['X'] = order
-    assert exchange.fetch_stoploss_order('X', 'TKN/BTC').myid == 123
+    assert (await exchange.fetch_stoploss_order('X', 'TKN/BTC')).myid == 123
 
     with pytest.raises(InvalidOrderException, match=r'Tried to get an invalid dry-run-order.*'):
-        exchange.fetch_stoploss_order('Y', 'TKN/BTC')
+        await exchange.fetch_stoploss_order('Y', 'TKN/BTC')
 
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.fetch_order = MagicMock(return_value=456)
+    api_mock.fetch_order = get_mock_coro(return_value=456)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.fetch_stoploss_order('X', 'TKN/BTC') == 456
+    assert await exchange.fetch_stoploss_order('X', 'TKN/BTC') == 456
 
     with pytest.raises(InvalidOrderException):
         api_mock.fetch_order = MagicMock(side_effect=ccxt.InvalidOrder("Order not found"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.fetch_stoploss_order(order_id='_', pair='TKN/BTC')
+        await exchange.fetch_stoploss_order(order_id='_', pair='TKN/BTC')
     assert api_mock.fetch_order.call_count == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           'fetch_stoploss_order', 'fetch_order',
-                           retries=API_FETCH_ORDER_RETRY_COUNT + 1,
-                           order_id='_', pair='TKN/BTC')
+    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                         'fetch_stoploss_order', 'fetch_order',
+                         retries=API_FETCH_ORDER_RETRY_COUNT + 1,
+                         order_id='_', pair='TKN/BTC')
 
 
-def test_fetch_order_or_stoploss_order(default_conf, mocker):
+@pytest.mark.asyncio
+async def test_fetch_order_or_stoploss_order(default_conf, mocker):
     exchange = get_patched_exchange(mocker, default_conf, id='binance')
-    fetch_order_mock = MagicMock()
-    fetch_stoploss_order_mock = MagicMock()
+    fetch_order_mock = get_mock_coro(None)
+    fetch_stoploss_order_mock = get_mock_coro(None)
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           fetch_order=fetch_order_mock,
                           fetch_stoploss_order=fetch_stoploss_order_mock,
                           )
 
-    exchange.fetch_order_or_stoploss_order('1234', 'ETH/BTC', False)
+    await exchange.fetch_order_or_stoploss_order('1234', 'ETH/BTC', False)
     assert fetch_order_mock.call_count == 1
     assert fetch_order_mock.call_args_list[0][0][0] == '1234'
     assert fetch_order_mock.call_args_list[0][0][1] == 'ETH/BTC'
@@ -2527,7 +2533,7 @@ def test_fetch_order_or_stoploss_order(default_conf, mocker):
     fetch_order_mock.reset_mock()
     fetch_stoploss_order_mock.reset_mock()
 
-    exchange.fetch_order_or_stoploss_order('1234', 'ETH/BTC', True)
+    await exchange.fetch_order_or_stoploss_order('1234', 'ETH/BTC', True)
     assert fetch_order_mock.call_count == 0
     assert fetch_stoploss_order_mock.call_count == 1
     assert fetch_stoploss_order_mock.call_args_list[0][0][0] == '1234'

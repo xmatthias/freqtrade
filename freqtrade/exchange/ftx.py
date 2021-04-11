@@ -135,7 +135,7 @@ class Ftx(Exchange):
         if self._config['dry_run']:
             return {}
         try:
-            order = await self._api_api.cancel_order(order_id, pair, params={'type': 'stop'})
+            order = await self._api_async.cancel_order(order_id, pair, params={'type': 'stop'})
             self._log_exchange_response('cancel_stoploss_order', order)
             return order
         except ccxt.InvalidOrder as e:

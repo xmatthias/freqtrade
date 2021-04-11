@@ -5,7 +5,7 @@ import logging
 import time
 from copy import deepcopy
 from math import isclose
-from unittest.mock import ANY, MagicMock, PropertyMock
+from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock
 
 import arrow
 import pytest
@@ -684,7 +684,7 @@ def test_process_trade_handling(default_conf, ticker, limit_buy_order_open, fee,
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         create_order=get_mock_coro(return_value=limit_buy_order_open),
-        fetch_order=MagicMock(return_value=limit_buy_order_open),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee,
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -1310,7 +1310,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
     trade.open_order_id = None
     trade.stoploss_order_id = 100
 
-    stoploss_order_hanging = MagicMock(return_value={
+    stoploss_order_hanging = get_mock_coro(return_value={
         'id': 100,
         'status': 'open',
         'type': 'stop_loss_limit',
@@ -1334,7 +1334,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
         'last': 0.00002344
     }))
 
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     stoploss_order_mock = get_mock_coro(return_value={'id': 13434334})
     mocker.patch('freqtrade.exchange.Binance.cancel_stoploss_order', cancel_order_mock)
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss_order_mock)
@@ -1437,8 +1437,8 @@ async def test_handle_stoploss_on_exchange_trailing_error(
 
     # Fail creating stoploss order
     caplog.clear()
-    cancel_mock = mocker.patch("freqtrade.exchange.Binance.cancel_stoploss_order", MagicMock())
-    mocker.patch("freqtrade.exchange.Binance.stoploss", side_effect=ExchangeError())
+    cancel_mock = mocker.patch("freqtrade.exchange.Binance.cancel_stoploss_order", get_mock_coro())
+    mocker.patch("freqtrade.exchange.Exchange.stoploss", side_effect=ExchangeError())
     await freqtrade.handle_trailing_stoploss_on_exchange(trade, stoploss_order_hanging)
     assert cancel_mock.call_count == 1
     assert log_has_re(r"Could not create trailing stoploss order for pair ETH/BTC\..*", caplog)
@@ -1494,7 +1494,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
     trade.open_order_id = None
     trade.stoploss_order_id = 100
 
-    stoploss_order_hanging = MagicMock(return_value={
+    stoploss_order_hanging = get_mock_coro(return_value={
         'id': 100,
         'status': 'open',
         'type': 'stop_loss_limit',
@@ -1517,7 +1517,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
         'last': 0.00002344
     }))
 
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     stoploss_order_mock = get_mock_coro(return_value={'id': 13434334})
     mocker.patch('freqtrade.exchange.Binance.cancel_stoploss_order', cancel_order_mock)
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss_order_mock)
@@ -1607,7 +1607,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
     trade.open_order_id = None
     trade.stoploss_order_id = 100
 
-    stoploss_order_hanging = MagicMock(return_value={
+    stoploss_order_hanging = get_mock_coro(return_value={
         'id': 100,
         'status': 'open',
         'type': 'stop_loss_limit',
@@ -1625,7 +1625,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
     assert trade.stop_loss == 0.000009384
 
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     stoploss_order_mock = get_mock_coro(return_value={'id': 22222})
     mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order', cancel_order_mock)
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss_order_mock)
@@ -2110,16 +2110,16 @@ async def test_check_handle_timedout_buy_usercustom(default_conf, ticker, limit_
     default_conf["unfilledtimeout"] = {"buy": 1400, "sell": 30}
 
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock(return_value=limit_buy_order_old)
+    cancel_order_mock = get_mock_coro(return_value=limit_buy_order_old)
     cancel_buy_order = deepcopy(limit_buy_order_old)
     cancel_buy_order['status'] = 'canceled'
-    cancel_order_wr_mock = MagicMock(return_value=cancel_buy_order)
+    cancel_order_wr_mock = get_mock_coro(return_value=cancel_buy_order)
 
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_buy_order_old),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_old),
         cancel_order_with_result=cancel_order_wr_mock,
         cancel_order=cancel_order_mock,
         get_fee=fee
@@ -2166,12 +2166,12 @@ async def test_check_handle_timedout_buy(default_conf, ticker, limit_buy_order_o
     rpc_mock = patch_RPCManager(mocker)
     limit_buy_cancel = deepcopy(limit_buy_order_old)
     limit_buy_cancel['status'] = 'canceled'
-    cancel_order_mock = MagicMock(return_value=limit_buy_cancel)
+    cancel_order_mock = get_mock_coro(return_value=limit_buy_cancel)
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_buy_order_old),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_old),
         cancel_order_with_result=cancel_order_mock,
         get_fee=fee
     )
@@ -2195,13 +2195,13 @@ async def test_check_handle_cancelled_buy(default_conf, ticker, limit_buy_order_
                                           fee, mocker, caplog) -> None:
     """ Handle Buy order cancelled on exchange"""
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     patch_exchange(mocker)
     limit_buy_order_old.update({"status": "canceled", 'filled': 0.0})
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_buy_order_old),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_old),
         cancel_order=cancel_order_mock,
         get_fee=fee
     )
@@ -2249,12 +2249,12 @@ async def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit
                                                      mocker, open_trade) -> None:
     default_conf["unfilledtimeout"] = {"buy": 1440, "sell": 1440}
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_sell_order_old),
+        fetch_order=get_mock_coro(return_value=limit_sell_order_old),
         cancel_order=cancel_order_mock
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -2297,12 +2297,12 @@ async def test_check_handle_timedout_sell_usercustom(default_conf, ticker, limit
 async def test_check_handle_timedout_sell(default_conf, ticker, limit_sell_order_old, mocker,
                                           open_trade) -> None:
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_sell_order_old),
+        fetch_order=get_mock_coro(return_value=limit_sell_order_old),
         cancel_order=cancel_order_mock
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -2328,13 +2328,13 @@ async def test_check_handle_cancelled_sell(default_conf, ticker, limit_sell_orde
                                            mocker, caplog) -> None:
     """ Handle sell order cancelled on exchange"""
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     limit_sell_order_old.update({"status": "canceled", 'filled': 0.0})
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_sell_order_old),
+        fetch_order=get_mock_coro(return_value=limit_sell_order_old),
         cancel_order_with_result=cancel_order_mock
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -2359,12 +2359,12 @@ async def test_check_handle_timedout_partial(default_conf, ticker, limit_buy_ord
     limit_buy_canceled = deepcopy(limit_buy_order_old_partial)
     limit_buy_canceled['status'] = 'canceled'
 
-    cancel_order_mock = MagicMock(return_value=limit_buy_canceled)
+    cancel_order_mock = get_mock_coro(return_value=limit_buy_canceled)
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_buy_order_old_partial),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_old_partial),
         cancel_order_with_result=cancel_order_mock
     )
     freqtrade = FreqtradeBot(default_conf)
@@ -2387,13 +2387,13 @@ async def test_check_handle_timedout_partial_fee(default_conf, ticker, open_trad
                                                  limit_buy_order_old_partial_canceled,
                                                  mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock(return_value=limit_buy_order_old_partial_canceled)
+    cancel_order_mock = get_mock_coro(return_value=limit_buy_order_old_partial_canceled)
     mocker.patch('freqtrade.wallets.Wallets.get_free', MagicMock(return_value=0))
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_buy_order_old_partial),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_old_partial),
         cancel_order_with_result=cancel_order_mock,
         get_trades_for_order=MagicMock(return_value=trades_for_order),
     )
@@ -2427,12 +2427,12 @@ async def test_check_handle_timedout_partial_except(default_conf, ticker, open_t
                                                     limit_buy_order_old_partial_canceled,
                                                     mocker) -> None:
     rpc_mock = patch_RPCManager(mocker)
-    cancel_order_mock = MagicMock(return_value=limit_buy_order_old_partial_canceled)
+    cancel_order_mock = get_mock_coro(return_value=limit_buy_order_old_partial_canceled)
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        fetch_order=MagicMock(return_value=limit_buy_order_old_partial),
+        fetch_order=get_mock_coro(return_value=limit_buy_order_old_partial),
         cancel_order_with_result=cancel_order_mock,
         get_trades_for_order=MagicMock(return_value=trades_for_order),
     )
@@ -2499,7 +2499,7 @@ async def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order
     cancel_buy_order['status'] = 'canceled'
     del cancel_buy_order['filled']
 
-    cancel_order_mock = MagicMock(return_value=cancel_buy_order)
+    cancel_order_mock = get_mock_coro(return_value=cancel_buy_order)
     mocker.patch('freqtrade.exchange.Exchange.cancel_order_with_result', cancel_order_mock)
 
     freqtrade = FreqtradeBot(default_conf)
@@ -2529,7 +2529,7 @@ async def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order
 
     # Order remained open for some reason (cancel failed)
     cancel_buy_order['status'] = 'open'
-    cancel_order_mock = MagicMock(return_value=cancel_buy_order)
+    cancel_order_mock = get_mock_coro(return_value=cancel_buy_order)
     mocker.patch('freqtrade.exchange.Exchange.cancel_order_with_result', cancel_order_mock)
     assert not await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert log_has_re(r"Order .* for .* not cancelled.", caplog)
@@ -2566,7 +2566,7 @@ async def test_handle_cancel_enter_corder_empty(mocker, default_conf, limit_buy_
                                                 cancelorder) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
-    cancel_order_mock = MagicMock(return_value=cancelorder)
+    cancel_order_mock = get_mock_coro(return_value=cancelorder)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         cancel_order=cancel_order_mock
@@ -2593,7 +2593,7 @@ async def test_handle_cancel_enter_corder_empty(mocker, default_conf, limit_buy_
 async def test_handle_cancel_exit_limit(mocker, default_conf, fee) -> None:
     send_msg_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro()
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         cancel_order=cancel_order_mock,
@@ -2931,14 +2931,14 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
     default_conf['exchange']['name'] = 'binance'
     rpc_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
-    stoploss = MagicMock(return_value={
+    stoploss = get_mock_coro(return_value={
         'id': 123,
         'info': {
             'foo': 'bar'
         }
     })
 
-    cancel_order = MagicMock(return_value=True)
+    cancel_order = get_mock_coro(return_value=True)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
@@ -4525,7 +4525,7 @@ async def test_refind_lost_order(mocker, default_conf, fee, caplog):
     mock_uts = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.update_trade_state')
 
     mock_fo = mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order',
-                           return_value={'status': 'open'})
+                           get_mock_coro(return_value={'status': 'open'}))
 
     def reset_open_orders(trade):
         trade.open_order_id = None

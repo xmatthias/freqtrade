@@ -2,7 +2,7 @@
 # pragma pylint: disable=invalid-sequence-index, invalid-name, too-many-arguments
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import ANY, MagicMock, PropertyMock
+from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock
 
 import pytest
 from numpy import isnan
@@ -678,7 +678,7 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         cancel_order=cancel_order_mock,
-        fetch_order=MagicMock(
+        fetch_order=get_mock_coro(
             return_value={
                 'status': 'closed',
                 'type': 'limit',
@@ -732,7 +732,7 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     # Fetch order - it's open first, and closed after cancel_order is called.
     mocker.patch(
         'freqtrade.exchange.Exchange.fetch_order',
-        side_effect=[{
+        AsyncMock(side_effect=[{
             'id': '1234',
             'status': 'open',
             'type': 'limit',
@@ -744,7 +744,7 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
             'type': 'limit',
             'side': 'buy',
             'filled': filled_amount
-        }]
+        }])
     )
     # check that the trade is called, which is done by ensuring exchange.cancel_order is called
     # and trade amount is updated
