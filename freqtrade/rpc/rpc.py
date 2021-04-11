@@ -551,12 +551,13 @@ class RPC:
                     logger.warning(f"Order {trade.open_order_id} not found.")
                     order = None
                 if order and order['side'] == 'buy':
-                    fully_canceled = self._freqtrade.handle_cancel_enter(
+                    fully_canceled = await self._freqtrade.handle_cancel_enter(
                         trade, order, CANCEL_REASON['FORCE_SELL'])
 
                 if order and order['side'] == 'sell':
                     # Cancel order - so it is placed anew with a fresh price.
-                    self._freqtrade.handle_cancel_exit(trade, order, CANCEL_REASON['FORCE_SELL'])
+                    await self._freqtrade.handle_cancel_exit(trade, order,
+                                                             CANCEL_REASON['FORCE_SELL'])
 
             if not fully_canceled:
                 # Get current rate and execute sell

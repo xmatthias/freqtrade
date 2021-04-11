@@ -673,7 +673,7 @@ def test_rpc_stopbuy(mocker, default_conf) -> None:
 async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
 
-    cancel_order_mock = MagicMock()
+    cancel_order_mock = get_mock_coro(None)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,

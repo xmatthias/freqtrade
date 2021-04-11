@@ -29,6 +29,9 @@ from tests.conftest import (create_mock_trades, get_patched_freqtradebot, log_ha
                             patch_exchange, patch_get_signal, patch_whitelist)
 
 
+pytestmark = pytest.mark.asyncio
+
+
 class DummyCls(Telegram):
     """
     Dummy class for testing the Telegram @authorized_only decorator

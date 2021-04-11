@@ -2472,7 +2472,7 @@ async def test_check_handle_timedout_exception(default_conf, ticker, open_trade,
     mocker.patch.multiple(
         'freqtrade.freqtradebot.FreqtradeBot',
         handle_cancel_enter=MagicMock(),
-        handle_cancel_exit=MagicMock(),
+        handle_cancel_exit=get_mock_coro(None),
     )
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -2492,7 +2492,7 @@ async def test_check_handle_timedout_exception(default_conf, ticker, open_trade,
                       caplog)
 
 
-def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order) -> None:
+async def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     cancel_buy_order = deepcopy(limit_buy_order)
@@ -2511,7 +2511,7 @@ def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order) -> N
     limit_buy_order['filled'] = 0.0
     limit_buy_order['status'] = 'open'
     reason = CANCEL_REASON['TIMEOUT']
-    assert freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
+    assert await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert cancel_order_mock.call_count == 1
 
     cancel_order_mock.reset_mock()
@@ -2524,21 +2524,21 @@ def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order) -> N
     caplog.clear()
     cancel_order_mock.reset_mock()
     limit_buy_order['filled'] = 2
-    assert not freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
+    assert not await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert cancel_order_mock.call_count == 1
 
     # Order remained open for some reason (cancel failed)
     cancel_buy_order['status'] = 'open'
     cancel_order_mock = MagicMock(return_value=cancel_buy_order)
     mocker.patch('freqtrade.exchange.Exchange.cancel_order_with_result', cancel_order_mock)
-    assert not freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
+    assert not await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert log_has_re(r"Order .* for .* not cancelled.", caplog)
 
 
 @pytest.mark.parametrize("limit_buy_order_canceled_empty", ['binance', 'ftx', 'kraken', 'bittrex'],
                          indirect=['limit_buy_order_canceled_empty'])
-def test_handle_cancel_enter_exchanges(mocker, caplog, default_conf,
-                                       limit_buy_order_canceled_empty) -> None:
+async def test_handle_cancel_enter_exchanges(mocker, caplog, default_conf,
+                                             limit_buy_order_canceled_empty) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     cancel_order_mock = mocker.patch(
@@ -2550,7 +2550,7 @@ def test_handle_cancel_enter_exchanges(mocker, caplog, default_conf,
     reason = CANCEL_REASON['TIMEOUT']
     trade = MagicMock()
     trade.pair = 'LTC/ETH'
-    assert freqtrade.handle_cancel_enter(trade, limit_buy_order_canceled_empty, reason)
+    assert await freqtrade.handle_cancel_enter(trade, limit_buy_order_canceled_empty, reason)
     assert cancel_order_mock.call_count == 0
     assert log_has_re(r'Buy order fully cancelled. Removing .* from database\.', caplog)
     assert nofiy_mock.call_count == 1
@@ -2562,8 +2562,8 @@ def test_handle_cancel_enter_exchanges(mocker, caplog, default_conf,
     'String Return value',
     123
 ])
-def test_handle_cancel_enter_corder_empty(mocker, default_conf, limit_buy_order,
-                                          cancelorder) -> None:
+async def test_handle_cancel_enter_corder_empty(mocker, default_conf, limit_buy_order,
+                                                cancelorder) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     cancel_order_mock = MagicMock(return_value=cancelorder)
@@ -2581,16 +2581,16 @@ def test_handle_cancel_enter_corder_empty(mocker, default_conf, limit_buy_order,
     limit_buy_order['filled'] = 0.0
     limit_buy_order['status'] = 'open'
     reason = CANCEL_REASON['TIMEOUT']
-    assert freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
+    assert await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert cancel_order_mock.call_count == 1
 
     cancel_order_mock.reset_mock()
     limit_buy_order['filled'] = 1.0
-    assert not freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
+    assert not await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert cancel_order_mock.call_count == 1
 
 
-def test_handle_cancel_exit_limit(mocker, default_conf, fee) -> None:
+async def test_handle_cancel_exit_limit(mocker, default_conf, fee) -> None:
     send_msg_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
     cancel_order_mock = MagicMock()
@@ -2616,26 +2616,26 @@ def test_handle_cancel_exit_limit(mocker, default_conf, fee) -> None:
              'amount': 1,
              'status': "open"}
     reason = CANCEL_REASON['TIMEOUT']
-    assert freqtrade.handle_cancel_exit(trade, order, reason)
+    assert await freqtrade.handle_cancel_exit(trade, order, reason)
     assert cancel_order_mock.call_count == 1
     assert send_msg_mock.call_count == 1
 
     send_msg_mock.reset_mock()
 
     order['amount'] = 2
-    assert freqtrade.handle_cancel_exit(trade, order, reason
+    assert await freqtrade.handle_cancel_exit(trade, order, reason
                                         ) == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
     # Assert cancel_order was not called (callcount remains unchanged)
     assert cancel_order_mock.call_count == 1
     assert send_msg_mock.call_count == 1
-    assert freqtrade.handle_cancel_exit(trade, order, reason
+    assert await freqtrade.handle_cancel_exit(trade, order, reason
                                         ) == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
     # Message should not be iterated again
     assert trade.sell_order_status == CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
     assert send_msg_mock.call_count == 1
 
 
-def test_handle_cancel_exit_cancel_exception(mocker, default_conf) -> None:
+async def test_handle_cancel_exit_cancel_exception(mocker, default_conf) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch(
@@ -2648,7 +2648,7 @@ def test_handle_cancel_exit_cancel_exception(mocker, default_conf) -> None:
     order = {'remaining': 1,
              'amount': 1,
              'status': "open"}
-    assert freqtrade.handle_cancel_exit(trade, order, reason) == 'error cancelling order'
+    assert await freqtrade.handle_cancel_exit(trade, order, reason) == 'error cancelling order'
 
 
 async def test_execute_trade_exit_up(default_conf, ticker, fee, ticker_sell_up, mocker) -> None:
@@ -4320,19 +4320,21 @@ async def test_sync_wallet_dry_run(mocker, default_conf, ticker, fee, limit_buy_
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_cancel_all_open_orders(mocker, default_conf, fee, limit_buy_order, limit_sell_order):
+async def test_cancel_all_open_orders(mocker, default_conf, fee, limit_buy_order, limit_sell_order):
     default_conf['cancel_open_orders_on_exit'] = True
     mocker.patch('freqtrade.exchange.Exchange.fetch_order',
                  side_effect=[
                      ExchangeError(), limit_sell_order, limit_buy_order, limit_sell_order])
-    buy_mock = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_cancel_enter')
-    sell_mock = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_cancel_exit')
+    buy_mock = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_cancel_enter',
+                            get_mock_coro(None))
+    sell_mock = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_cancel_exit',
+                             get_mock_coro(None))
 
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
     create_mock_trades(fee)
     trades = Trade.query.all()
     assert len(trades) == MOCK_TRADE_COUNT
-    freqtrade.cancel_all_open_orders()
+    await freqtrade.cancel_all_open_orders()
     assert buy_mock.call_count == 1
     assert sell_mock.call_count == 2
 

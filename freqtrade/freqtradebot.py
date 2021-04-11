@@ -121,7 +121,7 @@ class FreqtradeBot(LoggingMixin):
         logger.info('Cleaning up modules ...')
 
         if self.config['cancel_open_orders_on_exit']:
-            self.cancel_all_open_orders()
+            asyncio.get_event_loop().run_until_complete(self.cancel_all_open_orders())
 
         self.check_for_open_trades()
 
@@ -192,7 +192,7 @@ class FreqtradeBot(LoggingMixin):
         Close all orders that were left open
         """
         if self.config['cancel_open_orders_on_exit']:
-            self.cancel_all_open_orders()
+            asyncio.get_event_loop().run_until_complete(self.cancel_all_open_orders())
 
     def check_for_open_trades(self):
         """
@@ -920,7 +920,7 @@ class FreqtradeBot(LoggingMixin):
                                              default_retval=False)(pair=trade.pair,
                                                                    trade=trade,
                                                                    order=order))):
-                self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['TIMEOUT'])
+                await self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['TIMEOUT'])
 
             elif (order['side'] == 'sell' and (order['status'] == 'open' or fully_cancelled) and (
                   fully_cancelled
@@ -929,9 +929,9 @@ class FreqtradeBot(LoggingMixin):
                                            default_retval=False)(pair=trade.pair,
                                                                  trade=trade,
                                                                  order=order))):
-                self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['TIMEOUT'])
+                await self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['TIMEOUT'])
 
-    def cancel_all_open_orders(self) -> None:
+    async def cancel_all_open_orders(self) -> None:
         """
         Cancel all orders that are currently open
         :return: None
@@ -945,13 +945,13 @@ class FreqtradeBot(LoggingMixin):
                 continue
 
             if order['side'] == 'buy':
-                self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['ALL_CANCELLED'])
+                await self.handle_cancel_enter(trade, order, constants.CANCEL_REASON['ALL_CANCELLED'])
 
             elif order['side'] == 'sell':
-                self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['ALL_CANCELLED'])
+                await self.handle_cancel_exit(trade, order, constants.CANCEL_REASON['ALL_CANCELLED'])
         Trade.commit()
 
-    def handle_cancel_enter(self, trade: Trade, order: Dict, reason: str) -> bool:
+    async def handle_cancel_enter(self, trade: Trade, order: Dict, reason: str) -> bool:
         """
         Buy cancel - cancel order
         :return: True if order was fully cancelled
@@ -1001,7 +1001,7 @@ class FreqtradeBot(LoggingMixin):
             # we need to fall back to the values from order if corder does not contain these keys.
             trade.amount = filled_amount
             trade.stake_amount = trade.amount * trade.open_rate
-            self.update_trade_state(trade, trade.open_order_id, corder)
+            await self.update_trade_state(trade, trade.open_order_id, corder)
 
             trade.open_order_id = None
             logger.info('Partial buy order timeout for %s.', trade)
@@ -1012,7 +1012,7 @@ class FreqtradeBot(LoggingMixin):
                                   reason=reason)
         return was_trade_fully_canceled
 
-    def handle_cancel_exit(self, trade: Trade, order: Dict, reason: str) -> str:
+    async def handle_cancel_exit(self, trade: Trade, order: Dict, reason: str) -> str:
         """
         Sell cancel - cancel order and update trade
         :return: Reason for cancel
