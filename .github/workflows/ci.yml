@@ -6,6 +6,7 @@ on:
       - master
       - stable
       - develop
+      - async_tests
     tags:
   release:
     types: [published]
