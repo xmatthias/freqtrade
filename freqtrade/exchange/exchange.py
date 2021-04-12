@@ -1000,7 +1000,7 @@ class Exchange:
             return await self._api_async.fetch_l2_order_book(pair, limit1)
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api.name} does not support fetching order book.'
+                f'Exchange {self._api_async.name} does not support fetching order book.'
                 f'Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
