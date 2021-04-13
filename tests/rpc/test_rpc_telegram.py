@@ -173,7 +173,7 @@ def test_telegram_status(default_conf, update, mocker) -> None:
     default_conf['telegram']['enabled'] = False
     default_conf['telegram']['chat_id'] = "123"
 
-    status_table = get_mock_coro()
+    status_table = MagicMock()
     mocker.patch('freqtrade.rpc.telegram.Telegram._status_table', status_table)
 
     mocker.patch.multiple(

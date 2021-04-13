@@ -2370,9 +2370,9 @@ async def test_cancel_order(default_conf, mocker, exchange_name):
         await exchange.cancel_order(order_id='_', pair='TKN/BTC')
     assert api_mock.cancel_order.call_count == 1
 
-    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
-                         "cancel_order", "cancel_order",
-                         order_id='_', pair='TKN/BTC')
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "cancel_order", "cancel_order",
+                               order_id='_', pair='TKN/BTC')
 
 
 @pytest.mark.asyncio
@@ -2390,9 +2390,9 @@ async def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
         await exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC')
     assert api_mock.cancel_order.call_count == 1
 
-    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
-                         "cancel_stoploss_order", "cancel_order",
-                         order_id='_', pair='TKN/BTC')
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "cancel_stoploss_order", "cancel_order",
+                               order_id='_', pair='TKN/BTC')
 
 
 @pytest.mark.asyncio
@@ -2477,9 +2477,10 @@ async def test_fetch_order(default_conf, mocker, exchange_name, caplog):
             assert tm.call_args_list[3][0][0] == 10
     assert api_mock.fetch_order.call_count == API_FETCH_ORDER_RETRY_COUNT + 1
 
-    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
-                         'fetch_order', 'fetch_order', retries=API_FETCH_ORDER_RETRY_COUNT + 1,
-                         order_id='_', pair='TKN/BTC')
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               'fetch_order', 'fetch_order',
+                               retries=API_FETCH_ORDER_RETRY_COUNT + 1,
+                               order_id='_', pair='TKN/BTC')
 
 
 @pytest.mark.asyncio
@@ -2510,10 +2511,10 @@ async def test_fetch_stoploss_order(default_conf, mocker, exchange_name):
         await exchange.fetch_stoploss_order(order_id='_', pair='TKN/BTC')
     assert api_mock.fetch_order.call_count == 1
 
-    async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
-                         'fetch_stoploss_order', 'fetch_order',
-                         retries=API_FETCH_ORDER_RETRY_COUNT + 1,
-                         order_id='_', pair='TKN/BTC')
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               'fetch_stoploss_order', 'fetch_order',
+                               retries=API_FETCH_ORDER_RETRY_COUNT + 1,
+                               order_id='_', pair='TKN/BTC')
 
 
 @pytest.mark.asyncio
