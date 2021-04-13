@@ -56,7 +56,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
         SellCheckTuple(sell_type=SellType.NONE),
         SellCheckTuple(sell_type=SellType.SELL_SIGNAL)]
     )
-    cancel_order_mock = AsyncMock()
+    cancel_order_mock = get_mock_coro()
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -70,7 +70,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
 
     mocker.patch.multiple(
         'freqtrade.freqtradebot.FreqtradeBot',
-        create_stoploss_order=AsyncMock(return_value=True),
+        create_stoploss_order=get_mock_coro(return_value=True),
         _notify_exit=MagicMock(),
     )
     mocker.patch("freqtrade.strategy.interface.IStrategy.should_sell", should_sell_mock)

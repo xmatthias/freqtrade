@@ -594,8 +594,8 @@ def test_api_trade_single(botclient, mocker, fee, ticker, markets):
 def test_api_delete_trade(botclient, mocker, fee, markets):
     ftbot, client = botclient
     patch_get_signal(ftbot)
-    stoploss_mock = AsyncMock()
-    cancel_mock = AsyncMock()
+    stoploss_mock = get_mock_coro()
+    cancel_mock = get_mock_coro()
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         markets=PropertyMock(return_value=markets),
@@ -815,7 +815,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets):
         fetch_ticker=ticker,
         get_fee=fee,
         markets=PropertyMock(return_value=markets),
-        fetch_order=AsyncMock(return_value={}),
+        fetch_order=get_mock_coro(return_value={}),
     )
 
     rc = client_get(client, f"{BASE_URI}/status")

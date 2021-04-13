@@ -308,8 +308,8 @@ def test_rpc_trade_history(mocker, default_conf, markets, fee):
 
 async def test_rpc_delete_trade(mocker, default_conf, fee, markets):
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
-    stoploss_mock = AsyncMock()
-    cancel_mock = AsyncMock()
+    stoploss_mock = get_mock_coro()
+    cancel_mock = get_mock_coro()
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         markets=PropertyMock(return_value=markets),

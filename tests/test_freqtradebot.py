@@ -5,7 +5,7 @@ import logging
 import time
 from copy import deepcopy
 from math import isclose
-from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock
+from unittest.mock import ANY, MagicMock, PropertyMock
 
 import arrow
 import pytest

@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import reduce
 from random import choice, randint
 from string import ascii_uppercase
-from unittest.mock import ANY, AsyncMock, MagicMock
+from unittest.mock import ANY, MagicMock
 
 import arrow
 import pytest
@@ -26,8 +26,8 @@ from freqtrade.loggers import setup_logging
 from freqtrade.persistence import PairLocks, Trade
 from freqtrade.rpc import RPC
 from freqtrade.rpc.telegram import Telegram, authorized_only
-from tests.conftest import (create_mock_trades, get_patched_freqtradebot, log_has, log_has_re,
-                            patch_exchange, patch_get_signal, patch_whitelist)
+from tests.conftest import (create_mock_trades, get_mock_coro, get_patched_freqtradebot, log_has,
+                            log_has_re, patch_exchange, patch_get_signal, patch_whitelist)
 
 
 pytestmark = pytest.mark.asyncio
@@ -173,12 +173,12 @@ def test_telegram_status(default_conf, update, mocker) -> None:
     default_conf['telegram']['enabled'] = False
     default_conf['telegram']['chat_id'] = "123"
 
-    status_table = AsyncMock()
+    status_table = get_mock_coro()
     mocker.patch('freqtrade.rpc.telegram.Telegram._status_table', status_table)
 
     mocker.patch.multiple(
         'freqtrade.rpc.rpc.RPC',
-        _rpc_trade_status=AsyncMock(return_value=[{
+        _rpc_trade_status=get_mock_coro(return_value=[{
             'trade_id': 1,
             'pair': 'ETH/BTC',
             'base_currency': 'BTC',
@@ -225,7 +225,7 @@ def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
         get_fee=fee,
         _is_dry_limit_order_filled=MagicMock(return_value=True),
     )
-    status_table = AsyncMock()
+    status_table = get_mock_coro()
     mocker.patch.multiple(
         'freqtrade.rpc.telegram.Telegram',
         _status_table=status_table,

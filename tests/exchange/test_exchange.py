@@ -2360,7 +2360,7 @@ async def test_cancel_order_with_result_error(default_conf, mocker, exchange_nam
 async def test_cancel_order(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.cancel_order = AsyncMock(return_value={'id': '123'})
+    api_mock.cancel_order = get_mock_coro(return_value={'id': '123'})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     assert await exchange.cancel_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
 
@@ -2380,7 +2380,7 @@ async def test_cancel_order(default_conf, mocker, exchange_name):
 async def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.cancel_order = AsyncMock(return_value={'id': '123'})
+    api_mock.cancel_order = get_mock_coro(return_value={'id': '123'})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     assert await exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
 
