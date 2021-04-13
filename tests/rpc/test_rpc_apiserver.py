@@ -5,7 +5,7 @@ Unit test file for rpc/api_server.py
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock
+from unittest.mock import ANY, MagicMock, PropertyMock
 
 import pytest
 import uvicorn

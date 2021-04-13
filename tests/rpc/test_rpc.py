@@ -2,7 +2,7 @@
 # pragma pylint: disable=invalid-sequence-index, invalid-name, too-many-arguments
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock
+from unittest.mock import ANY, MagicMock, PropertyMock
 
 import pytest
 from numpy import isnan
@@ -732,7 +732,7 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     # Fetch order - it's open first, and closed after cancel_order is called.
     mocker.patch(
         'freqtrade.exchange.Exchange.fetch_order',
-        AsyncMock(side_effect=[{
+        get_mock_coro(side_effect=[{
             'id': '1234',
             'status': 'open',
             'type': 'limit',
@@ -754,12 +754,13 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
 
     mocker.patch(
         'freqtrade.exchange.Exchange.fetch_order',
-        return_value={
+        get_mock_coro(return_value={
             'status': 'open',
             'type': 'limit',
             'side': 'buy',
             'filled': filled_amount
         })
+        )
 
     freqtradebot.config['max_open_trades'] = 3
     await freqtradebot.enter_positions()
@@ -768,12 +769,12 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     # make an limit-buy open trade, if there is no 'filled', don't sell it
     mocker.patch(
         'freqtrade.exchange.Exchange.fetch_order',
-        return_value={
+        get_mock_coro(return_value={
             'status': 'open',
             'type': 'limit',
             'side': 'buy',
             'filled': None
-        }
+        })
     )
     # check that the trade is called, which is done by ensuring exchange.cancel_order is called
     msg = await rpc._rpc_forcesell('4')
@@ -784,14 +785,14 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     # make an limit-sell open trade
     mocker.patch(
         'freqtrade.exchange.Exchange.fetch_order',
-        return_value={
+        get_mock_coro(return_value={
             'status': 'open',
             'type': 'limit',
             'side': 'sell',
             'amount': amount,
             'remaining': amount,
             'filled': 0.0
-        }
+        })
     )
     msg = await rpc._rpc_forcesell('3')
     assert msg == {'result': 'Created sell order for trade 3.'}

@@ -66,9 +66,19 @@ def get_args(args):
 
 
 # Source: https://stackoverflow.com/questions/29881236/how-to-mock-asyncio-coroutines
-def get_mock_coro(return_value=None):
+# TODO: This should be replaced with AsyncMock once support for python 3.7 is dropped.
+def get_mock_coro(return_value=None, side_effect=None):
     async def mock_coro(*args, **kwargs):
-        return return_value
+        if side_effect:
+            effect = side_effect.pop(0)
+            if isinstance(effect, Exception):
+                raise effect
+            return effect
+        else:
+            return return_value
+
+    if side_effect and not isinstance(side_effect, list):
+        side_effect = [side_effect]
 
     return Mock(wraps=mock_coro)
 

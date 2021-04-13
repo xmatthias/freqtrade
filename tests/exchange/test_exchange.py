@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from math import isclose
 from random import randint
-from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import arrow
 import ccxt
@@ -2365,7 +2365,7 @@ async def test_cancel_order(default_conf, mocker, exchange_name):
     assert await exchange.cancel_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
 
     with pytest.raises(InvalidOrderException):
-        api_mock.cancel_order = AsyncMock(side_effect=ccxt.InvalidOrder("Did not find order"))
+        api_mock.cancel_order = get_mock_coro(side_effect=ccxt.InvalidOrder("Did not find order"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange.cancel_order(order_id='_', pair='TKN/BTC')
     assert api_mock.cancel_order.call_count == 1
@@ -2385,7 +2385,7 @@ async def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
     assert await exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC') == {'id': '123'}
 
     with pytest.raises(InvalidOrderException):
-        api_mock.cancel_order = AsyncMock(side_effect=ccxt.InvalidOrder("Did not find order"))
+        api_mock.cancel_order = get_mock_coro(side_effect=ccxt.InvalidOrder("Did not find order"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange.cancel_stoploss_order(order_id='_', pair='TKN/BTC')
     assert api_mock.cancel_order.call_count == 1
