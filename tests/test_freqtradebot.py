@@ -914,11 +914,11 @@ async def test_execute_entry(mocker, default_conf, fee, limit_buy_order,
         await freqtrade.execute_entry(pair, stake_amount)
 
     # In case of custom entry price
-    mocker.patch('freqtrade.exchange.Exchange.get_rate', return_value=0.50)
+    mocker.patch('freqtrade.exchange.Exchange.get_rate', get_mock_coro(0.50))
     limit_buy_order['status'] = 'open'
     limit_buy_order['id'] = '5566'
     freqtrade.strategy.custom_entry_price = lambda **kwargs: 0.508
-    assert freqtrade.execute_entry(pair, stake_amount)
+    assert await freqtrade.execute_entry(pair, stake_amount)
     trade = Trade.query.all()[6]
     assert trade
     assert trade.open_rate_requested == 0.508
@@ -930,10 +930,10 @@ async def test_execute_entry(mocker, default_conf, fee, limit_buy_order,
 
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        get_rate=MagicMock(return_value=10),
+        get_rate=get_mock_coro(return_value=10),
     )
 
-    assert freqtrade.execute_entry(pair, stake_amount)
+    assert await freqtrade.execute_entry(pair, stake_amount)
     trade = Trade.query.all()[7]
     assert trade
     assert trade.open_rate_requested == 10
@@ -942,7 +942,7 @@ async def test_execute_entry(mocker, default_conf, fee, limit_buy_order,
     limit_buy_order['status'] = 'open'
     limit_buy_order['id'] = '5568'
     freqtrade.strategy.custom_entry_price = lambda **kwargs: "string price"
-    assert freqtrade.execute_entry(pair, stake_amount)
+    assert await freqtrade.execute_entry(pair, stake_amount)
     trade = Trade.query.all()[8]
     assert trade
     assert trade.open_rate_requested == 10
