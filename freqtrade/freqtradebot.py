@@ -1294,7 +1294,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Try update amount (binance-fix)
         try:
-            new_amount = self.get_real_amount(trade, order)
+            new_amount = await self.get_real_amount(trade, order)
             if not isclose(safe_value_fallback(order, 'filled', 'amount'), new_amount,
                            abs_tol=constants.MATH_CLOSE_PREC):
                 order['amount'] = new_amount
@@ -1341,7 +1341,7 @@ class FreqtradeBot(LoggingMixin):
             return real_amount
         return amount
 
-    def get_real_amount(self, trade: Trade, order: Dict) -> float:
+    async def get_real_amount(self, trade: Trade, order: Dict) -> float:
         """
         Detect and update trade fee.
         Calls trade.update_fee() upon correct detection.
@@ -1371,14 +1371,16 @@ class FreqtradeBot(LoggingMixin):
                     return self.apply_fee_conditional(trade, trade_base_currency,
                                                       amount=order_amount, fee_abs=fee_cost)
                 return order_amount
-        return self.fee_detection_from_trades(trade, order, order_amount)
+        return await self.fee_detection_from_trades(trade, order, order_amount)
 
-    def fee_detection_from_trades(self, trade: Trade, order: Dict, order_amount: float) -> float:
+    async def fee_detection_from_trades(self, trade: Trade, order: Dict,
+                                        order_amount: float) -> float:
         """
         fee-detection fallback to Trades. Parses result of fetch_my_trades to get correct fee.
         """
-        trades = self.exchange.get_trades_for_order(self.exchange.get_order_id_conditional(order),
-                                                    trade.pair, trade.open_date)
+        trades = await self.exchange.get_trades_for_order(
+            self.exchange.get_order_id_conditional(order),trade.pair, trade.open_date
+            )
 
         if len(trades) == 0:
             logger.info("Applying fee on amount for %s failed: myTrade-Dict empty found", trade)

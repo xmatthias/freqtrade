@@ -3723,7 +3723,7 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, l
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
 
 
-def test_get_real_amount_quote(default_conf, trades_for_order, buy_order_fee, fee, caplog, mocker):
+async def test_get_real_amount_quote(default_conf, trades_for_order, buy_order_fee, fee, caplog, mocker):
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order)
     amount = sum(x['amount'] for x in trades_for_order)
     trade = Trade(
@@ -3738,14 +3738,14 @@ def test_get_real_amount_quote(default_conf, trades_for_order, buy_order_fee, fe
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount is reduced by "fee"
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.001)
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.001)
     assert log_has('Applying fee on amount for Trade(id=None, pair=LTC/ETH, amount=8.00000000, '
                    'open_rate=0.24544100, open_since=closed) (from 8.0 to 7.992).',
                    caplog)
 
 
-def test_get_real_amount_quote_dust(default_conf, trades_for_order, buy_order_fee, fee,
-                                    caplog, mocker):
+async def test_get_real_amount_quote_dust(default_conf, trades_for_order, buy_order_fee, fee,
+                                          caplog, mocker):
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order)
     walletmock = mocker.patch('freqtrade.wallets.Wallets.update')
     mocker.patch('freqtrade.wallets.Wallets.get_free', return_value=8.1122)
@@ -3763,13 +3763,13 @@ def test_get_real_amount_quote_dust(default_conf, trades_for_order, buy_order_fe
 
     walletmock.reset_mock()
     # Amount is kept as is
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount
     assert walletmock.call_count == 1
     assert log_has_re(r'Fee amount for Trade.* was in base currency '
                       '- Eating Fee 0.008 into dust', caplog)
 
 
-def test_get_real_amount_no_trade(default_conf, buy_order_fee, caplog, mocker, fee):
+async def test_get_real_amount_no_trade(default_conf, buy_order_fee, caplog, mocker, fee):
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=[])
 
     amount = buy_order_fee['amount']
@@ -3785,13 +3785,13 @@ def test_get_real_amount_no_trade(default_conf, buy_order_fee, caplog, mocker, f
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount is reduced by "fee"
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount
     assert log_has('Applying fee on amount for Trade(id=None, pair=LTC/ETH, amount=8.00000000, '
                    'open_rate=0.24544100, open_since=closed) failed: myTrade-Dict empty found',
                    caplog)
 
 
-def test_get_real_amount_stake(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_stake(default_conf, trades_for_order, buy_order_fee, fee, mocker):
     trades_for_order[0]['fee']['currency'] = 'ETH'
 
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order)
@@ -3808,17 +3808,17 @@ def test_get_real_amount_stake(default_conf, trades_for_order, buy_order_fee, fe
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount does not change
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount
 
 
-def test_get_real_amount_no_currency_in_fee(default_conf, trades_for_order, buy_order_fee,
-                                            fee, mocker):
+async def test_get_real_amount_no_currency_in_fee(default_conf, trades_for_order, buy_order_fee,
+                                                  fee, mocker):
 
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['fee'] = {'cost': 0.004, 'currency': None}
     trades_for_order[0]['fee']['currency'] = None
 
-    mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order)
+    mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', get_mock_coro(trades_for_order))
     amount = sum(x['amount'] for x in trades_for_order)
     trade = Trade(
         pair='LTC/ETH',
@@ -3832,10 +3832,10 @@ def test_get_real_amount_no_currency_in_fee(default_conf, trades_for_order, buy_
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount does not change
-    assert freqtrade.get_real_amount(trade, limit_buy_order) == amount
+    assert await freqtrade.get_real_amount(trade, limit_buy_order) == amount
 
 
-def test_get_real_amount_BNB(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_BNB(default_conf, trades_for_order, buy_order_fee, fee, mocker):
     trades_for_order[0]['fee']['currency'] = 'BNB'
     trades_for_order[0]['fee']['cost'] = 0.00094518
 
@@ -3853,10 +3853,11 @@ def test_get_real_amount_BNB(default_conf, trades_for_order, buy_order_fee, fee,
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount does not change
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount
 
 
-def test_get_real_amount_multi(default_conf, trades_for_order2, buy_order_fee, caplog, fee, mocker):
+async def test_get_real_amount_multi(default_conf, trades_for_order2, buy_order_fee, caplog,
+                                     fee, mocker):
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order2)
     amount = float(sum(x['amount'] for x in trades_for_order2))
     trade = Trade(
@@ -3871,7 +3872,7 @@ def test_get_real_amount_multi(default_conf, trades_for_order2, buy_order_fee, c
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount is reduced by "fee"
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.001)
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.001)
     assert log_has('Applying fee on amount for Trade(id=None, pair=LTC/ETH, amount=8.00000000, '
                    'open_rate=0.24544100, open_since=closed) (from 8.0 to 7.992).',
                    caplog)
@@ -3884,8 +3885,8 @@ def test_get_real_amount_multi(default_conf, trades_for_order2, buy_order_fee, c
     assert trade.fee_close_currency is None
 
 
-def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order_fee, caplog, fee,
-                                mocker, markets):
+async def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order_fee, caplog, fee,
+                                      mocker, markets):
     # Different fee currency on both trades
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order3)
     amount = float(sum(x['amount'] for x in trades_for_order3))
@@ -3907,7 +3908,7 @@ def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order_fee, 
                  return_value={'ask': 0.19, 'last': 0.2})
 
     # Amount is reduced by "fee"
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.0005)
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.0005)
     assert log_has('Applying fee on amount for Trade(id=None, pair=LTC/ETH, amount=8.00000000, '
                    'open_rate=0.24544100, open_since=closed) (from 8.0 to 7.996).',
                    caplog)
@@ -3919,7 +3920,7 @@ def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order_fee, 
     assert trade.fee_close_currency is None
 
 
-def test_get_real_amount_fromorder(default_conf, trades_for_order, buy_order_fee, fee,
+async def test_get_real_amount_fromorder(default_conf, trades_for_order, buy_order_fee, fee,
                                    caplog, mocker):
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['fee'] = {'cost': 0.004, 'currency': 'LTC'}
@@ -3941,13 +3942,13 @@ def test_get_real_amount_fromorder(default_conf, trades_for_order, buy_order_fee
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', side_effect=ExchangeError)
 
     # Amount is reduced by "fee"
-    assert freqtrade.get_real_amount(trade, limit_buy_order) == amount - 0.004
+    assert await freqtrade.get_real_amount(trade, limit_buy_order) == amount - 0.004
     assert log_has('Applying fee on amount for Trade(id=None, pair=LTC/ETH, amount=8.00000000, '
                    'open_rate=0.24544100, open_since=closed) (from 8.0 to 7.996).',
                    caplog)
 
 
-def test_get_real_amount_invalid_order(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_invalid_order(default_conf, trades_for_order, buy_order_fee, fee, mocker):
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['fee'] = {'cost': 0.004}
 
@@ -3965,10 +3966,10 @@ def test_get_real_amount_invalid_order(default_conf, trades_for_order, buy_order
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount does not change
-    assert freqtrade.get_real_amount(trade, limit_buy_order) == amount
+    assert await freqtrade.get_real_amount(trade, limit_buy_order) == amount
 
 
-def test_get_real_amount_wrong_amount(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_wrong_amount(default_conf, trades_for_order, buy_order_fee, fee, mocker):
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['amount'] = limit_buy_order['amount'] - 0.001
 
@@ -3987,10 +3988,10 @@ def test_get_real_amount_wrong_amount(default_conf, trades_for_order, buy_order_
 
     # Amount does not change
     with pytest.raises(DependencyException, match=r"Half bought\? Amounts don't match"):
-        freqtrade.get_real_amount(trade, limit_buy_order)
+        await freqtrade.get_real_amount(trade, limit_buy_order)
 
 
-def test_get_real_amount_wrong_amount_rounding(default_conf, trades_for_order, buy_order_fee, fee,
+async def test_get_real_amount_wrong_amount_rounding(default_conf, trades_for_order, buy_order_fee, fee,
                                                mocker):
     # Floats should not be compared directly.
     limit_buy_order = deepcopy(buy_order_fee)
@@ -4010,11 +4011,11 @@ def test_get_real_amount_wrong_amount_rounding(default_conf, trades_for_order, b
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
 
     # Amount changes by fee amount.
-    assert isclose(freqtrade.get_real_amount(trade, limit_buy_order), amount - (amount * 0.001),
-                   abs_tol=MATH_CLOSE_PREC,)
+    assert isclose(await freqtrade.get_real_amount(trade, limit_buy_order),
+                   amount - (amount * 0.001), abs_tol=MATH_CLOSE_PREC,)
 
 
-def test_get_real_amount_invalid(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_invalid(default_conf, trades_for_order, buy_order_fee, fee, mocker):
     # Remove "Currency" from fee dict
     trades_for_order[0]['fee'] = {'cost': 0.008}
 
@@ -4032,10 +4033,10 @@ def test_get_real_amount_invalid(default_conf, trades_for_order, buy_order_fee, 
     )
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
     # Amount does not change
-    assert freqtrade.get_real_amount(trade, buy_order_fee) == amount
+    assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount
 
 
-def test_get_real_amount_open_trade(default_conf, fee, mocker):
+async def test_get_real_amount_open_trade(default_conf, fee, mocker):
     amount = 12345
     trade = Trade(
         pair='LTC/ETH',
@@ -4053,7 +4054,7 @@ def test_get_real_amount_open_trade(default_conf, fee, mocker):
         'side': 'buy',
     }
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
-    assert freqtrade.get_real_amount(trade, order) == amount
+    assert await freqtrade.get_real_amount(trade, order) == amount
 
 
 @pytest.mark.parametrize('amount,fee_abs,wallet,amount_exp', [
