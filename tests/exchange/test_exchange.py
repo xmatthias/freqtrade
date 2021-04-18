@@ -2552,7 +2552,8 @@ def test_name(default_conf, mocker, exchange_name):
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_get_trades_for_order(default_conf, mocker, exchange_name):
+@pytest.mark.asyncio
+async def test_get_trades_for_order(default_conf, mocker, exchange_name):
 
     order_id = 'ABCD-ABCD'
     since = datetime(2018, 5, 5, 0, 0, 0)
@@ -2560,29 +2561,29 @@ def test_get_trades_for_order(default_conf, mocker, exchange_name):
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
     api_mock = MagicMock()
 
-    api_mock.fetch_my_trades = MagicMock(return_value=[{'id': 'TTR67E-3PFBD-76IISV',
-                                                        'order': 'ABCD-ABCD',
-                                                        'info': {'pair': 'XLTCZBTC',
-                                                                 'time': 1519860024.4388,
-                                                                 'type': 'buy',
-                                                                 'ordertype': 'limit',
-                                                                 'price': '20.00000',
-                                                                 'cost': '38.62000',
-                                                                 'fee': '0.06179',
-                                                                 'vol': '5',
-                                                                 'id': 'ABCD-ABCD'},
-                                                        'timestamp': 1519860024438,
-                                                        'datetime': '2018-02-28T23:20:24.438Z',
-                                                        'symbol': 'LTC/BTC',
-                                                        'type': 'limit',
-                                                        'side': 'buy',
-                                                        'price': 165.0,
-                                                        'amount': 0.2340606,
-                                                        'fee': {'cost': 0.06179, 'currency': 'BTC'}
-                                                        }])
+    api_mock.fetch_my_trades = get_mock_coro(return_value=[{'id': 'TTR67E-3PFBD-76IISV',
+                                                            'order': 'ABCD-ABCD',
+                                                            'info': {'pair': 'XLTCZBTC',
+                                                                     'time': 1519860024.4388,
+                                                                     'type': 'buy',
+                                                                     'ordertype': 'limit',
+                                                                     'price': '20.00000',
+                                                                     'cost': '38.62000',
+                                                                     'fee': '0.06179',
+                                                                     'vol': '5',
+                                                                     'id': 'ABCD-ABCD'},
+                                                            'timestamp': 1519860024438,
+                                                            'datetime': '2018-02-28T23:20:24.438Z',
+                                                            'symbol': 'LTC/BTC',
+                                                            'type': 'limit',
+                                                            'side': 'buy',
+                                                            'price': 165.0,
+                                                            'amount': 0.2340606,
+                                                            'fee': {'cost': 0.06179, 'currency': 'BTC'}
+                                                            }])
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
-    orders = exchange.get_trades_for_order(order_id, 'LTC/BTC', since)
+    orders = await exchange.get_trades_for_order(order_id, 'LTC/BTC', since)
     assert len(orders) == 1
     assert orders[0]['price'] == 165
     assert api_mock.fetch_my_trades.call_count == 1
@@ -2594,12 +2595,12 @@ def test_get_trades_for_order(default_conf, mocker, exchange_name):
     assert api_mock.fetch_my_trades.call_args[0][1] == int(since.replace(
         tzinfo=timezone.utc).timestamp() - 5) * 1000
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           'get_trades_for_order', 'fetch_my_trades',
-                           order_id=order_id, pair='LTC/BTC', since=since)
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               'get_trades_for_order', 'fetch_my_trades',
+                               order_id=order_id, pair='LTC/BTC', since=since)
 
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=False))
-    assert exchange.get_trades_for_order(order_id, 'LTC/BTC', since) == []
+    assert await exchange.get_trades_for_order(order_id, 'LTC/BTC', since) == []
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)

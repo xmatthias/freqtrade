@@ -1097,8 +1097,8 @@ class Exchange:
 
     # Fee handling
 
-    @retrier
-    def get_trades_for_order(self, order_id: str, pair: str, since: datetime) -> List:
+    @retrier_async
+    async def get_trades_for_order(self, order_id: str, pair: str, since: datetime) -> List:
         """
         Fetch Orders using the "fetch_my_trades" endpoint and filter them by order-id.
         The "since" argument passed in is coming from the database and is in UTC,
@@ -1122,7 +1122,7 @@ class Exchange:
         try:
             # Allow 5s offset to catch slight time offsets (discovered in #1185)
             # since needs to be int in milliseconds
-            my_trades = self._api.fetch_my_trades(
+            my_trades = await self._api_async.fetch_my_trades(
                 pair, int((since.replace(tzinfo=timezone.utc).timestamp() - 5) * 1000))
             matched_trades = [trade for trade in my_trades if trade['order'] == order_id]
 
