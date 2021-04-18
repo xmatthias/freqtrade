@@ -279,7 +279,7 @@ def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
     assert 'LTC/BTC' in msg_mock.call_args_list[0][0][0]
 
 
-async def test_status_table_handle(default_conf, update, ticker, fee, mocker) -> None:
+def test_status_table_handle(default_conf, update, ticker, fee, mocker) -> None:
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
@@ -306,7 +306,7 @@ async def test_status_table_handle(default_conf, update, ticker, fee, mocker) ->
     msg_mock.reset_mock()
 
     # Create some test data
-    await freqtradebot.enter_positions()
+    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
 
     telegram._status_table(update=update, context=MagicMock())
 
@@ -427,8 +427,8 @@ def test_daily_wrong_input(default_conf, update, ticker, mocker) -> None:
     assert str('Daily Profit over the last 7 days') in msg_mock.call_args_list[0][0][0]
 
 
-async def test_profit_handle(default_conf, update, ticker, ticker_sell_up, fee,
-                             limit_buy_order, limit_sell_order, mocker) -> None:
+def test_profit_handle(default_conf, update, ticker, ticker_sell_up, fee,
+                       limit_buy_order, limit_sell_order, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -445,7 +445,7 @@ async def test_profit_handle(default_conf, update, ticker, ticker_sell_up, fee,
     msg_mock.reset_mock()
 
     # Create some test data
-    await freqtradebot.enter_positions()
+    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
     trade = Trade.query.first()
 
     # Simulate fulfilled LIMIT_BUY order for trade
