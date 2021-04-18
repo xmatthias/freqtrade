@@ -727,7 +727,7 @@ class FreqtradeBot(LoggingMixin):
             )
 
         logger.debug('checking sell')
-        exit_rate = self.exchange.get_rate(trade.pair, refresh=True, side="sell")
+        exit_rate = await self.exchange.get_rate(trade.pair, refresh=True, side="sell")
         if await self._check_and_execute_exit(trade, exit_rate, buy, sell):
             return True
 
@@ -1183,7 +1183,7 @@ class FreqtradeBot(LoggingMixin):
         profit_rate = trade.close_rate if trade.close_rate else trade.close_rate_requested
         profit_trade = trade.calc_profit(rate=profit_rate)
         # Use cached rates here - it was updated seconds ago.
-        current_rate = self.exchange.get_rate(
+        current_rate = await self.exchange.get_rate(
             trade.pair, refresh=False, side="sell") if not fill else None
         profit_ratio = trade.calc_profit_ratio(profit_rate)
         gain = "profit" if profit_ratio > 0 else "loss"
@@ -1229,7 +1229,7 @@ class FreqtradeBot(LoggingMixin):
 
         profit_rate = trade.close_rate if trade.close_rate else trade.close_rate_requested
         profit_trade = trade.calc_profit(rate=profit_rate)
-        current_rate = self.exchange.get_rate(trade.pair, refresh=False, side="sell")
+        current_rate = await self.exchange.get_rate(trade.pair, refresh=False, side="sell")
         profit_ratio = trade.calc_profit_ratio(profit_rate)
         gain = "profit" if profit_ratio > 0 else "loss"
 

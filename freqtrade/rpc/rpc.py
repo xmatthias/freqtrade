@@ -155,7 +155,7 @@ class RPC:
                 # calculate profit and send message to user
                 if trade.is_open:
                     try:
-                        current_rate = self._freqtrade.exchange.get_rate(
+                        current_rate = await self._freqtrade.exchange.get_rate(
                             trade.pair, refresh=False, side="sell")
                     except (ExchangeError, PricingError):
                         current_rate = NAN
@@ -204,8 +204,8 @@ class RPC:
                 results.append(trade_dict)
             return results
 
-    def _rpc_status_table(self, stake_currency: str,
-                          fiat_display_currency: str) -> Tuple[List, List, float]:
+    async def _rpc_status_table(self, stake_currency: str,
+                                fiat_display_currency: str) -> Tuple[List, List, float]:
         trades = Trade.get_open_trades()
         if not trades:
             raise RPCException('no active trade')
@@ -215,7 +215,7 @@ class RPC:
             for trade in trades:
                 # calculate profit and send message to user
                 try:
-                    current_rate = self._freqtrade.exchange.get_rate(
+                    current_rate = await self._freqtrade.exchange.get_rate(
                         trade.pair, refresh=False, side="sell")
                 except (PricingError, ExchangeError):
                     current_rate = NAN
@@ -340,7 +340,7 @@ class RPC:
         durations = {'wins': wins_dur, 'draws': draws_dur, 'losses': losses_dur}
         return {'sell_reasons': sell_reasons, 'durations': durations}
 
-    def _rpc_trade_statistics(
+    async def _rpc_trade_statistics(
             self, stake_currency: str, fiat_display_currency: str,
             start_date: datetime = datetime.fromtimestamp(0)) -> Dict[str, Any]:
         """ Returns cumulative profit statistics """
@@ -375,7 +375,7 @@ class RPC:
             else:
                 # Get current rate
                 try:
-                    current_rate = self._freqtrade.exchange.get_rate(
+                    current_rate = await self._freqtrade.exchange.get_rate(
                         trade.pair, refresh=False, side="sell")
                 except (PricingError, ExchangeError):
                     current_rate = NAN
@@ -563,7 +563,7 @@ class RPC:
 
             if not fully_canceled:
                 # Get current rate and execute sell
-                current_rate = self._freqtrade.exchange.get_rate(
+                current_rate = await self._freqtrade.exchange.get_rate(
                     trade.pair, refresh=False, side="sell")
                 sell_reason = SellCheckTuple(sell_type=SellType.FORCE_SELL)
                 await self._freqtrade.execute_trade_exit(trade, current_rate, sell_reason)

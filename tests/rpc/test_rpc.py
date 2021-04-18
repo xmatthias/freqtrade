@@ -201,11 +201,12 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     freqtradebot.state = State.RUNNING
     with pytest.raises(RPCException, match=r'.*no active trade*'):
-        rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+        await rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
 
     await freqtradebot.enter_positions()
 
-    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
+        default_conf['stake_currency'], 'USD')
     assert "Since" in headers
     assert "Pair" in headers
     assert 'instantly' == result[0][2]
@@ -215,7 +216,8 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
     # Test with fiatconvert
 
     rpc._fiat_converter = CryptoToFiatConverter()
-    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
+        default_conf['stake_currency'], 'USD')
     assert "Since" in headers
     assert "Pair" in headers
     assert 'instantly' == result[0][2]
@@ -225,7 +227,8 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
-    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
+        default_conf['stake_currency'], 'USD')
     assert 'instantly' == result[0][2]
     assert 'ETH/BTC' in result[0][1]
     assert 'nan%' == result[0][3]
@@ -382,7 +385,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     rpc = RPC(freqtradebot)
     rpc._fiat_converter = CryptoToFiatConverter()
 
-    res = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    res = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert res['trade_count'] == 0
     assert res['first_trade_date'] == ''
     assert res['first_trade_timestamp'] == 0
@@ -418,7 +421,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     trade.close_date = datetime.utcnow()
     trade.is_open = False
 
-    stats = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    stats = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert prec_satoshi(stats['profit_closed_coin'], 6.217e-05)
     assert prec_satoshi(stats['profit_closed_percent_mean'], 6.2)
     assert prec_satoshi(stats['profit_closed_fiat'], 0.93255)
@@ -435,7 +438,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     # Test non-available pair
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
-    stats = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    stats = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert stats['trade_count'] == 2
     assert stats['first_trade_date'] == 'just now'
     assert stats['latest_trade_date'] == 'just now'
@@ -487,7 +490,7 @@ async def test_rpc_trade_statistics_closed(mocker, default_conf, ticker, fee,
     for trade in Trade.query.order_by(Trade.id).all():
         trade.open_rate = None
 
-    stats = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    stats = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert prec_satoshi(stats['profit_closed_coin'], 0)
     assert prec_satoshi(stats['profit_closed_percent_mean'], 0)
     assert prec_satoshi(stats['profit_closed_fiat'], 0)

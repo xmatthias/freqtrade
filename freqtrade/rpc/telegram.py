@@ -406,8 +406,9 @@ class Telegram(RPCHandler):
         """
         try:
             fiat_currency = self._config.get('fiat_display_currency', '')
-            statlist, head, fiat_profit_sum = self._rpc._rpc_status_table(
-                self._config['stake_currency'], fiat_currency)
+            statlist, head, fiat_profit_sum = asyncio.new_event_loop().run_until_complete(
+                self._rpc._rpc_status_table(self._config['stake_currency'], fiat_currency)
+            )
 
             show_total = not isnan(fiat_profit_sum) and len(statlist) > 1
             max_trades_per_msg = 50
@@ -497,10 +498,10 @@ class Telegram(RPCHandler):
         except (TypeError, ValueError, IndexError):
             pass
 
-        stats = self._rpc._rpc_trade_statistics(
-            stake_cur,
-            fiat_disp_cur,
-            start_date)
+        stats = asyncio.new_event_loop().run_until_complete(
+            self._rpc._rpc_trade_statistics(stake_cur,
+                                            fiat_disp_cur, start_date)
+        )
         profit_closed_coin = stats['profit_closed_coin']
         profit_closed_percent_mean = stats['profit_closed_percent_mean']
         profit_closed_percent = stats['profit_closed_percent']

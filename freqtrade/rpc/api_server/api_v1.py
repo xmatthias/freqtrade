@@ -60,10 +60,10 @@ def performance(rpc: RPC = Depends(get_rpc)):
 
 
 @router.get('/profit', response_model=Profit, tags=['info'])
-def profit(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
-    return rpc._rpc_trade_statistics(config['stake_currency'],
-                                     config.get('fiat_display_currency')
-                                     )
+async def profit(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
+    return await rpc._rpc_trade_statistics(config['stake_currency'],
+                                           config.get('fiat_display_currency')
+                                           )
 
 
 @router.get('/stats', response_model=Stats, tags=['info'])
