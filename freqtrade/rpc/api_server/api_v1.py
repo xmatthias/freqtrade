@@ -93,9 +93,9 @@ def trades(limit: int = 500, offset: int = 0, rpc: RPC = Depends(get_rpc)):
 
 
 @router.get('/trade/{tradeid}', response_model=OpenTradeSchema, tags=['info', 'trading'])
-def trade(tradeid: int = 0, rpc: RPC = Depends(get_rpc)):
+async def trade(tradeid: int = 0, rpc: RPC = Depends(get_rpc)):
     try:
-        return rpc._rpc_trade_status([tradeid])[0]
+        return (await rpc._rpc_trade_status([tradeid]))[0]
     except (RPCException, KeyError):
         raise HTTPException(status_code=404, detail='Trade not found.')
 
