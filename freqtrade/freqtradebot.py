@@ -484,7 +484,7 @@ class FreqtradeBot(LoggingMixin):
             enter_limit_requested = price
         else:
             # Calculate price
-            proposed_enter_rate = self.exchange.get_rate(pair, refresh=True, side="buy")
+            proposed_enter_rate = await self.exchange.get_rate(pair, refresh=True, side="buy")
             custom_entry_price = strategy_safe_wrapper(self.strategy.custom_entry_price,
                                                        default_retval=proposed_enter_rate)(
                 pair=pair, current_time=datetime.now(timezone.utc),
@@ -622,11 +622,11 @@ class FreqtradeBot(LoggingMixin):
         # Send the message
         self.rpc.send_msg(msg)
 
-    def _notify_enter_cancel(self, trade: Trade, order_type: str, reason: str) -> None:
+    async def _notify_enter_cancel(self, trade: Trade, order_type: str, reason: str) -> None:
         """
         Sends rpc notification when a buy cancel occurred.
         """
-        current_rate = self.exchange.get_rate(trade.pair, refresh=False, side="buy")
+        current_rate = await self.exchange.get_rate(trade.pair, refresh=False, side="buy")
 
         msg = {
             'trade_id': trade.id,
@@ -1015,8 +1015,8 @@ class FreqtradeBot(LoggingMixin):
             reason += f", {constants.CANCEL_REASON['PARTIALLY_FILLED']}"
 
         self.wallets.update()
-        self._notify_enter_cancel(trade, order_type=self.strategy.order_types['buy'],
-                                  reason=reason)
+        await self._notify_enter_cancel(trade, order_type=self.strategy.order_types['buy'],
+                                        reason=reason)
         return was_trade_fully_canceled
 
     async def handle_cancel_exit(self, trade: Trade, order: Dict, reason: str) -> str:

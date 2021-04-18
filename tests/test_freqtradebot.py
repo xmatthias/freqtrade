@@ -791,7 +791,7 @@ async def test_execute_entry(mocker, default_conf, fee, limit_buy_order,
     freqtrade.strategy.confirm_trade_entry = MagicMock(return_value=False)
     stake_amount = 2
     bid = 0.11
-    buy_rate_mock = MagicMock(return_value=bid)
+    buy_rate_mock = get_mock_coro(return_value=bid)
     buy_mm = get_mock_coro(return_value=limit_buy_order_open)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -908,7 +908,7 @@ async def test_execute_entry(mocker, default_conf, fee, limit_buy_order,
     assert not await freqtrade.execute_entry(pair, stake_amount)
 
     # Fail to get price...
-    mocker.patch('freqtrade.exchange.Exchange.get_rate', MagicMock(return_value=0.0))
+    mocker.patch('freqtrade.exchange.Exchange.get_rate', get_mock_coro(return_value=0.0))
 
     with pytest.raises(PricingError, match="Could not determine buy price."):
         await freqtrade.execute_entry(pair, stake_amount)
@@ -958,7 +958,7 @@ async def test_execute_entry_confirm_error(mocker, default_conf, fee, limit_buy_
             'last': 0.00001172
         }),
         create_order=get_mock_coro(return_value=limit_buy_order),
-        get_rate=MagicMock(return_value=0.11),
+        get_rate=get_mock_coro(return_value=0.11),
         get_min_pair_stake_amount=MagicMock(return_value=1),
         get_fee=fee,
     )
@@ -4149,7 +4149,7 @@ async def test_order_book_depth_of_market_high_delta(default_conf, ticker, limit
     assert trade is None
 
 
-def test_order_book_bid_strategy1(mocker, default_conf, order_book_l2) -> None:
+async def test_order_book_bid_strategy1(mocker, default_conf, order_book_l2) -> None:
     """
     test if function get_rate will return the order book price
     instead of the ask rate
@@ -4169,11 +4169,11 @@ def test_order_book_bid_strategy1(mocker, default_conf, order_book_l2) -> None:
     default_conf['telegram']['enabled'] = False
 
     freqtrade = FreqtradeBot(default_conf)
-    assert freqtrade.exchange.get_rate('ETH/BTC', refresh=True, side="buy") == 0.043935
+    assert await freqtrade.exchange.get_rate('ETH/BTC', refresh=True, side="buy") == 0.043935
     assert ticker_mock.call_count == 0
 
 
-def test_order_book_bid_strategy_exception(mocker, default_conf, caplog) -> None:
+async def test_order_book_bid_strategy_exception(mocker, default_conf, caplog) -> None:
     patch_exchange(mocker)
     ticker_mock = MagicMock(return_value={'ask': 0.042, 'last': 0.046})
     mocker.patch.multiple(
@@ -4191,8 +4191,8 @@ def test_order_book_bid_strategy_exception(mocker, default_conf, caplog) -> None
     freqtrade = FreqtradeBot(default_conf)
     # orderbook shall be used even if tickers would be lower.
     with pytest.raises(PricingError):
-        freqtrade.exchange.get_rate('ETH/BTC', refresh=True, side="buy")
-    assert log_has_re(r'Buy Price at location 1 from orderbook could not be determined.', caplog)
+        await freqtrade.exchange.get_rate('ETH/BTC', refresh=True, side="buy")
+    assert log_has_re(r'Buy Price from orderbook could not be determined.', caplog)
 
 
 def test_check_depth_of_market_buy(default_conf, mocker, order_book_l2) -> None:

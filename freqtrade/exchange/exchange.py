@@ -1035,7 +1035,7 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    def get_rate(self, pair: str, refresh: bool, side: str) -> float:
+    async def get_rate(self, pair: str, refresh: bool, side: str) -> float:
         """
         Calculates bid/ask target
         bid rate - between current ask price and last price

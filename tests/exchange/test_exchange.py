@@ -1818,7 +1818,7 @@ def test_fetch_l2_order_book_exception(default_conf, mocker, exchange_name):
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
 
-
+@pytest.mark.asyncio
 @pytest.mark.parametrize("side,ask,bid,last,last_ab,expected", [
     ('ask', 20, 19, 10, 0.0, 20),  # Full ask side
     ('ask', 20, 19, 10, 1.0, 10),  # Full last side
@@ -1843,8 +1843,8 @@ def test_fetch_l2_order_book_exception(default_conf, mocker, exchange_name):
     ('bid', 6, 5, None, 1, 5),  # last not available - uses bid
     ('bid', 6, 5, None, 0, 5),  # last not available - uses bid
 ])
-def test_get_buy_rate(mocker, default_conf, caplog, side, ask, bid,
-                      last, last_ab, expected) -> None:
+async def test_get_buy_rate(mocker, default_conf, caplog, side, ask, bid,
+                            last, last_ab, expected) -> None:
     caplog.set_level(logging.DEBUG)
     default_conf['bid_strategy']['ask_last_balance'] = last_ab
     default_conf['bid_strategy']['price_side'] = side
@@ -1852,14 +1852,14 @@ def test_get_buy_rate(mocker, default_conf, caplog, side, ask, bid,
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
                  return_value={'ask': ask, 'last': last, 'bid': bid})
 
-    assert exchange.get_rate('ETH/BTC', refresh=True, side="buy") == expected
+    assert await exchange.get_rate('ETH/BTC', refresh=True, side="buy") == expected
     assert not log_has("Using cached buy rate for ETH/BTC.", caplog)
 
-    assert exchange.get_rate('ETH/BTC', refresh=False, side="buy") == expected
+    assert await exchange.get_rate('ETH/BTC', refresh=False, side="buy") == expected
     assert log_has("Using cached buy rate for ETH/BTC.", caplog)
     # Running a 2nd time with Refresh on!
     caplog.clear()
-    assert exchange.get_rate('ETH/BTC', refresh=True, side="buy") == expected
+    assert await exchange.get_rate('ETH/BTC', refresh=True, side="buy") == expected
     assert not log_has("Using cached buy rate for ETH/BTC.", caplog)
 
 
