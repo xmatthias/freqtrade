@@ -796,7 +796,7 @@ class FreqtradeBot(LoggingMixin):
             # Lock pair for one candle to prevent immediate rebuys
             self.strategy.lock_pair(trade.pair, datetime.now(timezone.utc),
                                     reason='Auto lock')
-            self._notify_exit(trade, "stoploss")
+            await self._notify_exit(trade, "stoploss")
             return True
 
         if trade.open_order_id or not trade.is_open:
@@ -1053,7 +1053,7 @@ class FreqtradeBot(LoggingMixin):
             reason = constants.CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
 
         self.wallets.update()
-        self._notify_exit_cancel(
+        await self._notify_exit_cancel(
             trade,
             order_type=self.strategy.order_types['sell'],
             reason=reason
@@ -1172,11 +1172,11 @@ class FreqtradeBot(LoggingMixin):
         self.strategy.lock_pair(trade.pair, datetime.now(timezone.utc),
                                 reason='Auto lock')
 
-        self._notify_exit(trade, order_type)
+        await self._notify_exit(trade, order_type)
 
         return True
 
-    def _notify_exit(self, trade: Trade, order_type: str, fill: bool = False) -> None:
+    async def _notify_exit(self, trade: Trade, order_type: str, fill: bool = False) -> None:
         """
         Sends rpc notification when a sell occurred.
         """
@@ -1218,7 +1218,7 @@ class FreqtradeBot(LoggingMixin):
         # Send the message
         self.rpc.send_msg(msg)
 
-    def _notify_exit_cancel(self, trade: Trade, order_type: str, reason: str) -> None:
+    async def _notify_exit_cancel(self, trade: Trade, order_type: str, reason: str) -> None:
         """
         Sends rpc notification when a sell cancel occurred.
         """
@@ -1313,7 +1313,7 @@ class FreqtradeBot(LoggingMixin):
         # Updating wallets when order is closed
         if not trade.is_open:
             if not stoploss_order and not trade.open_order_id:
-                self._notify_exit(trade, '', True)
+                await self._notify_exit(trade, '', True)
             self.protections.stop_per_pair(trade.pair)
             self.protections.global_stop()
             self.wallets.update()
