@@ -7,7 +7,7 @@ import ccxt
 from freqtrade.exceptions import (DDosProtection, InsufficientFundsError, InvalidOrderException,
                                   OperationalException, TemporaryError)
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import API_FETCH_ORDER_RETRY_COUNT, retrier, retrier_async
+from freqtrade.exchange.common import API_FETCH_ORDER_RETRY_COUNT, retrier_async
 from freqtrade.misc import safe_value_fallback2
 
 

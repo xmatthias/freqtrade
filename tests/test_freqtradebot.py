@@ -2503,7 +2503,7 @@ async def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order
     mocker.patch('freqtrade.exchange.Exchange.cancel_order_with_result', cancel_order_mock)
 
     freqtrade = FreqtradeBot(default_conf)
-    freqtrade._notify_enter_cancel = MagicMock()
+    freqtrade._notify_enter_cancel = get_mock_coro()
 
     trade = MagicMock()
     trade.pair = 'LTC/USDT'
@@ -2573,7 +2573,7 @@ async def test_handle_cancel_enter_corder_empty(mocker, default_conf, limit_buy_
     )
 
     freqtrade = FreqtradeBot(default_conf)
-    freqtrade._notify_enter_cancel = MagicMock()
+    freqtrade._notify_enter_cancel = get_mock_coro()
 
     trade = MagicMock()
     trade.pair = 'LTC/USDT'
@@ -3723,7 +3723,8 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, l
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
 
 
-async def test_get_real_amount_quote(default_conf, trades_for_order, buy_order_fee, fee, caplog, mocker):
+async def test_get_real_amount_quote(default_conf, trades_for_order, buy_order_fee, fee,
+                                     caplog, mocker):
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order)
     amount = sum(x['amount'] for x in trades_for_order)
     trade = Trade(
@@ -3818,7 +3819,8 @@ async def test_get_real_amount_no_currency_in_fee(default_conf, trades_for_order
     limit_buy_order['fee'] = {'cost': 0.004, 'currency': None}
     trades_for_order[0]['fee']['currency'] = None
 
-    mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', get_mock_coro(trades_for_order))
+    mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order',
+                 get_mock_coro(trades_for_order))
     amount = sum(x['amount'] for x in trades_for_order)
     trade = Trade(
         pair='LTC/ETH',
@@ -3921,7 +3923,7 @@ async def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order
 
 
 async def test_get_real_amount_fromorder(default_conf, trades_for_order, buy_order_fee, fee,
-                                   caplog, mocker):
+                                         caplog, mocker):
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['fee'] = {'cost': 0.004, 'currency': 'LTC'}
 
@@ -3948,7 +3950,8 @@ async def test_get_real_amount_fromorder(default_conf, trades_for_order, buy_ord
                    caplog)
 
 
-async def test_get_real_amount_invalid_order(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_invalid_order(default_conf, trades_for_order, buy_order_fee,
+                                             fee, mocker):
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['fee'] = {'cost': 0.004}
 
@@ -3969,7 +3972,8 @@ async def test_get_real_amount_invalid_order(default_conf, trades_for_order, buy
     assert await freqtrade.get_real_amount(trade, limit_buy_order) == amount
 
 
-async def test_get_real_amount_wrong_amount(default_conf, trades_for_order, buy_order_fee, fee, mocker):
+async def test_get_real_amount_wrong_amount(default_conf, trades_for_order, buy_order_fee,
+                                            fee, mocker):
     limit_buy_order = deepcopy(buy_order_fee)
     limit_buy_order['amount'] = limit_buy_order['amount'] - 0.001
 
@@ -3991,8 +3995,8 @@ async def test_get_real_amount_wrong_amount(default_conf, trades_for_order, buy_
         await freqtrade.get_real_amount(trade, limit_buy_order)
 
 
-async def test_get_real_amount_wrong_amount_rounding(default_conf, trades_for_order, buy_order_fee, fee,
-                                               mocker):
+async def test_get_real_amount_wrong_amount_rounding(default_conf, trades_for_order,
+                                                     buy_order_fee, fee, mocker):
     # Floats should not be compared directly.
     limit_buy_order = deepcopy(buy_order_fee)
     trades_for_order[0]['amount'] = trades_for_order[0]['amount'] + 1e-15

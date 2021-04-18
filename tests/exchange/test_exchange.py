@@ -2579,7 +2579,10 @@ async def test_get_trades_for_order(default_conf, mocker, exchange_name):
                                                             'side': 'buy',
                                                             'price': 165.0,
                                                             'amount': 0.2340606,
-                                                            'fee': {'cost': 0.06179, 'currency': 'BTC'}
+                                                            'fee': {
+                                                                'cost': 0.06179,
+                                                                'currency': 'BTC'
+                                                                }
                                                             }])
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
