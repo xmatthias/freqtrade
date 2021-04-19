@@ -212,16 +212,16 @@ class Exchange:
     @property
     def name(self) -> str:
         """exchange Name (from ccxt)"""
-        return self._api.name
+        return self._api_async.name
 
     @property
     def id(self) -> str:
         """exchange ccxt id"""
-        return self._api.id
+        return self._api_async.id
 
     @property
     def timeframes(self) -> List[str]:
-        return list((self._api.timeframes or {}).keys())
+        return list((self._api_async.timeframes or {}).keys())
 
     @property
     def markets(self) -> Dict:
@@ -234,7 +234,7 @@ class Exchange:
     @property
     def precisionMode(self) -> str:
         """exchange ccxt precisionMode"""
-        return self._api.precisionMode
+        return self._api_async.precisionMode
 
     def _log_exchange_response(self, endpoint, response) -> None:
         """ Log exchange responses """
@@ -430,7 +430,7 @@ class Exchange:
         """
         Check if timeframe from config is a supported timeframe on the exchange
         """
-        if not hasattr(self._api, "timeframes") or self._api.timeframes is None:
+        if not hasattr(self._api, "timeframes") or self._api_async.timeframes is None:
             # If timeframes attribute is missing (or is None), the exchange probably
             # has no fetchOHLCV method.
             # Therefore we also show that.
@@ -488,7 +488,7 @@ class Exchange:
         :param endpoint: Name of endpoint (e.g. 'fetchOHLCV', 'fetchTickers')
         :return: bool
         """
-        return endpoint in self._api.has and self._api.has[endpoint]
+        return endpoint in self._api_async.has and self._api_async.has[endpoint]
 
     def amount_to_precision(self, pair: str, amount: float) -> float:
         """
