@@ -1067,7 +1067,7 @@ def limit_sell_order(limit_sell_order_open):
 
 @pytest.fixture
 def order_book_l2():
-    return MagicMock(return_value={
+    return get_mock_coro(return_value={
         'bids': [
             [0.043936, 10.442],
             [0.043935, 31.865],

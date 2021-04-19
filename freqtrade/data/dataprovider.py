@@ -225,4 +225,4 @@ class DataProvider:
         """
         if self._exchange is None:
             raise OperationalException(NO_EXCHANGE_EXCEPTION)
-        return self._exchange.fetch_l2_order_book(pair, maximum)
+        return self._exchange.fetch_l2_order_book_sync(pair, maximum)
