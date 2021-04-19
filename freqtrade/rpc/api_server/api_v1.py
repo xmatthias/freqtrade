@@ -44,9 +44,9 @@ def version():
 
 
 @router.get('/balance', response_model=Balances, tags=['info'])
-def balance(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
+async def balance(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
     """Account Balances"""
-    return rpc._rpc_balance(config['stake_currency'], config.get('fiat_display_currency', ''),)
+    return await rpc._rpc_balance(config['stake_currency'], config.get('fiat_display_currency', ''))
 
 
 @router.get('/count', response_model=Count, tags=['info'])

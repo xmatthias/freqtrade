@@ -241,14 +241,12 @@ def test_refresh_pairlist_dynamic(mocker, shitcoinmarkets, tickers, whitelist_co
         PairListManager(freqtrade.exchange, whitelist_conf, asyncio.get_event_loop())
 
 
-def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers, whitelist_conf_2):
-
-    tickers_dict = tickers()
+def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers_base, whitelist_conf_2):
 
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         exchange_has=MagicMock(return_value=True),
-        get_tickers=get_mock_coro(return_value=tickers_dict),
+        get_tickers=get_mock_coro(return_value=tickers_base),
     )
 
     freqtrade = get_patched_freqtradebot(mocker, whitelist_conf_2)
@@ -265,7 +263,7 @@ def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers, whitelist_
     # Delay to allow 0 TTL cache to expire...
     time.sleep(1)
     whitelist = ['FUEL/BTC', 'ETH/BTC', 'TKN/BTC', 'LTC/BTC', 'XRP/BTC']
-    tickers_dict['FUEL/BTC']['quoteVolume'] = 10000.0
+    tickers_base['FUEL/BTC']['quoteVolume'] = 10000.0
     freqtrade.pairlists.refresh_pairlist()
     assert whitelist == freqtrade.pairlists.whitelist
 
@@ -920,14 +918,14 @@ def test_rangestabilityfilter_caching(mocker, markets, default_conf, tickers, oh
     assert freqtrade.exchange.refresh_latest_ohlcv.call_count == previous_call_count
 
 
-def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers, caplog):
+def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers_base, caplog):
     default_conf['pairlists'] = [{'method': 'VolumePairList', 'number_assets': 10},
                                  {'method': 'SpreadFilter', 'max_spread_ratio': 0.1}]
 
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           markets=PropertyMock(return_value=markets),
                           exchange_has=MagicMock(return_value=True),
-                          get_tickers=tickers
+                          get_tickers=get_mock_coro(tickers_base),
                           )
 
     ftbot = get_patched_freqtradebot(mocker, default_conf)
@@ -935,10 +933,10 @@ def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers, caplo
 
     assert len(ftbot.pairlists.whitelist) == 5
 
-    tickers.return_value['ETH/BTC']['ask'] = 0.0
-    del tickers.return_value['TKN/BTC']
-    del tickers.return_value['LTC/BTC']
-    mocker.patch.multiple('freqtrade.exchange.Exchange', get_tickers=tickers)
+    tickers_base['ETH/BTC']['ask'] = 0.0
+    del tickers_base['TKN/BTC']
+    del tickers_base['LTC/BTC']
+    mocker.patch.multiple('freqtrade.exchange.Exchange', get_tickers=get_mock_coro(tickers_base))
 
     ftbot.pairlists.refresh_pairlist()
     assert log_has_re(r'Removed .* invalid ticker data.*', caplog)

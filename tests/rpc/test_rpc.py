@@ -505,7 +505,8 @@ async def test_rpc_trade_statistics_closed(mocker, default_conf, ticker, fee,
     assert prec_satoshi(stats['best_rate'], 6.2)
 
 
-def test_rpc_balance_handle_error(default_conf, mocker):
+@pytest.mark.asyncio
+async def test_rpc_balance_handle_error(default_conf, mocker):
     mock_balance = {
         'BTC': {
             'free': 10.0,
@@ -529,7 +530,7 @@ def test_rpc_balance_handle_error(default_conf, mocker):
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         get_balances=MagicMock(return_value=mock_balance),
-        get_tickers=MagicMock(side_effect=TemporaryError('Could not load ticker due to xxx'))
+        get_tickers=get_mock_coro(side_effect=TemporaryError('Could not load ticker due to xxx'))
     )
 
     freqtradebot = get_patched_freqtradebot(mocker, default_conf)
@@ -537,10 +538,12 @@ def test_rpc_balance_handle_error(default_conf, mocker):
     rpc = RPC(freqtradebot)
     rpc._fiat_converter = CryptoToFiatConverter()
     with pytest.raises(RPCException, match="Error getting current tickers."):
-        rpc._rpc_balance(default_conf['stake_currency'], default_conf['fiat_display_currency'])
+        await rpc._rpc_balance(default_conf['stake_currency'],
+                               default_conf['fiat_display_currency'])
 
 
-def test_rpc_balance_handle(default_conf, mocker, tickers):
+@pytest.mark.asyncio
+async def test_rpc_balance_handle(default_conf, mocker, tickers):
     mock_balance = {
         'BTC': {
             'free': 10.0,
@@ -578,7 +581,8 @@ def test_rpc_balance_handle(default_conf, mocker, tickers):
     rpc = RPC(freqtradebot)
     rpc._fiat_converter = CryptoToFiatConverter()
 
-    result = rpc._rpc_balance(default_conf['stake_currency'], default_conf['fiat_display_currency'])
+    result = await rpc._rpc_balance(default_conf['stake_currency'],
+                                    default_conf['fiat_display_currency'])
     assert prec_satoshi(result['total'], 12.309096315)
     assert prec_satoshi(result['value'], 184636.44472997)
     assert tickers.call_count == 1

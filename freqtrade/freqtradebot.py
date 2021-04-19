@@ -151,10 +151,9 @@ class FreqtradeBot(LoggingMixin):
 
         # Check whether markets have to be reloaded and reload them when it's needed
         self.exchange.reload_markets()
+        loop = asyncio.get_event_loop()
 
-        asyncio.get_event_loop().run_until_complete(
-            self.update_closed_trades_without_assigned_fees()
-            )
+        loop.run_until_complete(self.update_closed_trades_without_assigned_fees())
 
         # Query trades from persistence layer
         trades = Trade.get_open_trades()
@@ -171,7 +170,7 @@ class FreqtradeBot(LoggingMixin):
 
         with self._exit_lock:
             # Check and handle any timed out open orders
-            asyncio.get_event_loop().run_until_complete(self.check_handle_timedout())
+            loop.run_until_complete(self.check_handle_timedout())
 
         # Protect from collisions with forcesell.
         # Without this, freqtrade my try to recreate stoploss_on_exchange orders
@@ -179,11 +178,11 @@ class FreqtradeBot(LoggingMixin):
         with self._exit_lock:
             trades = Trade.get_open_trades()
             # First process current opened trades (positions)
-            asyncio.get_event_loop().run_until_complete(self.exit_positions(trades))
+            loop.run_until_complete(self.exit_positions(trades))
 
         # Then looking for buy opportunities
         if self.get_free_open_trades():
-            asyncio.get_event_loop().run_until_complete(self.enter_positions())
+            loop.run_until_complete(self.enter_positions())
 
         Trade.commit()
 

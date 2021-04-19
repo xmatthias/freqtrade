@@ -594,8 +594,9 @@ class Telegram(RPCHandler):
     def _balance(self, update: Update, context: CallbackContext) -> None:
         """ Handler for /balance """
         try:
-            result = self._rpc._rpc_balance(self._config['stake_currency'],
-                                            self._config.get('fiat_display_currency', ''))
+            result = asyncio.new_event_loop().run_until_complete(
+                self._rpc._rpc_balance(self._config['stake_currency'],
+                                       self._config.get('fiat_display_currency', '')))
 
             balance_dust_level = self._config['telegram'].get('balance_dust_level', 0.0)
             if not balance_dust_level:

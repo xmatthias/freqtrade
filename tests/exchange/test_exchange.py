@@ -1417,11 +1417,11 @@ async def test_get_tickers(default_conf, mocker, exchange_name):
                                "get_tickers", "fetch_tickers")
 
     with pytest.raises(OperationalException):
-        api_mock.fetch_tickers = get_mock_coro](side_effect=ccxt.NotSupported("DeadBeef"))
+        api_mock.fetch_tickers = get_mock_coro(side_effect=ccxt.NotSupported("DeadBeef"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange.get_tickers()
 
-    api_mock.fetch_tickers = get_mock_coro](return_value={})
+    api_mock.fetch_tickers = get_mock_coro(return_value={})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     await exchange.get_tickers()
 

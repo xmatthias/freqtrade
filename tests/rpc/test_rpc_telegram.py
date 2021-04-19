@@ -539,6 +539,7 @@ def test_telegram_balance_handle(default_conf, update, mocker, rpc_balance, tick
 def test_balance_handle_empty_response(default_conf, update, mocker) -> None:
     default_conf['dry_run'] = False
     mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value={})
+    mocker.patch('freqtrade.exchange.Exchange.get_tickers', get_mock_coro({}))
 
     telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
     patch_get_signal(freqtradebot)
@@ -552,6 +553,7 @@ def test_balance_handle_empty_response(default_conf, update, mocker) -> None:
 
 def test_balance_handle_empty_response_dry(default_conf, update, mocker) -> None:
     mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value={})
+    mocker.patch('freqtrade.exchange.Exchange.get_tickers', get_mock_coro({}))
 
     telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
     patch_get_signal(freqtradebot)

@@ -1169,8 +1169,13 @@ def ohlcv_history(ohlcv_history_list):
 
 
 @pytest.fixture
-def tickers():
-    return get_mock_coro(return_value={
+def tickers(tickers_base):
+    return get_mock_coro(tickers_base)
+
+
+@pytest.fixture
+def tickers_base():
+    return {
         'ETH/BTC': {
             'symbol': 'ETH/BTC',
             'timestamp': 1522014806207,
@@ -1519,7 +1524,7 @@ def tickers():
             "quoteVolume": 0.0,
             "info": {}
         },
-    })
+    }
 
 
 @pytest.fixture

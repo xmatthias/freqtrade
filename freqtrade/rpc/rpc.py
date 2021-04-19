@@ -449,12 +449,12 @@ class RPC:
             'losing_trades': losing_trades,
         }
 
-    def _rpc_balance(self, stake_currency: str, fiat_display_currency: str) -> Dict:
+    async def _rpc_balance(self, stake_currency: str, fiat_display_currency: str) -> Dict:
         """ Returns current account balance per crypto """
         output = []
         total = 0.0
         try:
-            tickers = self._freqtrade.exchange.get_tickers(cached=True)
+            tickers = await self._freqtrade.exchange.get_tickers(cached=True)
         except (ExchangeError):
             raise RPCException('Error getting current tickers.')
 

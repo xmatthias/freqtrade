@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict
 
@@ -26,7 +27,7 @@ def start_test_pairlist(args: Dict[str, Any]) -> None:
     results = {}
     for curr in quote_currencies:
         config['stake_currency'] = curr
-        pairlists = PairListManager(exchange, config)
+        pairlists = PairListManager(exchange, config, asyncio.get_event_loop())
         pairlists.refresh_pairlist()
         results[curr] = pairlists.whitelist
 
