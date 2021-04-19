@@ -1776,13 +1776,14 @@ def test_get_next_limit_in_list():
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_fetch_l2_order_book(default_conf, mocker, order_book_l2, exchange_name):
+@pytest.mark.asyncio
+async def test_fetch_l2_order_book(default_conf, mocker, order_book_l2, exchange_name):
     default_conf['exchange']['name'] = exchange_name
     api_mock = MagicMock()
 
     api_mock.fetch_l2_order_book = order_book_l2
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    order_book = exchange.fetch_l2_order_book(pair='ETH/BTC', limit=10)
+    order_book = await exchange.fetch_l2_order_book(pair='ETH/BTC', limit=10)
     assert 'bids' in order_book
     assert 'asks' in order_book
     assert len(order_book['bids']) == 10
@@ -1792,7 +1793,7 @@ def test_fetch_l2_order_book(default_conf, mocker, order_book_l2, exchange_name)
     for val in [1, 5, 10, 12, 20, 50, 100]:
         api_mock.fetch_l2_order_book.reset_mock()
 
-        order_book = exchange.fetch_l2_order_book(pair='ETH/BTC', limit=val)
+        order_book = await exchange.fetch_l2_order_book(pair='ETH/BTC', limit=val)
         assert api_mock.fetch_l2_order_book.call_args_list[0][0][0] == 'ETH/BTC'
         # Not all exchanges support all limits for orderbook
         if not exchange._ft_has['l2_limit_range'] or val in exchange._ft_has['l2_limit_range']:
@@ -1801,22 +1802,20 @@ def test_fetch_l2_order_book(default_conf, mocker, order_book_l2, exchange_name)
             next_limit = exchange.get_next_limit_in_list(val, exchange._ft_has['l2_limit_range'])
             assert api_mock.fetch_l2_order_book.call_args_list[0][0][1] == next_limit
 
-
-@pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_fetch_l2_order_book_exception(default_conf, mocker, exchange_name):
+    # Test exceptions
     api_mock = MagicMock()
     with pytest.raises(OperationalException):
         api_mock.fetch_l2_order_book = MagicMock(side_effect=ccxt.NotSupported("Not supported"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
+        await exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
     with pytest.raises(TemporaryError):
         api_mock.fetch_l2_order_book = MagicMock(side_effect=ccxt.NetworkError("DeadBeef"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
+        await exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
     with pytest.raises(OperationalException):
         api_mock.fetch_l2_order_book = MagicMock(side_effect=ccxt.BaseError("DeadBeef"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
+        await exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("side,ask,bid,last,last_ab,expected", [

@@ -115,16 +115,16 @@ class TestCCXTExchange():
         if EXCHANGES[exchangename].get('hasQuoteVolume'):
             assert ticker['quoteVolume'] is not None
 
-    def test_ccxt_fetch_l2_orderbook(self, exchange):
+    def test_ccxt_fetch_l2_orderbook_sync(self, exchange):
         exchange, exchangename = exchange
         pair = EXCHANGES[exchangename]['pair']
-        l2 = exchange.fetch_l2_order_book(pair)
+        l2 = exchange.fetch_l2_order_book_sync(pair)
         assert 'asks' in l2
         assert 'bids' in l2
         l2_limit_range = exchange._ft_has['l2_limit_range']
         l2_limit_range_required = exchange._ft_has['l2_limit_range_required']
         for val in [1, 2, 5, 25, 100]:
-            l2 = exchange.fetch_l2_order_book(pair, val)
+            l2 = exchange.fetch_l2_order_book_sync(pair, val)
             if not l2_limit_range or val in l2_limit_range:
                 assert len(l2['asks']) == val
                 assert len(l2['bids']) == val
@@ -140,15 +140,15 @@ class TestCCXTExchange():
                     assert len(l2['asks']) == next_limit
 
     @pytest.mark.asyncio
-    async def test_ccxt_fetch_l2_orderbook_async(self, exchange):
+    async def test_ccxt_fetch_l2_orderbook(self, exchange):
         exchange, exchangename = exchange
         pair = EXCHANGES[exchangename]['pair']
-        l2 = await exchange.fetch_l2_order_book_async(pair)
+        l2 = await exchange.fetch_l2_order_book(pair)
         assert 'asks' in l2
         assert 'bids' in l2
         l2_limit_range = exchange._ft_has['l2_limit_range']
         for val in [1, 2, 5, 25, 100]:
-            l2 = await exchange.fetch_l2_order_book_async(pair, val)
+            l2 = await exchange.fetch_l2_order_book(pair, val)
             if not l2_limit_range or val in l2_limit_range:
                 assert len(l2['asks']) == val
                 assert len(l2['bids']) == val

@@ -987,7 +987,7 @@ class Exchange:
         return result
 
     @retrier_async
-    async def fetch_l2_order_book_async(self, pair: str, limit: int = 100) -> dict:
+    async def fetch_l2_order_book(self, pair: str, limit: int = 100) -> dict:
         """
         Get L2 order book from exchange.
         Can be limited to a certain amount (if supported).
@@ -1011,7 +1011,7 @@ class Exchange:
             raise OperationalException(e) from e
 
     @retrier
-    def fetch_l2_order_book(self, pair: str, limit: int = 100) -> dict:
+    def fetch_l2_order_book_sync(self, pair: str, limit: int = 100) -> dict:
         """
         Get L2 order book from exchange.
         Can be limited to a certain amount (if supported).
@@ -1062,7 +1062,7 @@ class Exchange:
         if conf_strategy.get('use_order_book', False) and ('use_order_book' in conf_strategy):
 
             order_book_top = conf_strategy.get('order_book_top', 1)
-            order_book = self.fetch_l2_order_book(pair, order_book_top)
+            order_book = await self.fetch_l2_order_book(pair, order_book_top)
             logger.debug('order_book %s', order_book)
             # top 1 = index 0
             try:

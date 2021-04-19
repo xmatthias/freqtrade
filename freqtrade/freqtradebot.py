@@ -437,7 +437,7 @@ class FreqtradeBot(LoggingMixin):
             bid_check_dom = self.config.get('bid_strategy', {}).get('check_depth_of_market', {})
             if ((bid_check_dom.get('enabled', False)) and
                     (bid_check_dom.get('bids_to_ask_delta', 0) > 0)):
-                if self._check_depth_of_market_buy(pair, bid_check_dom):
+                if (await self._check_depth_of_market_buy(pair, bid_check_dom)):
                     return await self.execute_entry(pair, stake_amount, buy_tag=buy_tag)
                 else:
                     return False
@@ -446,13 +446,13 @@ class FreqtradeBot(LoggingMixin):
         else:
             return False
 
-    def _check_depth_of_market_buy(self, pair: str, conf: Dict) -> bool:
+    async def _check_depth_of_market_buy(self, pair: str, conf: Dict) -> bool:
         """
         Checks depth of market before executing a buy
         """
         conf_bids_to_ask_delta = conf.get('bids_to_ask_delta', 0)
         logger.info(f"Checking depth of market for {pair} ...")
-        order_book = self.exchange.fetch_l2_order_book(pair, 1000)
+        order_book = await self.exchange.fetch_l2_order_book(pair, 1000)
         order_book_data_frame = order_book_to_dataframe(order_book['bids'], order_book['asks'])
         order_book_bids = order_book_data_frame['b_size'].sum()
         order_book_asks = order_book_data_frame['a_size'].sum()

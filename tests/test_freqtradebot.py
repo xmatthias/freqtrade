@@ -4178,7 +4178,7 @@ async def test_order_book_bid_strategy_exception(mocker, default_conf, caplog) -
     ticker_mock = MagicMock(return_value={'ask': 0.042, 'last': 0.046})
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_l2_order_book=MagicMock(return_value={'bids': [[]], 'asks': [[]]}),
+        fetch_l2_order_book=get_mock_coro({'bids': [[]], 'asks': [[]]}),
         fetch_ticker=ticker_mock,
 
     )
@@ -4195,7 +4195,7 @@ async def test_order_book_bid_strategy_exception(mocker, default_conf, caplog) -
     assert log_has_re(r'Buy Price from orderbook could not be determined.', caplog)
 
 
-def test_check_depth_of_market_buy(default_conf, mocker, order_book_l2) -> None:
+async def test_check_depth_of_market_buy(default_conf, mocker, order_book_l2) -> None:
     """
     test check depth of market
     """
@@ -4212,7 +4212,7 @@ def test_check_depth_of_market_buy(default_conf, mocker, order_book_l2) -> None:
     freqtrade = FreqtradeBot(default_conf)
 
     conf = default_conf['bid_strategy']['check_depth_of_market']
-    assert freqtrade._check_depth_of_market_buy('ETH/BTC', conf) is False
+    assert (await freqtrade._check_depth_of_market_buy('ETH/BTC', conf)) is False
 
 
 async def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit_buy_order, fee,
@@ -4256,10 +4256,11 @@ async def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit
 
     patch_get_signal(freqtrade, value=(False, True, None))
     assert await freqtrade.handle_trade(trade) is True
-    assert trade.close_rate_requested == order_book_l2.return_value['asks'][0][0]
+    # assert trade.close_rate_requested == order_book_l2.return_value['asks'][0][0]
+    assert trade.close_rate_requested == 0.043949
 
     mocker.patch('freqtrade.exchange.Exchange.fetch_l2_order_book',
-                 return_value={'bids': [[]], 'asks': [[]]})
+                 get_mock_coro(return_value={'bids': [[]], 'asks': [[]]}))
     with pytest.raises(PricingError):
         await freqtrade.handle_trade(trade)
     assert log_has_re(r'Sell Price at location 1 from orderbook could not be determined\..*',
