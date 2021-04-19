@@ -926,8 +926,8 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier
-    def get_tickers(self, cached: bool = False) -> Dict:
+    @retrier_async
+    async def get_tickers(self, cached: bool = False) -> Dict:
         """
         :param cached: Allow cached result
         :return: fetch_tickers result
@@ -937,7 +937,7 @@ class Exchange:
             if tickers:
                 return tickers
         try:
-            tickers = self._api.fetch_tickers()
+            tickers = await self._api_async.fetch_tickers()
             self._fetch_tickers_cache['fetch_tickers'] = tickers
             return tickers
         except ccxt.NotSupported as e:

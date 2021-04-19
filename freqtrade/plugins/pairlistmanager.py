@@ -1,11 +1,10 @@
 """
 PairList manager class
 """
+import asyncio
 import logging
 from copy import deepcopy
 from typing import Dict, List
-
-from cachetools import TTLCache, cached
 
 from freqtrade.constants import ListPairsWithTimeframes
 from freqtrade.exceptions import OperationalException
@@ -19,13 +18,15 @@ logger = logging.getLogger(__name__)
 
 class PairListManager():
 
-    def __init__(self, exchange, config: dict) -> None:
+    def __init__(self, exchange, config: dict, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
         self._exchange = exchange
         self._config = config
         self._whitelist = self._config['exchange'].get('pair_whitelist')
         self._blacklist = self._config['exchange'].get('pair_blacklist', [])
         self._pairlist_handlers: List[IPairList] = []
         self._tickers_needed = False
+
         for pairlist_handler_config in self._config.get('pairlists', None):
             pairlist_handler = PairListResolver.load_pairlist(
                 pairlist_handler_config['method'],
@@ -68,16 +69,13 @@ class PairListManager():
         """List of short_desc for each Pairlist Handler"""
         return [{p.name: p.short_desc()} for p in self._pairlist_handlers]
 
-    @cached(TTLCache(maxsize=1, ttl=1800))
-    def _get_cached_tickers(self):
-        return self._exchange.get_tickers()
-
     def refresh_pairlist(self) -> None:
         """Run pairlist through all configured Pairlist Handlers."""
         # Tickers should be cached to avoid calling the exchange on each call.
         tickers: Dict = {}
         if self._tickers_needed:
-            tickers = self._get_cached_tickers()
+            # TODO: asyncio - improve this?
+            tickers = self._loop.run_until_complete(self._exchange.get_tickers())
 
         # Generate the pairlist with first Pairlist Handler in the chain
         pairlist = self._pairlist_handlers[0].gen_pairlist(tickers)

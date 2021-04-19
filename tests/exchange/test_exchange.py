@@ -1376,7 +1376,8 @@ def test_get_balances_prod(default_conf, mocker, exchange_name):
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_get_tickers(default_conf, mocker, exchange_name):
+@pytest.mark.asyncio
+async def test_get_tickers(default_conf, mocker, exchange_name):
     api_mock = MagicMock()
     tick = {'ETH/BTC': {
         'symbol': 'ETH/BTC',
@@ -1390,10 +1391,10 @@ def test_get_tickers(default_conf, mocker, exchange_name):
         'last': 41,
     }
     }
-    api_mock.fetch_tickers = MagicMock(return_value=tick)
+    api_mock.fetch_tickers = get_mock_coro(return_value=tick)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     # retrieve original ticker
-    tickers = exchange.get_tickers()
+    tickers = await exchange.get_tickers()
 
     assert 'ETH/BTC' in tickers
     assert 'BCH/BTC' in tickers
@@ -1406,23 +1407,23 @@ def test_get_tickers(default_conf, mocker, exchange_name):
     api_mock.fetch_tickers.reset_mock()
 
     # Cached ticker should not call api again
-    tickers2 = exchange.get_tickers(cached=True)
+    tickers2 = await exchange.get_tickers(cached=True)
     assert tickers2 == tickers
     assert api_mock.fetch_tickers.call_count == 0
-    tickers2 = exchange.get_tickers(cached=False)
+    tickers2 = await exchange.get_tickers(cached=False)
     assert api_mock.fetch_tickers.call_count == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "get_tickers", "fetch_tickers")
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "get_tickers", "fetch_tickers")
 
     with pytest.raises(OperationalException):
-        api_mock.fetch_tickers = MagicMock(side_effect=ccxt.NotSupported("DeadBeef"))
+        api_mock.fetch_tickers = get_mock_coro](side_effect=ccxt.NotSupported("DeadBeef"))
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.get_tickers()
+        await exchange.get_tickers()
 
-    api_mock.fetch_tickers = MagicMock(return_value={})
+    api_mock.fetch_tickers = get_mock_coro](return_value={})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    exchange.get_tickers()
+    await exchange.get_tickers()
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)

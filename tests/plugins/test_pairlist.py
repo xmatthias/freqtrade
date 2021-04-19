@@ -1,5 +1,6 @@
 # pragma pylint: disable=missing-docstring,C0103,protected-access
 
+import asyncio
 import time
 from unittest.mock import MagicMock, PropertyMock
 
@@ -11,7 +12,8 @@ from freqtrade.persistence import Trade
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
 from freqtrade.plugins.pairlistmanager import PairListManager
 from freqtrade.resolvers import PairListResolver
-from tests.conftest import get_patched_exchange, get_patched_freqtradebot, log_has, log_has_re
+from tests.conftest import (get_mock_coro, get_patched_exchange, get_patched_freqtradebot, log_has,
+                            log_has_re)
 
 
 @pytest.fixture(scope="function")
@@ -121,7 +123,7 @@ def test_log_cached(mocker, static_pl_conf, markets, tickers):
 def test_load_pairlist_noexist(mocker, markets, default_conf):
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets))
-    plm = PairListManager(freqtrade.exchange, default_conf)
+    plm = PairListManager(freqtrade.exchange, default_conf, asyncio.get_event_loop())
     with pytest.raises(OperationalException,
                        match=r"Impossible to load Pairlist 'NonexistingPairList'. "
                              r"This class does not exist or contains Python code errors."):
@@ -132,7 +134,7 @@ def test_load_pairlist_noexist(mocker, markets, default_conf):
 def test_load_pairlist_verify_multi(mocker, markets, default_conf):
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets))
-    plm = PairListManager(freqtrade.exchange, default_conf)
+    plm = PairListManager(freqtrade.exchange, default_conf, asyncio.get_event_loop())
     # Call different versions one after the other, should always consider what was passed in
     # and have no side-effects (therefore the same check multiple times)
     assert plm.verify_whitelist(['ETH/BTC', 'XRP/BTC', ], print) == ['ETH/BTC', 'XRP/BTC']
@@ -236,7 +238,7 @@ def test_refresh_pairlist_dynamic(mocker, shitcoinmarkets, tickers, whitelist_co
     with pytest.raises(OperationalException,
                        match=r'`number_assets` not specified. Please check your configuration '
                              r'for "pairlist.config.number_assets"'):
-        PairListManager(freqtrade.exchange, whitelist_conf)
+        PairListManager(freqtrade.exchange, whitelist_conf, asyncio.get_event_loop())
 
 
 def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers, whitelist_conf_2):
@@ -246,12 +248,9 @@ def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers, whitelist_
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         exchange_has=MagicMock(return_value=True),
+        get_tickers=get_mock_coro(return_value=tickers_dict),
     )
-    # Remove caching of ticker data to emulate changing volume by the time of second call
-    mocker.patch.multiple(
-        'freqtrade.plugins.pairlistmanager.PairListManager',
-        _get_cached_tickers=MagicMock(return_value=tickers_dict),
-    )
+
     freqtrade = get_patched_freqtradebot(mocker, whitelist_conf_2)
     # Remock markets with shitcoinmarkets since get_patched_freqtradebot uses the markets fixture
     mocker.patch.multiple(
@@ -275,6 +274,7 @@ def test_VolumePairList_refresh_empty(mocker, markets_empty, whitelist_conf):
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         exchange_has=MagicMock(return_value=True),
+        get_tickers=get_mock_coro({})
     )
     freqtrade = get_patched_freqtradebot(mocker, whitelist_conf)
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets_empty))
@@ -647,7 +647,7 @@ def test_PrecisionFilter_error(mocker, whitelist_conf) -> None:
 
     with pytest.raises(OperationalException,
                        match=r"PrecisionFilter can only work with stoploss defined\..*"):
-        PairListManager(MagicMock, whitelist_conf)
+        PairListManager(MagicMock, whitelist_conf, asyncio.get_event_loop())
 
 
 def test_PerformanceFilter_error(mocker, whitelist_conf, caplog) -> None:
@@ -764,7 +764,7 @@ def test_volumepairlist_caching(mocker, markets, whitelist_conf, tickers):
 
     assert len(freqtrade.pairlists._pairlist_handlers[0]._pair_cache) == 1
     freqtrade.pairlists.refresh_pairlist()
-    assert tickers.call_count == 1
+    assert tickers.call_count == 2
 
 
 def test_agefilter_min_days_listed_too_small(mocker, default_conf, markets, tickers):

@@ -3,6 +3,7 @@
 """
 This module contains the backtesting logic
 """
+import asyncio
 import logging
 from collections import defaultdict
 from copy import deepcopy
@@ -98,7 +99,7 @@ class Backtesting:
             self.timeframe_detail_min = 0
         self.detail_data: Dict[str, DataFrame] = {}
 
-        self.pairlists = PairListManager(self.exchange, self.config)
+        self.pairlists = PairListManager(self.exchange, self.config, asyncio.get_event_loop())
         if 'VolumePairList' in self.pairlists.name_list:
             raise OperationalException("VolumePairList not allowed for backtesting.")
         if 'PerformanceFilter' in self.pairlists.name_list:

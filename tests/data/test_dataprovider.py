@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -209,7 +210,7 @@ def test_current_whitelist(mocker, default_conf, tickers):
                           get_tickers=tickers)
     exchange = get_patched_exchange(mocker, default_conf)
 
-    pairlist = PairListManager(exchange, default_conf)
+    pairlist = PairListManager(exchange, default_conf, asyncio.get_event_loop())
     dp = DataProvider(default_conf, exchange, pairlist)
 
     # Simulate volumepairs from exchange.

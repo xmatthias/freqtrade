@@ -1170,7 +1170,7 @@ def ohlcv_history(ohlcv_history_list):
 
 @pytest.fixture
 def tickers():
-    return MagicMock(return_value={
+    return get_mock_coro(return_value={
         'ETH/BTC': {
             'symbol': 'ETH/BTC',
             'timestamp': 1522014806207,
