@@ -2928,10 +2928,11 @@ def test_order_has_fee(order, expected) -> None:
     ({'symbol': 'BTC/USDT', 'fee': {'currency': 'USDT', 'cost': 0.34, 'rate': 0.01}},
         (0.34, 'USDT', 0.01)),
 ])
-def test_extract_cost_curr_rate(mocker, default_conf, order, expected) -> None:
-    mocker.patch('freqtrade.exchange.Exchange.calculate_fee_rate', MagicMock(return_value=0.01))
+@pytest.mark.asyncio
+async def test_extract_cost_curr_rate(mocker, default_conf, order, expected) -> None:
+    mocker.patch('freqtrade.exchange.Exchange.calculate_fee_rate', get_mock_coro(return_value=0.01))
     ex = get_patched_exchange(mocker, default_conf)
-    assert ex.extract_cost_curr_rate(order) == expected
+    assert (await ex.extract_cost_curr_rate(order)) == expected
 
 
 @pytest.mark.parametrize("order,expected", [
@@ -2963,11 +2964,12 @@ def test_extract_cost_curr_rate(mocker, default_conf, order, expected) -> None:
     ({'symbol': 'ETH/BTC', 'amount': 0.04, 'cost': 0.0,
       'fee': {'currency': 'NEO', 'cost': 0.0, 'rate': None}}, None),
 ])
-def test_calculate_fee_rate(mocker, default_conf, order, expected) -> None:
+@pytest.mark.asyncio
+async def test_calculate_fee_rate(mocker, default_conf, order, expected) -> None:
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', return_value={'last': 0.081})
 
     ex = get_patched_exchange(mocker, default_conf)
-    assert ex.calculate_fee_rate(order) == expected
+    assert (await ex.calculate_fee_rate(order)) == expected
 
 
 @pytest.mark.parametrize('retrycount,max_retries,expected', [

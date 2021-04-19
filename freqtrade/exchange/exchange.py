@@ -1175,7 +1175,7 @@ class Exchange:
                 and order['fee']['cost'] is not None
                 )
 
-    def calculate_fee_rate(self, order: Dict) -> Optional[float]:
+    async def calculate_fee_rate(self, order: Dict) -> Optional[float]:
         """
         Calculate fee rate if it's not given by the exchange.
         :param order: Order or trade (one trade) dict
@@ -1205,7 +1205,7 @@ class Exchange:
             except ExchangeError:
                 return None
 
-    def extract_cost_curr_rate(self, order: Dict) -> Tuple[float, str, Optional[float]]:
+    async def extract_cost_curr_rate(self, order: Dict) -> Tuple[float, str, Optional[float]]:
         """
         Extract tuple of cost, currency, rate.
         Requires order_has_fee to run first!
@@ -1214,7 +1214,8 @@ class Exchange:
         """
         return (order['fee']['cost'],
                 order['fee']['currency'],
-                self.calculate_fee_rate(order))
+                await self.calculate_fee_rate(order))
+
 
     # Historic data
 
