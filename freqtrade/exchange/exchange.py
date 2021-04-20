@@ -942,7 +942,7 @@ class Exchange:
             return tickers
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api.name} does not support fetching tickers in batch. '
+                f'Exchange {self.name} does not support fetching tickers in batch. '
                 f'Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -1000,7 +1000,7 @@ class Exchange:
             return await self._api_async.fetch_l2_order_book(pair, limit1)
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api_async.name} does not support fetching order book.'
+                f'Exchange {self.name} does not support fetching order book.'
                 f'Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -1025,7 +1025,7 @@ class Exchange:
             return self._api.fetch_l2_order_book(pair, limit1)
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api.name} does not support fetching order book.'
+                f'Exchange {self.name} does not support fetching order book.'
                 f'Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -1381,7 +1381,7 @@ class Exchange:
 
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api.name} does not support fetching historical '
+                f'Exchange {self.name} does not support fetching historical '
                 f'candle (OHLCV) data. Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -1421,7 +1421,7 @@ class Exchange:
             return trades_dict_to_list(trades)
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api.name} does not support fetching historical trade data.'
+                f'Exchange {self.name} does not support fetching historical trade data.'
                 f'Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
