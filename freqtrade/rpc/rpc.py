@@ -620,7 +620,7 @@ class RPC:
             raise RPCException(f'position for {pair} already open - id: {trade.id}')
 
         # gen stake amount
-        stakeamount = self._freqtrade.wallets.get_trade_stake_amount(pair)
+        stakeamount = await self._freqtrade.wallets.get_trade_stake_amount(pair)
 
         # execute buy
         if await self._freqtrade.execute_entry(pair, stakeamount, price, forcebuy=True):

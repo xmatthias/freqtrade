@@ -79,7 +79,8 @@ async def test_sell_kraken_trading_agreement(default_conf, mocker):
     assert api_mock.create_order.call_args[0][5] == {'trading_agreement': 'agree'}
 
 
-def test_get_balances_prod(default_conf, mocker):
+@pytest.mark.asyncio
+async def test_get_balances_prod(default_conf, mocker):
     balance_item = {
         'free': None,
         'total': 10.0,
@@ -87,7 +88,7 @@ def test_get_balances_prod(default_conf, mocker):
     }
 
     api_mock = MagicMock()
-    api_mock.fetch_balance = MagicMock(return_value={
+    api_mock.fetch_balance = get_mock_coro(return_value={
         '1ST': balance_item.copy(),
         '2ST': balance_item.copy(),
         '3ST': balance_item.copy(),
@@ -138,10 +139,10 @@ def test_get_balances_prod(default_conf, mocker):
                            'average': 0.0,
                            'remaining': 100.0,
                            }]
-    api_mock.fetch_open_orders = MagicMock(return_value=kraken_open_orders)
+    api_mock.fetch_open_orders = get_mock_coro(return_value=kraken_open_orders)
     default_conf['dry_run'] = False
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id="kraken")
-    balances = exchange.get_balances()
+    balances = await exchange.get_balances()
     assert len(balances) == 6
 
     assert balances['1ST']['free'] == 9.0
@@ -163,8 +164,8 @@ def test_get_balances_prod(default_conf, mocker):
     assert balances['EUR']['free'] == 8.0
     assert balances['EUR']['total'] == 10.0
     assert balances['EUR']['used'] == 2.0
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, "kraken",
-                           "get_balances", "fetch_balance")
+    await async_ccxt_exception(mocker, default_conf, api_mock, "kraken",
+                               "get_balances", "fetch_balance")
 
 
 @pytest.mark.asyncio

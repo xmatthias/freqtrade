@@ -68,7 +68,8 @@ class FreqtradeBot(LoggingMixin):
         init_db(self.config.get('db_url', None), clean_open_orders=self.config['dry_run'])
 
         self.wallets = Wallets(self.config, self.exchange)
-        asyncio.get_event_loop().run_until_complete(self.wallets.update())
+        # TODO: asyncio - is updating the wallets "right away" really necessary?
+        # asyncio.get_event_loop().run_until_complete(self.wallets.update())
 
         PairLocks.timeframe = self.config['timeframe']
 
@@ -432,7 +433,7 @@ class FreqtradeBot(LoggingMixin):
         )
 
         if buy and not sell:
-            stake_amount = self.wallets.get_trade_stake_amount(pair, self.edge)
+            stake_amount = await self.wallets.get_trade_stake_amount(pair, self.edge)
 
             bid_check_dom = self.config.get('bid_strategy', {}).get('check_depth_of_market', {})
             if ((bid_check_dom.get('enabled', False)) and

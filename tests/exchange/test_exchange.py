@@ -1351,7 +1351,8 @@ async def test_sell_considers_time_in_force(default_conf, mocker, exchange_name)
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_get_balances_prod(default_conf, mocker, exchange_name):
+@pytest.mark.asyncio
+async def test_get_balances_prod(default_conf, mocker, exchange_name):
     balance_item = {
         'free': 10.0,
         'total': 10.0,
@@ -1359,20 +1360,21 @@ def test_get_balances_prod(default_conf, mocker, exchange_name):
     }
 
     api_mock = MagicMock()
-    api_mock.fetch_balance = MagicMock(return_value={
+    api_mock.fetch_balance = get_mock_coro(return_value={
         '1ST': balance_item,
         '2ST': balance_item,
         '3ST': balance_item
     })
+    api_mock.fetch_open_orders = get_mock_coro(return_value=[])
     default_conf['dry_run'] = False
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert len(exchange.get_balances()) == 3
-    assert exchange.get_balances()['1ST']['free'] == 10.0
-    assert exchange.get_balances()['1ST']['total'] == 10.0
-    assert exchange.get_balances()['1ST']['used'] == 0.0
+    assert len(await exchange.get_balances()) == 3
+    assert (await exchange.get_balances())['1ST']['free'] == 10.0
+    assert (await exchange.get_balances())['1ST']['total'] == 10.0
+    assert (await exchange.get_balances())['1ST']['used'] == 0.0
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "get_balances", "fetch_balance")
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "get_balances", "fetch_balance")
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)

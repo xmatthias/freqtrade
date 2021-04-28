@@ -405,7 +405,9 @@ class Backtesting:
 
     def _enter_trade(self, pair: str, row: List) -> Optional[LocalTrade]:
         try:
-            stake_amount = self.wallets.get_trade_stake_amount(pair, None)
+            # TODO: asyncio: improve this !!!
+            stake_amount = asyncio.get_event_loop().run_until_complete(
+                self.wallets.get_trade_stake_amount(pair, None))
         except DependencyException:
             return None
 

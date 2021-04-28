@@ -1928,7 +1928,7 @@ async def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open
     time.sleep(0.01)  # Race condition fix
     trade.update(limit_buy_order)
     assert trade.is_open is True
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
 
     patch_get_signal(freqtrade, value=(False, True, None))
     assert await freqtrade.handle_trade(trade) is True
@@ -3171,7 +3171,7 @@ async def test_sell_profit_only_enable_profit(default_conf, limit_buy_order, lim
 
     trade = Trade.query.first()
     trade.update(limit_buy_order)
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(False, True, None))
     assert await freqtrade.handle_trade(trade) is False
 
@@ -3209,7 +3209,7 @@ async def test_sell_profit_only_disable_profit(default_conf, limit_buy_order, li
 
     trade = Trade.query.first()
     trade.update(limit_buy_order)
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(False, True, None))
     assert await freqtrade.handle_trade(trade) is True
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
@@ -3278,7 +3278,7 @@ async def test_sell_profit_only_disable_loss(default_conf, limit_buy_order, limi
 
     trade = Trade.query.first()
     trade.update(limit_buy_order)
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(False, True, None))
     assert await freqtrade.handle_trade(trade) is True
     assert trade.sell_reason == SellType.SELL_SIGNAL.value
@@ -3319,13 +3319,13 @@ async def test_sell_not_enough_balance(default_conf, limit_buy_order, limit_buy_
     assert trade.amount != amnt
 
 
-def test__safe_exit_amount(default_conf, fee, caplog, mocker):
+async def test__safe_exit_amount(default_conf, fee, caplog, mocker):
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     amount = 95.33
     amount_wallet = 95.29
     mocker.patch('freqtrade.wallets.Wallets.get_free', MagicMock(return_value=amount_wallet))
-    wallet_update = mocker.patch('freqtrade.wallets.Wallets.update')
+    wallet_update = mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
     trade = Trade(
         pair='LTC/ETH',
         amount=amount,
@@ -3339,17 +3339,17 @@ def test__safe_exit_amount(default_conf, fee, caplog, mocker):
     patch_get_signal(freqtrade)
 
     wallet_update.reset_mock()
-    assert freqtrade._safe_exit_amount(trade.pair, trade.amount) == amount_wallet
+    assert await freqtrade._safe_exit_amount(trade.pair, trade.amount) == amount_wallet
     assert log_has_re(r'.*Falling back to wallet-amount.', caplog)
     assert wallet_update.call_count == 1
     caplog.clear()
     wallet_update.reset_mock()
-    assert freqtrade._safe_exit_amount(trade.pair, amount_wallet) == amount_wallet
+    assert await freqtrade._safe_exit_amount(trade.pair, amount_wallet) == amount_wallet
     assert not log_has_re(r'.*Falling back to wallet-amount.', caplog)
     assert wallet_update.call_count == 1
 
 
-def test__safe_exit_amount_error(default_conf, fee, caplog, mocker):
+async def test__safe_exit_amount_error(default_conf, fee, mocker):
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     amount = 95.33
@@ -3367,7 +3367,7 @@ def test__safe_exit_amount_error(default_conf, fee, caplog, mocker):
     freqtrade = FreqtradeBot(default_conf)
     patch_get_signal(freqtrade)
     with pytest.raises(DependencyException, match=r"Not enough amount to sell."):
-        assert freqtrade._safe_exit_amount(trade.pair, trade.amount)
+        assert await freqtrade._safe_exit_amount(trade.pair, trade.amount)
 
 
 async def test_locked_pairs(default_conf, ticker, fee, ticker_sell_down, mocker, caplog) -> None:
@@ -3432,7 +3432,7 @@ async def test_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy
 
     trade = Trade.query.first()
     trade.update(limit_buy_order)
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     patch_get_signal(freqtrade, value=(True, True, None))
     assert await freqtrade.handle_trade(trade) is False
 
@@ -4069,9 +4069,9 @@ async def test_get_real_amount_open_trade(default_conf, fee, mocker):
     (8.0, 0.1, 8.0, 8.0),
     (8.0, 0.1, 7.9, 7.9),
 ])
-def test_apply_fee_conditional(default_conf, fee, caplog, mocker,
-                               amount, fee_abs, wallet, amount_exp):
-    walletmock = mocker.patch('freqtrade.wallets.Wallets.update')
+async def test_apply_fee_conditional(default_conf, fee, caplog, mocker,
+                                     amount, fee_abs, wallet, amount_exp):
+    walletmock = mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
     mocker.patch('freqtrade.wallets.Wallets.get_free', return_value=wallet)
     trade = Trade(
         pair='LTC/ETH',
@@ -4086,7 +4086,7 @@ def test_apply_fee_conditional(default_conf, fee, caplog, mocker,
 
     walletmock.reset_mock()
     # Amount is kept as is
-    assert freqtrade.apply_fee_conditional(trade, 'LTC', amount, fee_abs) == amount_exp
+    assert (await freqtrade.apply_fee_conditional(trade, 'LTC', amount, fee_abs)) == amount_exp
     assert walletmock.call_count == 1
 
 
@@ -4251,7 +4251,7 @@ async def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit
 
     time.sleep(0.01)  # Race condition fix
     trade.update(limit_buy_order)
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     assert trade.is_open is True
 
     patch_get_signal(freqtrade, value=(False, True, None))
