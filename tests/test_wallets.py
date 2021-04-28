@@ -9,11 +9,14 @@ from freqtrade.exceptions import DependencyException
 from tests.conftest import get_mock_coro, get_patched_freqtradebot, patch_wallet
 
 
-def test_sync_wallet_at_boot(mocker, default_conf):
+pytestmark = pytest.mark.asyncio
+
+
+async def test_sync_wallet_at_boot(mocker, default_conf):
     default_conf['dry_run'] = False
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        get_balances=MagicMock(return_value={
+        get_balances=get_mock_coro(return_value={
             "BNT": {
                 "free": 1.0,
                 "used": 2.0,
@@ -33,6 +36,7 @@ def test_sync_wallet_at_boot(mocker, default_conf):
     )
 
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    await freqtrade.wallets.update()
 
     assert len(freqtrade.wallets._wallets) == 3
     assert freqtrade.wallets._wallets['BNT'].free == 1.0
@@ -46,7 +50,7 @@ def test_sync_wallet_at_boot(mocker, default_conf):
     assert freqtrade.wallets._last_wallet_refresh > 0
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        get_balances=MagicMock(return_value={
+        get_balances=get_mock_coro(return_value={
             "BNT": {
                 "free": 1.2,
                 "used": 1.9,
@@ -60,7 +64,7 @@ def test_sync_wallet_at_boot(mocker, default_conf):
         })
     )
 
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
 
     # USDT is missing from the 2nd result - so should not be in this either.
     assert len(freqtrade.wallets._wallets) == 2
@@ -74,9 +78,9 @@ def test_sync_wallet_at_boot(mocker, default_conf):
     assert freqtrade.wallets.get_used('GAS') == 0.1
     assert freqtrade.wallets.get_total('GAS') == 0.260439
     update_mock = mocker.patch('freqtrade.wallets.Wallets._update_live', get_mock_coro())
-    freqtrade.wallets.update(False)
+    await freqtrade.wallets.update(False)
     assert update_mock.call_count == 0
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     assert update_mock.call_count == 1
 
     assert freqtrade.wallets.get_free('NOCURRENCY') == 0
@@ -84,11 +88,11 @@ def test_sync_wallet_at_boot(mocker, default_conf):
     assert freqtrade.wallets.get_total('NOCURRENCY') == 0
 
 
-def test_sync_wallet_missing_data(mocker, default_conf):
+async def test_sync_wallet_missing_data(mocker, default_conf):
     default_conf['dry_run'] = False
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        get_balances=MagicMock(return_value={
+        get_balances=get_mock_coro(return_value={
             "BNT": {
                 "free": 1.0,
                 "used": 2.0,
@@ -102,7 +106,7 @@ def test_sync_wallet_missing_data(mocker, default_conf):
     )
 
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
-
+    await freqtrade.wallets.update()
     assert len(freqtrade.wallets._wallets) == 2
     assert freqtrade.wallets._wallets['BNT'].free == 1.0
     assert freqtrade.wallets._wallets['BNT'].used == 2.0
@@ -113,12 +117,13 @@ def test_sync_wallet_missing_data(mocker, default_conf):
     assert freqtrade.wallets.get_free('GAS') == 0.260739
 
 
-def test_get_trade_stake_amount_no_stake_amount(default_conf, mocker) -> None:
+async def test_get_trade_stake_amount_no_stake_amount(default_conf, mocker) -> None:
     patch_wallet(mocker, free=default_conf['stake_amount'] * 0.5)
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    await freqtrade.wallets.update()
 
     with pytest.raises(DependencyException, match=r'.*stake amount.*'):
-        freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
+        await freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
 
 
 @pytest.mark.parametrize("balance_ratio,capital,result1,result2", [
@@ -154,30 +159,30 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
     freqtrade = get_patched_freqtradebot(mocker, conf)
 
     # no open trades, order amount should be 'balance / max_open_trades'
-    result = freqtrade.wallets.get_trade_stake_amount('ETH/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('ETH/USDT')
     assert result == result1
 
     # create one trade, order amount should be 'balance / (max_open_trades - num_open_trades)'
     await freqtrade.execute_entry('ETH/USDT', result)
 
-    result = freqtrade.wallets.get_trade_stake_amount('LTC/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('LTC/USDT')
     assert result == result1
 
     # create 2 trades, order amount should be None
     await freqtrade.execute_entry('LTC/BTC', result)
 
-    result = freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
     assert result == 0
 
     freqtrade.config['max_open_trades'] = 3
     freqtrade.config['dry_run_wallet'] = 200
     freqtrade.wallets.start_cap = 200
-    result = freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
     assert round(result, 4) == round(result2, 4)
 
     # set max_open_trades = None, so do not trade
     freqtrade.config['max_open_trades'] = 0
-    result = freqtrade.wallets.get_trade_stake_amount('NEO/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('NEO/USDT')
     assert result == 0
 
 

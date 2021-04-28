@@ -7,7 +7,7 @@ import ccxt
 from freqtrade.exceptions import (DDosProtection, InsufficientFundsError, InvalidOrderException,
                                   OperationalException, TemporaryError)
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import retrier, retrier_async
+from freqtrade.exchange.common import retrier_async
 
 
 logger = logging.getLogger(__name__)

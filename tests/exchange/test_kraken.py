@@ -6,7 +6,7 @@ import pytest
 
 from freqtrade.exceptions import DependencyException, InvalidOrderException
 from tests.conftest import get_mock_coro, get_patched_exchange
-from tests.exchange.test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
+from tests.exchange.test_exchange import async_ccxt_exception
 
 
 STOPLOSS_ORDERTYPE = 'stop-loss'

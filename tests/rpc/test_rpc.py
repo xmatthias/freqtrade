@@ -570,7 +570,7 @@ async def test_rpc_balance_handle(default_conf, mocker, tickers):
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        get_balances=MagicMock(return_value=mock_balance),
+        get_balances=get_mock_coro(return_value=mock_balance),
         get_tickers=tickers,
         get_valid_pair_combination=MagicMock(
             side_effect=lambda a, b: f"{b}/{a}" if a == "USDT" else f"{a}/{b}")

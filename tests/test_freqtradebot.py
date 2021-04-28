@@ -1427,9 +1427,9 @@ async def test_handle_stoploss_on_exchange_trailing_error(
         }
     }
     mocker.patch('freqtrade.exchange.Binance.cancel_stoploss_order',
-                 side_effect=InvalidOrderException())
+                 get_mock_coro(side_effect=InvalidOrderException()))
     mocker.patch('freqtrade.exchange.Binance.fetch_stoploss_order',
-                 return_value=stoploss_order_hanging)
+                 return_vlaue=stoploss_order_hanging)
     await freqtrade.handle_trailing_stoploss_on_exchange(trade, stoploss_order_hanging)
     assert log_has_re(r"Could not cancel stoploss order abcd for pair ETH/BTC.*", caplog)
 
@@ -1439,7 +1439,7 @@ async def test_handle_stoploss_on_exchange_trailing_error(
     # Fail creating stoploss order
     caplog.clear()
     cancel_mock = mocker.patch("freqtrade.exchange.Binance.cancel_stoploss_order", get_mock_coro())
-    mocker.patch("freqtrade.exchange.Exchange.stoploss", side_effect=ExchangeError())
+    mocker.patch("freqtrade.exchange.Binance.stoploss", get_mock_coro(side_effect=ExchangeError()))
     await freqtrade.handle_trailing_stoploss_on_exchange(trade, stoploss_order_hanging)
     assert cancel_mock.call_count == 1
     assert log_has_re(r"Could not create trailing stoploss order for pair ETH/BTC\..*", caplog)
@@ -2517,7 +2517,7 @@ async def test_handle_cancel_enter(mocker, caplog, default_conf, limit_buy_order
     cancel_order_mock.reset_mock()
     caplog.clear()
     limit_buy_order['filled'] = 0.01
-    assert not freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
+    assert not await freqtrade.handle_cancel_enter(trade, limit_buy_order, reason)
     assert cancel_order_mock.call_count == 0
     assert log_has_re("Order .* for .* not cancelled, as the filled amount.* unsellable.*", caplog)
 
@@ -2943,7 +2943,6 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
-        get_balance=get_mock_coro(),
         get_fee=fee,
         amount_to_precision=lambda s, x, y: y,
         price_to_precision=lambda s, x, y: y,

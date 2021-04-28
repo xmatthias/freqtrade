@@ -654,7 +654,7 @@ def test_PerformanceFilter_error(mocker, whitelist_conf, caplog) -> None:
         del Trade.query
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
     exchange = get_patched_exchange(mocker, whitelist_conf)
-    pm = PairListManager(exchange, whitelist_conf)
+    pm = PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
     pm.refresh_pairlist()
 
     assert log_has("PerformanceFilter is not available in this mode.", caplog)
