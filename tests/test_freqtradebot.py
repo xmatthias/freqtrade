@@ -145,13 +145,13 @@ def test_order_dict_live(default_conf, mocker, caplog) -> None:
     assert not log_has_re(".*stoploss_on_exchange .* dry-run", caplog)
 
 
-def test_get_trade_stake_amount(default_conf, ticker, mocker) -> None:
+async def test_get_trade_stake_amount(default_conf, ticker, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
 
     freqtrade = FreqtradeBot(default_conf)
 
-    result = freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
+    result = await freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
     assert result == default_conf['stake_amount']
 
 
@@ -186,12 +186,12 @@ async def test_check_available_stake_amount(default_conf, ticker, mocker, fee, l
 
         if expected[i] is not None:
             limit_buy_order_open['id'] = str(i)
-            result = freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
+            result = await freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
             assert pytest.approx(result) == expected[i]
             await freqtrade.execute_entry('ETH/BTC', result)
         else:
             with pytest.raises(DependencyException):
-                freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
+                await freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
 
 
 def test_edge_called_in_process(mocker, edge_conf) -> None:
@@ -209,16 +209,17 @@ def test_edge_called_in_process(mocker, edge_conf) -> None:
     assert freqtrade.active_pair_whitelist == ['NEO/BTC', 'LTC/BTC']
 
 
-def test_edge_overrides_stake_amount(mocker, edge_conf) -> None:
+async def test_edge_overrides_stake_amount(mocker, edge_conf) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     patch_edge(mocker)
     edge_conf['dry_run_wallet'] = 999.9
-    freqtrade = FreqtradeBot(edge_conf)
+    # freqtrade = FreqtradeBot(edge_conf)
+    freqtrade = get_patched_freqtradebot(mocker, edge_conf)
 
-    assert freqtrade.wallets.get_trade_stake_amount(
+    assert await freqtrade.wallets.get_trade_stake_amount(
         'NEO/BTC', freqtrade.edge) == (999.9 * 0.5 * 0.01) / 0.20
-    assert freqtrade.wallets.get_trade_stake_amount(
+    assert await freqtrade.wallets.get_trade_stake_amount(
         'LTC/BTC', freqtrade.edge) == (999.9 * 0.5 * 0.01) / 0.21
 
 
@@ -457,7 +458,7 @@ async def test_create_trade_limit_reached(default_conf, ticker, limit_buy_order_
     patch_get_signal(freqtrade)
 
     assert not await freqtrade.create_trade('ETH/BTC')
-    assert freqtrade.wallets.get_trade_stake_amount('ETH/BTC', freqtrade.edge) == 0
+    assert await freqtrade.wallets.get_trade_stake_amount('ETH/BTC', freqtrade.edge) == 0
 
 
 async def test_enter_positions_no_pairs_left(default_conf, ticker, limit_buy_order_open, fee,
@@ -1870,8 +1871,7 @@ async def test_update_trade_state_sell(default_conf, trades_for_order, limit_sel
     mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order)
     # fetch_order should not be called!!
     mocker.patch('freqtrade.exchange.Exchange.fetch_order', MagicMock(side_effect=ValueError))
-    wallet_mock = MagicMock()
-    mocker.patch('freqtrade.wallets.Wallets.update', wallet_mock)
+    wallet_mock = mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
 
     patch_exchange(mocker)
     amount = limit_sell_order["amount"]
@@ -2905,6 +2905,7 @@ async def test_execute_trade_exit_sloe_cancel_exception(mocker, default_conf, ti
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
+        get_balances=get_mock_coro([]),
         get_fee=fee,
         create_order=create_order_mock,
     )
@@ -2942,6 +2943,7 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
+        get_balance=get_mock_coro(),
         get_fee=fee,
         amount_to_precision=lambda s, x, y: y,
         price_to_precision=lambda s, x, y: y,
@@ -4309,6 +4311,7 @@ async def test_sync_wallet_dry_run(mocker, default_conf, ticker, fee, limit_buy_
     )
 
     bot = get_patched_freqtradebot(mocker, default_conf)
+    await bot.wallets.update()
     patch_get_signal(bot)
     assert bot.wallets.get_free('BTC') == 0.002
 
@@ -4390,6 +4393,7 @@ async def test_update_open_orders(mocker, default_conf, fee, caplog):
 @pytest.mark.usefixtures("init_persistence")
 async def test_update_closed_trades_without_assigned_fees(mocker, default_conf, fee):
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
 
     def patch_with_fee(order):
         order.update({'fee': {'cost': 0.1, 'rate': 0.01,
