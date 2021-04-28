@@ -458,7 +458,7 @@ class RPC:
         except (ExchangeError):
             raise RPCException('Error getting current tickers.')
 
-        self._freqtrade.wallets.update(require_update=False)
+        await self._freqtrade.wallets.update(require_update=False)
 
         for coin, balance in self._freqtrade.wallets.get_all_balances().items():
             if not balance.total:
@@ -579,7 +579,7 @@ class RPC:
                     # TODO: This should be spawned in tasks
                     await _exec_forcesell(trade)
                 Trade.commit()
-                self._freqtrade.wallets.update()
+                await self._freqtrade.wallets.update()
                 return {'result': 'Created sell orders for all open trades.'}
 
             # Query for trade
@@ -592,7 +592,7 @@ class RPC:
 
             await _exec_forcesell(trade)
             Trade.commit()
-            self._freqtrade.wallets.update()
+            await self._freqtrade.wallets.update()
             return {'result': f'Created sell order for trade {trade_id}.'}
 
     async def _rpc_forcebuy(self, pair: str, price: Optional[float]) -> Optional[Trade]:
@@ -661,7 +661,7 @@ class RPC:
                     pass
 
             trade.delete()
-            self._freqtrade.wallets.update()
+            await self._freqtrade.wallets.update()
             return {
                 'result': 'success',
                 'trade_id': trade_id,

@@ -34,7 +34,6 @@ class Wallets:
         self._wallets: Dict[str, Wallet] = {}
         self.start_cap = config['dry_run_wallet']
         self._last_wallet_refresh = 0
-        self.update()
 
     def get_free(self, currency: str) -> float:
         balance = self._wallets.get(currency)
@@ -93,8 +92,8 @@ class Wallets:
             )
         self._wallets = _wallets
 
-    def _update_live(self) -> None:
-        balances = self._exchange.get_balances()
+    async def _update_live(self) -> None:
+        balances = await self._exchange.get_balances()
 
         for currency in balances:
             if isinstance(balances[currency], dict):
@@ -109,7 +108,7 @@ class Wallets:
             if currency not in balances:
                 del self._wallets[currency]
 
-    def update(self, require_update: bool = True) -> None:
+    async def update(self, require_update: bool = True) -> None:
         """
         Updates wallets from the configured version.
         By default, updates from the exchange.
@@ -119,7 +118,7 @@ class Wallets:
         """
         if (require_update or (self._last_wallet_refresh + 3600 < arrow.utcnow().int_timestamp)):
             if (not self._config['dry_run'] or self._config.get('runmode') == RunMode.LIVE):
-                self._update_live()
+                await self._update_live()
             else:
                 self._update_dry()
             if self._log:

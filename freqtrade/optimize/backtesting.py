@@ -128,6 +128,7 @@ class Backtesting:
         PairLocks.reset_locks()
 
         self.wallets = Wallets(self.config, self.exchange, log=False)
+        asyncio.get_event_loop().run_until_complete(self.wallets.update())
 
         self.timerange = TimeRange.parse_timerange(
             None if self.config.get('timerange') is None else str(self.config.get('timerange')))
@@ -576,7 +577,8 @@ class Backtesting:
             tmp += timedelta(minutes=self.timeframe_min)
 
         trades += self.handle_left_open(open_trades, data=data)
-        self.wallets.update()
+        # TODO: asyncio - investigate better approach for below call
+        asyncio.get_event_loop().run_until_complete(self.wallets.update())
 
         results = trade_list_to_dataframe(trades)
         return {

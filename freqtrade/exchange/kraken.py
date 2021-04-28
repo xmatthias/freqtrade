@@ -33,20 +33,20 @@ class Kraken(Exchange):
         return (parent_check and
                 market.get('darkpool', False) is False)
 
-    @retrier
-    def get_balances(self) -> dict:
+    @retrier_async
+    async def get_balances(self) -> dict:
         if self._config['dry_run']:
             return {}
 
         try:
-            balances = self._api.fetch_balance()
+            balances = await self._api_async.fetch_balance()
             # Remove additional info from ccxt results
             balances.pop("info", None)
             balances.pop("free", None)
             balances.pop("total", None)
             balances.pop("used", None)
 
-            orders = self._api.fetch_open_orders()
+            orders = await self._api_async.fetch_open_orders()
             order_list = [(x["symbol"].split("/")[0 if x["side"] == "sell" else 1],
                            x["remaining"] if x["side"] == "sell" else x["remaining"] * x["price"],
                            # Don't remove the below comment, this can be important for debugging

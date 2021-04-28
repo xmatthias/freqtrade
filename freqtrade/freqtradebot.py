@@ -68,6 +68,7 @@ class FreqtradeBot(LoggingMixin):
         init_db(self.config.get('db_url', None), clean_open_orders=self.config['dry_run'])
 
         self.wallets = Wallets(self.config, self.exchange)
+        asyncio.get_event_loop().run_until_complete(self.wallets.update())
 
         PairLocks.timeframe = self.config['timeframe']
 
@@ -592,7 +593,7 @@ class FreqtradeBot(LoggingMixin):
         Trade.commit()
 
         # Updating wallets
-        self.wallets.update()
+        await self.wallets.update()
 
         self._notify_enter(trade, order_type)
 
@@ -679,7 +680,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Updating wallets if any trade occurred
         if trades_closed:
-            self.wallets.update()
+            await self.wallets.update()
 
         return trades_closed
 
@@ -1013,7 +1014,7 @@ class FreqtradeBot(LoggingMixin):
             logger.info('Partial buy order timeout for %s.', trade)
             reason += f", {constants.CANCEL_REASON['PARTIALLY_FILLED']}"
 
-        self.wallets.update()
+        await self.wallets.update()
         await self._notify_enter_cancel(trade, order_type=self.strategy.order_types['buy'],
                                         reason=reason)
         return was_trade_fully_canceled
@@ -1051,7 +1052,7 @@ class FreqtradeBot(LoggingMixin):
             # TODO: figure out how to handle partially complete sell orders
             reason = constants.CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']
 
-        self.wallets.update()
+        await self.wallets.update()
         await self._notify_exit_cancel(
             trade,
             order_type=self.strategy.order_types['sell'],
@@ -1059,7 +1060,7 @@ class FreqtradeBot(LoggingMixin):
         )
         return reason
 
-    def _safe_exit_amount(self, pair: str, amount: float) -> float:
+    async def _safe_exit_amount(self, pair: str, amount: float) -> float:
         """
         Get sellable amount.
         Should be trade.amount - but will fall back to the available amount if necessary.
@@ -1071,7 +1072,7 @@ class FreqtradeBot(LoggingMixin):
         :raise: DependencyException: if available balance is not within 2% of the available amount.
         """
         # Update wallets to ensure amounts tied up in a stoploss is now free!
-        self.wallets.update()
+        await self.wallets.update()
         trade_base_currency = self.exchange.get_pair_base_currency(pair)
         wallet_amount = self.wallets.get_free(trade_base_currency)
         logger.debug(f"{pair} - Wallet: {wallet_amount} - Trade-amount: {amount}")
@@ -1132,7 +1133,7 @@ class FreqtradeBot(LoggingMixin):
             # but we allow this value to be changed)
             order_type = self.strategy.order_types.get("forcesell", order_type)
 
-        amount = self._safe_exit_amount(trade.pair, trade.amount)
+        amount = await self._safe_exit_amount(trade.pair, trade.amount)
         time_in_force = self.strategy.order_time_in_force['sell']
 
         if not strategy_safe_wrapper(self.strategy.confirm_trade_exit, default_retval=True)(
@@ -1315,20 +1316,20 @@ class FreqtradeBot(LoggingMixin):
                 await self._notify_exit(trade, '', True)
             self.protections.stop_per_pair(trade.pair)
             self.protections.global_stop()
-            self.wallets.update()
+            await self.wallets.update()
         elif not trade.open_order_id:
             # Buy fill
             self._notify_enter_fill(trade)
 
         return False
 
-    def apply_fee_conditional(self, trade: Trade, trade_base_currency: str,
-                              amount: float, fee_abs: float) -> float:
+    async def apply_fee_conditional(self, trade: Trade, trade_base_currency: str,
+                                    amount: float, fee_abs: float) -> float:
         """
         Applies the fee to amount (either from Order or from Trades).
         Can eat into dust if more than the required asset is available.
         """
-        self.wallets.update()
+        await self.wallets.update()
         if fee_abs != 0 and self.wallets.get_free(trade_base_currency) >= amount:
             # Eat into dust if we own more than base currency
             logger.info(f"Fee amount for {trade} was in base currency - "
@@ -1367,8 +1368,8 @@ class FreqtradeBot(LoggingMixin):
                 trade.update_fee(fee_cost, fee_currency, fee_rate, order.get('side', ''))
                 if trade_base_currency == fee_currency:
                     # Apply fee to amount
-                    return self.apply_fee_conditional(trade, trade_base_currency,
-                                                      amount=order_amount, fee_abs=fee_cost)
+                    return await self.apply_fee_conditional(trade, trade_base_currency,
+                                                            amount=order_amount, fee_abs=fee_cost)
                 return order_amount
         return await self.fee_detection_from_trades(trade, order, order_amount)
 
@@ -1414,8 +1415,8 @@ class FreqtradeBot(LoggingMixin):
             raise DependencyException("Half bought? Amounts don't match")
 
         if fee_abs != 0:
-            return self.apply_fee_conditional(trade, trade_base_currency,
-                                              amount=amount, fee_abs=fee_abs)
+            return await self.apply_fee_conditional(trade, trade_base_currency,
+                                                    amount=amount, fee_abs=fee_abs)
         else:
             return amount
 

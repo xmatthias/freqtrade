@@ -906,11 +906,11 @@ class Exchange:
 
         return order
 
-    @retrier
-    def get_balances(self) -> dict:
+    @retrier_async
+    async def get_balances(self) -> dict:
 
         try:
-            balances = self._api.fetch_balance()
+            balances = await self._api_async.fetch_balance()
             # Remove additional info from ccxt results
             balances.pop("info", None)
             balances.pop("free", None)
