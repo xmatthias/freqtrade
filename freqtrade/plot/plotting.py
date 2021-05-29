@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
@@ -546,7 +547,7 @@ def load_and_plot_trades(config: Dict[str, Any]):
     strategy = StrategyResolver.load_strategy(config)
 
     exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config)
-    IStrategy.dp = DataProvider(config, exchange)
+    IStrategy.dp = DataProvider(config, exchange, asyncio.get_event_loop())
     plot_elements = init_plotscript(config, list(exchange.markets), strategy.startup_candle_count)
     timerange = plot_elements['timerange']
     trades = plot_elements['trades']

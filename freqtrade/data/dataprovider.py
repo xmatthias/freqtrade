@@ -4,6 +4,7 @@ Responsible to provide data to the bot
 including ticker and orderbook data, live and historical candle (OHLCV) data
 Common Interface for bot and strategy to access data.
 """
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -26,10 +27,12 @@ MAX_DATAFRAME_CANDLES = 1000
 
 class DataProvider:
 
-    def __init__(self, config: dict, exchange: Optional[Exchange], pairlists=None) -> None:
+    def __init__(self, config: dict, exchange: Optional[Exchange], loop: asyncio.AbstractEventLoop,
+                 pairlists=None, ) -> None:
         self._config = config
         self._exchange = exchange
         self._pairlists = pairlists
+        self._loop = loop
         self.__cached_pairs: Dict[PairWithTimeframe, Tuple[DataFrame, datetime]] = {}
         self.__slice_index: Optional[int] = None
         self.__cached_pairs_backtesting: Dict[PairWithTimeframe, DataFrame] = {}
@@ -211,7 +214,8 @@ class DataProvider:
         if self._exchange is None:
             raise OperationalException(NO_EXCHANGE_EXCEPTION)
         try:
-            return self._exchange.fetch_ticker(pair)
+
+            return self._loop.run_until_complete(self._exchange.fetch_ticker(pair))
         except ExchangeError:
             return {}
 

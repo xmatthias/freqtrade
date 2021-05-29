@@ -84,7 +84,8 @@ class FreqtradeBot(LoggingMixin):
 
         self.pairlists = PairListManager(self.exchange, self.config, asyncio.get_event_loop())
 
-        self.dataprovider = DataProvider(self.config, self.exchange, self.pairlists)
+        self.dataprovider = DataProvider(self.config, self.exchange, asyncio.get_event_loop(),
+                                         pairlists=self.pairlists)
 
         # Attach Dataprovider to Strategy baseclass
         IStrategy.dp = self.dataprovider

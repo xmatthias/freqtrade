@@ -19,7 +19,7 @@ def test_ohlcv(mocker, default_conf, ohlcv_history):
     exchange._klines[("XRP/BTC", timeframe)] = ohlcv_history
     exchange._klines[("UNITTEST/BTC", timeframe)] = ohlcv_history
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.DRY_RUN
     assert ohlcv_history.equals(dp.ohlcv("UNITTEST/BTC", timeframe))
     assert isinstance(dp.ohlcv("UNITTEST/BTC", timeframe), DataFrame)
@@ -32,12 +32,12 @@ def test_ohlcv(mocker, default_conf, ohlcv_history):
     assert dp.ohlcv("UNITTEST/BTC", timeframe).equals(dp.ohlcv("UNITTEST/BTC"))
 
     default_conf["runmode"] = RunMode.LIVE
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.LIVE
     assert isinstance(dp.ohlcv("UNITTEST/BTC", timeframe), DataFrame)
 
     default_conf["runmode"] = RunMode.BACKTEST
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.BACKTEST
     assert dp.ohlcv("UNITTEST/BTC", timeframe).empty
 
@@ -46,7 +46,7 @@ def test_historic_ohlcv(mocker, default_conf, ohlcv_history):
     historymock = MagicMock(return_value=ohlcv_history)
     mocker.patch("freqtrade.data.dataprovider.load_pair_history", historymock)
 
-    dp = DataProvider(default_conf, None)
+    dp = DataProvider(default_conf, None, asyncio.get_event_loop())
     data = dp.historic_ohlcv("UNITTEST/BTC", "5m")
     assert isinstance(data, DataFrame)
     assert historymock.call_count == 1
@@ -61,7 +61,7 @@ def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
 
     default_conf["runmode"] = RunMode.BACKTEST
     exchange = get_patched_exchange(mocker, default_conf)
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     data = dp.historic_ohlcv("UNITTEST/BTC", "5m")
     assert isinstance(data, DataFrame)
     hdf5loadmock.assert_not_called()
@@ -71,7 +71,7 @@ def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     hdf5loadmock.reset_mock()
     jsonloadmock.reset_mock()
     default_conf["dataformat_ohlcv"] = "hdf5"
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     data = dp.historic_ohlcv("UNITTEST/BTC", "5m")
     assert isinstance(data, DataFrame)
     hdf5loadmock.assert_called_once()
@@ -85,7 +85,7 @@ def test_get_pair_dataframe(mocker, default_conf, ohlcv_history):
     exchange._klines[("XRP/BTC", timeframe)] = ohlcv_history
     exchange._klines[("UNITTEST/BTC", timeframe)] = ohlcv_history
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.DRY_RUN
     assert ohlcv_history.equals(dp.get_pair_dataframe("UNITTEST/BTC", timeframe))
     assert isinstance(dp.get_pair_dataframe("UNITTEST/BTC", timeframe), DataFrame)
@@ -98,7 +98,7 @@ def test_get_pair_dataframe(mocker, default_conf, ohlcv_history):
         .equals(dp.get_pair_dataframe("UNITTEST/BTC"))
 
     default_conf["runmode"] = RunMode.LIVE
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.LIVE
     assert isinstance(dp.get_pair_dataframe("UNITTEST/BTC", timeframe), DataFrame)
     assert dp.get_pair_dataframe("NONESENSE/AAA", timeframe).empty
@@ -106,7 +106,7 @@ def test_get_pair_dataframe(mocker, default_conf, ohlcv_history):
     historymock = MagicMock(return_value=ohlcv_history)
     mocker.patch("freqtrade.data.dataprovider.load_pair_history", historymock)
     default_conf["runmode"] = RunMode.BACKTEST
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.BACKTEST
     assert isinstance(dp.get_pair_dataframe("UNITTEST/BTC", timeframe), DataFrame)
     # assert dp.get_pair_dataframe("NONESENSE/AAA", timeframe).empty
@@ -118,7 +118,7 @@ def test_available_pairs(mocker, default_conf, ohlcv_history):
     exchange._klines[("XRP/BTC", timeframe)] = ohlcv_history
     exchange._klines[("UNITTEST/BTC", timeframe)] = ohlcv_history
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert len(dp.available_pairs) == 2
     assert dp.available_pairs == [("XRP/BTC", timeframe), ("UNITTEST/BTC", timeframe), ]
 
@@ -133,7 +133,7 @@ def test_refresh(mocker, default_conf, ohlcv_history):
 
     pairs_non_trad = [("ETH/USDT", timeframe), ("BTC/TUSD", "1h")]
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     dp.refresh(pairs)
 
     assert refresh_mock.call_count == 1
@@ -156,7 +156,7 @@ def test_orderbook(mocker, default_conf, order_book_l2):
     api_mock.fetch_l2_order_book = order_book_l2
     exchange = get_patched_exchange(mocker, default_conf, api_mock=api_mock)
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.orderbook('ETH/BTC', 5)
     assert order_book_l2.call_count == 1
     assert order_book_l2.call_args_list[0][0][0] == 'ETH/BTC'
@@ -172,7 +172,7 @@ def test_market(mocker, default_conf, markets):
     api_mock.markets = markets
     exchange = get_patched_exchange(mocker, default_conf, api_mock=api_mock)
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.market('ETH/BTC')
 
     assert type(res) is dict
@@ -189,7 +189,7 @@ def test_ticker(mocker, default_conf, tickers):
     ticker_mock = MagicMock(return_value=tickers()['ETH/BTC'])
     mocker.patch("freqtrade.exchange.Exchange.fetch_ticker", ticker_mock)
     exchange = get_patched_exchange(mocker, default_conf)
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('ETH/BTC')
     assert type(res) is dict
     assert 'symbol' in res
@@ -198,7 +198,7 @@ def test_ticker(mocker, default_conf, tickers):
     ticker_mock = MagicMock(side_effect=ExchangeError('Pair not found'))
     mocker.patch("freqtrade.exchange.Exchange.fetch_ticker", ticker_mock)
     exchange = get_patched_exchange(mocker, default_conf)
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('UNITTEST/BTC')
     assert res == {}
 
@@ -213,7 +213,7 @@ def test_current_whitelist(mocker, default_conf, tickers):
     exchange = get_patched_exchange(mocker, default_conf)
 
     pairlist = PairListManager(exchange, default_conf, asyncio.get_event_loop())
-    dp = DataProvider(default_conf, exchange, pairlist)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop(), pairlist)
 
     # Simulate volumepairs from exchange.
     pairlist.refresh_pairlist()
@@ -223,7 +223,7 @@ def test_current_whitelist(mocker, default_conf, tickers):
     assert dp.current_whitelist() is not pairlist._whitelist
 
     with pytest.raises(OperationalException):
-        dp = DataProvider(default_conf, exchange)
+        dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
         dp.current_whitelist()
 
 
@@ -234,7 +234,7 @@ def test_get_analyzed_dataframe(mocker, default_conf, ohlcv_history):
     timeframe = default_conf["timeframe"]
     exchange = get_patched_exchange(mocker, default_conf)
 
-    dp = DataProvider(default_conf, exchange)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     dp._set_cached_df("XRP/BTC", timeframe, ohlcv_history)
     dp._set_cached_df("UNITTEST/BTC", timeframe, ohlcv_history)
 
@@ -273,7 +273,7 @@ def test_get_analyzed_dataframe(mocker, default_conf, ohlcv_history):
 
 
 def test_no_exchange_mode(default_conf):
-    dp = DataProvider(default_conf, None)
+    dp = DataProvider(default_conf, None, asyncio.get_event_loop())
 
     message = "Exchange is not available to DataProvider."
 
