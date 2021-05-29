@@ -355,7 +355,7 @@ def fee():
 
 @pytest.fixture
 def ticker():
-    return MagicMock(return_value={
+    return get_mock_coro(return_value={
         'bid': 0.00001098,
         'ask': 0.00001099,
         'last': 0.00001098,
@@ -364,7 +364,7 @@ def ticker():
 
 @pytest.fixture
 def ticker_sell_up():
-    return MagicMock(return_value={
+    return get_mock_coro(return_value={
         'bid': 0.00001172,
         'ask': 0.00001173,
         'last': 0.00001172,
@@ -373,7 +373,7 @@ def ticker_sell_up():
 
 @pytest.fixture
 def ticker_sell_down():
-    return MagicMock(return_value={
+    return get_mock_coro(return_value={
         'bid': 0.00001044,
         'ask': 0.00001043,
         'last': 0.00001044,

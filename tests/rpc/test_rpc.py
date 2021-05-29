@@ -882,7 +882,7 @@ async def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_op
     trade = await rpc._rpc_forcebuy(pair, None)
     assert isinstance(trade, Trade)
     assert trade.pair == pair
-    assert trade.open_rate == ticker()['bid']
+    assert trade.open_rate == (await ticker())['bid']
 
     # Test buy duplicate
     with pytest.raises(RPCException, match=r'position for ETH/BTC already open - id: 1'):

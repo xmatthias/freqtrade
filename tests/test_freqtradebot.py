@@ -237,7 +237,7 @@ async def test_edge_overrides_stoploss(limit_buy_order, fee, caplog, mocker, edg
     buy_price = limit_buy_order['price']
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': buy_price * 0.79,
             'ask': buy_price * 0.79,
             'last': buy_price * 0.79
@@ -276,7 +276,7 @@ async def test_edge_should_ignore_strategy_stoploss(limit_buy_order, fee,
     buy_price = limit_buy_order['price']
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': buy_price * 0.85,
             'ask': buy_price * 0.85,
             'last': buy_price * 0.85
@@ -1017,7 +1017,7 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf, fee, caplog,
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1137,7 +1137,7 @@ async def test_handle_sle_cancel_cant_recreate(mocker, default_conf, fee, caplog
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1179,7 +1179,7 @@ async def test_create_stoploss_order_invalid_order(mocker, default_conf, caplog,
     ])
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1226,7 +1226,7 @@ async def test_create_stoploss_order_insufficient_funds(mocker, default_conf, ca
     mock_insuf = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_insufficient_funds')
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1269,7 +1269,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
     patch_RPCManager(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1329,7 +1329,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
 
     # price jumped 2x
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', MagicMock(return_value={
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(return_value={
         'bid': 0.00002344,
         'ask': 0.00002346,
         'last': 0.00002344
@@ -1361,7 +1361,7 @@ async def test_handle_stoploss_on_exchange_trailing(mocker, default_conf, fee,
                                                 stop_price=0.00002346 * 0.95)
 
     # price fell below stoploss, so dry-run sells trade.
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', MagicMock(return_value={
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(return_value={
         'bid': 0.00002144,
         'ask': 0.00002146,
         'last': 0.00002144
@@ -1378,7 +1378,7 @@ async def test_handle_stoploss_on_exchange_trailing_error(
 
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1453,7 +1453,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
     patch_RPCManager(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1512,7 +1512,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
     assert await freqtrade.handle_stoploss_on_exchange(trade) is False
 
     # price jumped 2x
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', MagicMock(return_value={
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(return_value={
         'bid': 0.00002344,
         'ask': 0.00002346,
         'last': 0.00002344
@@ -1545,7 +1545,7 @@ async def test_handle_stoploss_on_exchange_custom_stop(mocker, default_conf, fee
                                                 stop_price=0.00002346 * 0.96)
 
     # price fell below stoploss, so dry-run sells trade.
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', MagicMock(return_value={
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(return_value={
         'bid': 0.00002144,
         'ask': 0.00002146,
         'last': 0.00002144
@@ -1566,7 +1566,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
     edge_conf['exchange']['name'] = 'binance'
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -1632,7 +1632,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss_order_mock)
 
     # price goes down 5%
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', MagicMock(return_value={
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(return_value={
         'bid': 0.00001172 * 0.95,
         'ask': 0.00001173 * 0.95,
         'last': 0.00001172 * 0.95
@@ -1648,7 +1648,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, capl
     cancel_order_mock.assert_not_called()
 
     # price jumped 2x
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', MagicMock(return_value={
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(return_value={
         'bid': 0.00002344,
         'ask': 0.00002346,
         'last': 0.00002344
@@ -1906,7 +1906,7 @@ async def test_handle_trade(default_conf, limit_buy_order, limit_sell_order_open
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -2679,7 +2679,7 @@ async def test_execute_trade_exit_up(default_conf, ticker, fee, ticker_sell_up, 
         fetch_ticker=ticker_sell_up
     )
     # Prevented sell ...
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_up()['bid'],
+    await freqtrade.execute_trade_exit(trade=trade, limit=(await ticker_sell_up())['bid'],
                                        sell_reason=SellCheckTuple(sell_type=SellType.ROI))
     assert rpc_mock.call_count == 0
     assert freqtrade.strategy.confirm_trade_exit.call_count == 1
@@ -2687,7 +2687,7 @@ async def test_execute_trade_exit_up(default_conf, ticker, fee, ticker_sell_up, 
     # Repatch with true
     freqtrade.strategy.confirm_trade_exit = MagicMock(return_value=True)
 
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_up()['bid'],
+    await freqtrade.execute_trade_exit(trade=trade, limit=(await ticker_sell_up())['bid'],
                                        sell_reason=SellCheckTuple(sell_type=SellType.ROI))
     assert freqtrade.strategy.confirm_trade_exit.call_count == 1
 
@@ -2740,8 +2740,9 @@ async def test_execute_trade_exit_down(default_conf, ticker, fee, ticker_sell_do
         fetch_ticker=ticker_sell_down
     )
 
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_down()['bid'],
-                                       sell_reason=SellCheckTuple(sell_type=SellType.STOP_LOSS))
+    await freqtrade.execute_trade_exit(
+        trade=trade, limit=(await ticker_sell_down())['bid'],
+        sell_reason=SellCheckTuple(sell_type=SellType.STOP_LOSS))
 
     assert rpc_mock.call_count == 2
     last_msg = rpc_mock.call_args_list[-1][0][0]
@@ -2801,8 +2802,9 @@ async def test_execute_trade_exit_custom_exit_price(default_conf, ticker, fee, t
     # Set a custom exit price
     freqtrade.strategy.custom_exit_price = lambda **kwargs: 1.170e-05
 
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_up()['bid'],
-                                       sell_reason=SellCheckTuple(sell_type=SellType.SELL_SIGNAL))
+    await freqtrade.execute_trade_exit(
+        trade=trade, limit=ticker_sell_up()['bid'],
+        sell_reason=SellCheckTuple(sell_type=SellType.SELL_SIGNAL))
 
     # Sell price must be different to default bid price
 
@@ -2863,7 +2865,7 @@ async def test_execute_trade_exit_down_stoploss_on_exchange_dry_run(
     # Setting trade stoploss to 0.01
 
     trade.stop_loss = 0.00001099 * 0.99
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_down()['bid'],
+    await freqtrade.execute_trade_exit(trade=trade, limit=(await ticker_sell_down())['bid'],
                                        sell_reason=SellCheckTuple(sell_type=SellType.STOP_LOSS))
 
     assert rpc_mock.call_count == 2
@@ -2970,7 +2972,7 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
         fetch_ticker=ticker_sell_up
     )
 
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_up()['bid'],
+    await freqtrade.execute_trade_exit(trade=trade, limit=(await ticker_sell_up())['bid'],
                                        sell_reason=SellCheckTuple(sell_type=SellType.STOP_LOSS))
 
     trade = Trade.query.first()
@@ -3078,7 +3080,7 @@ async def test_execute_trade_exit_market_order(default_conf, ticker, fee,
     )
     freqtrade.config['order_types']['sell'] = 'market'
 
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_up()['bid'],
+    await freqtrade.execute_trade_exit(trade=trade, limit=(await ticker_sell_up())['bid'],
                                        sell_reason=SellCheckTuple(sell_type=SellType.ROI))
 
     assert not trade.is_open
@@ -3137,8 +3139,9 @@ async def test_execute_trade_exit_insufficient_funds_error(default_conf, ticker,
     )
 
     sell_reason = SellCheckTuple(sell_type=SellType.ROI)
-    assert not await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_up()['bid'],
-                                                  sell_reason=sell_reason)
+    assert not await freqtrade.execute_trade_exit(
+        trade=trade, limit=(await ticker_sell_up())['bid'],
+        sell_reason=sell_reason)
     assert mock_insuf.call_count == 1
 
 
@@ -3148,7 +3151,7 @@ async def test_sell_profit_only_enable_profit(default_conf, limit_buy_order, lim
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
@@ -3188,7 +3191,7 @@ async def test_sell_profit_only_disable_profit(default_conf, limit_buy_order, li
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00002172,
             'ask': 0.00002173,
             'last': 0.00002172
@@ -3222,7 +3225,7 @@ async def test_sell_profit_only_enable_loss(default_conf, limit_buy_order, limit
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00000172,
             'ask': 0.00000173,
             'last': 0.00000172
@@ -3255,7 +3258,7 @@ async def test_sell_profit_only_disable_loss(default_conf, limit_buy_order, limi
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.0000172,
             'ask': 0.0000173,
             'last': 0.0000172
@@ -3291,7 +3294,7 @@ async def test_sell_not_enough_balance(default_conf, limit_buy_order, limit_buy_
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00002172,
             'ask': 0.00002173,
             'last': 0.00002172
@@ -3394,9 +3397,10 @@ async def test_locked_pairs(default_conf, ticker, fee, ticker_sell_down, mocker,
         fetch_ticker=ticker_sell_down
     )
 
-    await freqtrade.execute_trade_exit(trade=trade, limit=ticker_sell_down()['bid'],
-                                       sell_reason=SellCheckTuple(sell_type=SellType.STOP_LOSS))
-    trade.close(ticker_sell_down()['bid'])
+    await freqtrade.execute_trade_exit(
+        trade=trade, limit=(await ticker_sell_down())['bid'],
+        sell_reason=SellCheckTuple(sell_type=SellType.STOP_LOSS))
+    trade.close((await ticker_sell_down())['bid'])
     assert freqtrade.strategy.is_pair_locked(trade.pair)
 
     # reinit - should buy other pair.
@@ -3412,7 +3416,7 @@ async def test_ignore_roi_if_buy_signal(default_conf, limit_buy_order, limit_buy
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.0000172,
             'ask': 0.0000173,
             'last': 0.0000172
@@ -3449,7 +3453,7 @@ async def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001099,
             'ask': 0.00001099,
             'last': 0.00001099
@@ -3472,7 +3476,7 @@ async def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': 0.00001099 * 1.5,
                      'ask': 0.00001099 * 1.5,
                      'last': 0.00001099 * 1.5
@@ -3483,7 +3487,7 @@ async def test_trailing_stop_loss(default_conf, limit_buy_order_open, limit_buy_
 
     # Price fell
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': 0.00001099 * 1.1,
                      'ask': 0.00001099 * 1.1,
                      'last': 0.00001099 * 1.1
@@ -3504,7 +3508,7 @@ async def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': buy_price - 0.000001,
             'ask': buy_price - 0.000001,
             'last': buy_price - 0.000001
@@ -3532,7 +3536,7 @@ async def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': buy_price + 0.000003,
                      'ask': buy_price + 0.000003,
                      'last': buy_price + 0.000003
@@ -3545,7 +3549,7 @@ async def test_trailing_stop_loss_positive(default_conf, limit_buy_order, limit_
     caplog.clear()
 
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': buy_price + 0.000002,
                      'ask': buy_price + 0.000002,
                      'last': buy_price + 0.000002
@@ -3565,7 +3569,7 @@ async def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_bu
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': buy_price - 0.000001,
             'ask': buy_price - 0.000001,
             'last': buy_price - 0.000001
@@ -3593,7 +3597,7 @@ async def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_bu
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': buy_price + 0.000003,
                      'ask': buy_price + 0.000003,
                      'last': buy_price + 0.000003
@@ -3606,7 +3610,7 @@ async def test_trailing_stop_loss_offset(default_conf, limit_buy_order, limit_bu
     caplog.clear()
 
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': buy_price + 0.000002,
                      'ask': buy_price + 0.000002,
                      'last': buy_price + 0.000002
@@ -3629,7 +3633,7 @@ async def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': buy_price,
             'ask': buy_price,
             'last': buy_price
@@ -3657,7 +3661,7 @@ async def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_
 
     # Raise ticker above buy price
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': buy_price + 0.0000004,
                      'ask': buy_price + 0.0000004,
                      'last': buy_price + 0.0000004
@@ -3672,7 +3676,7 @@ async def test_tsl_only_offset_reached(default_conf, limit_buy_order, limit_buy_
 
     # price rises above the offset (rises 12% when the offset is 5.5%)
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 MagicMock(return_value={
+                 get_mock_coro(return_value={
                      'bid': buy_price + 0.0000014,
                      'ask': buy_price + 0.0000014,
                      'last': buy_price + 0.0000014
@@ -3690,7 +3694,7 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, l
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00000172,
             'ask': 0.00000173,
             'last': 0.00000172
@@ -4231,7 +4235,7 @@ async def test_order_book_ask_strategy(default_conf, limit_buy_order_open, limit
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 0.00001172,
             'ask': 0.00001173,
             'last': 0.00001172
