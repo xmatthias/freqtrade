@@ -855,8 +855,8 @@ class FreqtradeBot(LoggingMixin):
                 logger.info(f"Cancelling current stoploss on exchange for pair {trade.pair} "
                             f"(orderid:{order['id']}) in order to add another one ...")
                 try:
-                    co = await self.exchange.cancel_stoploss_order_with_result(order['id'], trade.pair,
-                                                                               trade.amount)
+                    co = await self.exchange.cancel_stoploss_order_with_result(
+                        order['id'], trade.pair, trade.amount)
                     trade.update_order(co)
                 except InvalidOrderException:
                     logger.exception(f"Could not cancel stoploss order {order['id']} "
@@ -1381,7 +1381,7 @@ class FreqtradeBot(LoggingMixin):
         fee-detection fallback to Trades. Parses result of fetch_my_trades to get correct fee.
         """
         trades = await self.exchange.get_trades_for_order(
-            self.exchange.get_order_id_conditional(order),trade.pair, trade.open_date
+            self.exchange.get_order_id_conditional(order), trade.pair, trade.open_date
             )
 
         if len(trades) == 0:

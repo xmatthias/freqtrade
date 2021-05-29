@@ -1013,6 +1013,7 @@ class Exchange:
     @retrier
     def fetch_l2_order_book_sync(self, pair: str, limit: int = 100) -> dict:
         """
+        TODO: asyncio: Can this be removed?
         Get L2 order book from exchange.
         Can be limited to a certain amount (if supported).
         Returns a dict in the format
