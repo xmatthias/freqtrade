@@ -88,11 +88,12 @@ class TestCCXTExchange():
         assert pair in markets
         assert isinstance(markets[pair], dict)
 
-    def test_ccxt_fetch_tickers(self, exchange):
+    @pytest.mark.asyncio
+    async def test_ccxt_fetch_tickers(self, exchange):
         exchange, exchangename = exchange
         pair = EXCHANGES[exchangename]['pair']
 
-        tickers = exchange.get_tickers()
+        tickers = await exchange.get_tickers()
         assert pair in tickers
         assert 'ask' in tickers[pair]
         assert tickers[pair]['ask'] is not None
