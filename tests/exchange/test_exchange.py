@@ -1429,7 +1429,8 @@ async def test_get_tickers(default_conf, mocker, exchange_name):
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_fetch_ticker(default_conf, mocker, exchange_name):
+@pytest.mark.asyncio
+async def test_fetch_ticker(default_conf, mocker, exchange_name):
     api_mock = MagicMock()
     tick = {
         'symbol': 'ETH/BTC',
@@ -1437,11 +1438,11 @@ def test_fetch_ticker(default_conf, mocker, exchange_name):
         'ask': 0.00001099,
         'last': 0.0001,
     }
-    api_mock.fetch_ticker = MagicMock(return_value=tick)
+    api_mock.fetch_ticker = get_mock_coro(return_value=tick)
     api_mock.markets = {'ETH/BTC': {'active': True}}
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     # retrieve original ticker
-    ticker = exchange.fetch_ticker(pair='ETH/BTC')
+    ticker = await exchange.fetch_ticker(pair='ETH/BTC')
 
     assert ticker['bid'] == 0.00001098
     assert ticker['ask'] == 0.00001099
@@ -1453,27 +1454,27 @@ def test_fetch_ticker(default_conf, mocker, exchange_name):
         'ask': 1,
         'last': 42,
     }
-    api_mock.fetch_ticker = MagicMock(return_value=tick)
+    api_mock.fetch_ticker = get_mock_coro(return_value=tick)
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
     # if not caching the result we should get the same ticker
     # if not fetching a new result we should get the cached ticker
-    ticker = exchange.fetch_ticker(pair='ETH/BTC')
+    ticker = await exchange.fetch_ticker(pair='ETH/BTC')
 
     assert api_mock.fetch_ticker.call_count == 1
     assert ticker['bid'] == 0.5
     assert ticker['ask'] == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "fetch_ticker", "fetch_ticker",
-                           pair='ETH/BTC')
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "fetch_ticker", "fetch_ticker",
+                               pair='ETH/BTC')
 
-    api_mock.fetch_ticker = MagicMock(return_value={})
+    api_mock.fetch_ticker = get_mock_coro(return_value={})
     exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    exchange.fetch_ticker(pair='ETH/BTC')
+    await exchange.fetch_ticker(pair='ETH/BTC')
 
     with pytest.raises(DependencyException, match=r'Pair XRP/ETH not available'):
-        exchange.fetch_ticker(pair='XRP/ETH')
+        await exchange.fetch_ticker(pair='XRP/ETH')
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)

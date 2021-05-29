@@ -954,13 +954,13 @@ class Exchange:
 
     # Pricing info
 
-    @retrier
-    def fetch_ticker(self, pair: str) -> dict:
+    @retrier_async
+    async def fetch_ticker(self, pair: str) -> dict:
         try:
             if (pair not in self.markets or
                     self.markets[pair].get('active', False) is False):
                 raise ExchangeError(f"Pair {pair} not available")
-            data = self._api.fetch_ticker(pair)
+            data = await self._api_async.fetch_ticker(pair)
             return data
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -1078,7 +1078,7 @@ class Exchange:
                          f"side - top {order_book_top} order book {side} rate {rate:.8f}")
         else:
             logger.debug(f"Using Last {conf_strategy['price_side'].capitalize()} / Last Price")
-            ticker = self.fetch_ticker(pair)
+            ticker = await self.fetch_ticker(pair)
             ticker_rate = ticker[conf_strategy['price_side']]
             if ticker['last'] and ticker_rate:
                 if side == 'buy' and ticker_rate > ticker['last']:
