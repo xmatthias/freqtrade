@@ -153,8 +153,8 @@ class FreqtradeBot(LoggingMixin):
         """
 
         # Check whether markets have to be reloaded and reload them when it's needed
-        self.exchange.reload_markets()
         loop = asyncio.get_event_loop()
+        self.exchange.reload_markets()
 
         loop.run_until_complete(self.update_closed_trades_without_assigned_fees())
 
