@@ -1199,7 +1199,7 @@ class Exchange:
                 return None
             try:
                 comb = self.get_valid_pair_combination(fee_curr, self._config['stake_currency'])
-                tick = self.fetch_ticker(comb)
+                tick = await self.fetch_ticker(comb)
 
                 fee_to_quote_rate = safe_value_fallback2(tick, tick, 'last', 'ask')
                 return round((order['fee']['cost'] * fee_to_quote_rate) / order['cost'], 8)
@@ -1216,7 +1216,6 @@ class Exchange:
         return (order['fee']['cost'],
                 order['fee']['currency'],
                 await self.calculate_fee_rate(order))
-
 
     # Historic data
 

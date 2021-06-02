@@ -195,8 +195,8 @@ def pair_candles(pair: str, timeframe: str, limit: Optional[int], rpc: RPC = Dep
 
 
 @router.get('/pair_history', response_model=PairHistory, tags=['candle data'])
-def pair_history(pair: str, timeframe: str, timerange: str, strategy: str,
-                 config=Depends(get_config)):
+async def pair_history(pair: str, timeframe: str, timerange: str, strategy: str,
+                       config=Depends(get_config)):
     config = deepcopy(config)
     config.update({
         'strategy': strategy,

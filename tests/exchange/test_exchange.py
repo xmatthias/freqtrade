@@ -1821,6 +1821,7 @@ async def test_fetch_l2_order_book(default_conf, mocker, order_book_l2, exchange
         exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange.fetch_l2_order_book(pair='ETH/BTC', limit=50)
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("side,ask,bid,last,last_ab,expected", [
     ('ask', 20, 19, 10, 0.0, 20),  # Full ask side

@@ -1,6 +1,7 @@
 """
 This module contains class to define a RPC communications
 """
+import asyncio
 import logging
 from abc import abstractmethod
 from datetime import date, datetime, timedelta, timezone
@@ -852,7 +853,8 @@ class RPC:
         from freqtrade.data.dataprovider import DataProvider
         from freqtrade.resolvers.strategy_resolver import StrategyResolver
         strategy = StrategyResolver.load_strategy(config)
-        strategy.dp = DataProvider(config, exchange=None, pairlists=None)
+        strategy.dp = DataProvider(config, exchange=None, pairlists=None,
+                                   loop=asyncio.get_event_loop())
 
         df_analyzed = strategy.analyze_ticker(_data[pair], {'pair': pair})
 

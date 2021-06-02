@@ -3895,7 +3895,8 @@ async def test_get_real_amount_multi(default_conf, trades_for_order2, buy_order_
 async def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order_fee, caplog, fee,
                                       mocker, markets):
     # Different fee currency on both trades
-    mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order', return_value=trades_for_order3)
+    mocker.patch('freqtrade.exchange.Exchange.get_trades_for_order',
+                 get_mock_coro(return_value=trades_for_order3))
     amount = float(sum(x['amount'] for x in trades_for_order3))
     default_conf['stake_currency'] = 'ETH'
     trade = Trade(
@@ -3912,7 +3913,7 @@ async def test_get_real_amount_multi2(default_conf, trades_for_order3, buy_order
     freqtrade = get_patched_freqtradebot(mocker, default_conf)
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets))
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker',
-                 return_value={'ask': 0.19, 'last': 0.2})
+                 get_mock_coro(return_value={'ask': 0.19, 'last': 0.2}))
 
     # Amount is reduced by "fee"
     assert await freqtrade.get_real_amount(trade, buy_order_fee) == amount - (amount * 0.0005)
