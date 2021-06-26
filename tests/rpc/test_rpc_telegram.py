@@ -223,7 +223,7 @@ def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=True),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
     status_table = get_mock_coro()
     mocker.patch.multiple(
@@ -678,7 +678,7 @@ def test_telegram_forcesell_handle(default_conf, update, ticker, fee,
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=True),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
 
     freqtradebot = FreqtradeBot(default_conf)
@@ -737,7 +737,7 @@ def test_telegram_forcesell_down_handle(default_conf, update, ticker, fee,
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=True),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
 
     freqtradebot = FreqtradeBot(default_conf)
@@ -798,7 +798,7 @@ def test_forcesell_all_handle(default_conf, update, ticker, fee, mocker) -> None
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=True),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
     default_conf['max_open_trades'] = 4
     freqtradebot = FreqtradeBot(default_conf)

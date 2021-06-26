@@ -693,7 +693,7 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
                 'filled': 0.0,
             }
         ),
-        _is_dry_limit_order_filled=MagicMock(return_value=True),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=True),
         get_fee=fee,
     )
     mocker.patch('freqtrade.wallets.Wallets.get_free', return_value=1000)
@@ -731,7 +731,7 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     freqtradebot.state = State.RUNNING
     assert cancel_order_mock.call_count == 0
     mocker.patch(
-        'freqtrade.exchange.Exchange._is_dry_limit_order_filled', MagicMock(return_value=False))
+        'freqtrade.exchange.Exchange._is_dry_limit_order_filled', get_mock_coro(return_value=False))
     await freqtradebot.enter_positions()
     # make an limit-buy open trade
     trade = Trade.query.filter(Trade.id == '3').first()

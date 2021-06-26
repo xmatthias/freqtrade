@@ -850,7 +850,7 @@ def test_OffsetFilter_error(mocker, whitelist_conf) -> None:
 
     with pytest.raises(OperationalException,
                        match=r'OffsetFilter requires offset to be >= 0'):
-        PairListManager(MagicMock, whitelist_conf)
+        PairListManager(MagicMock, whitelist_conf, asyncio.get_event_loop())
 
 
 def test_rangestabilityfilter_checks(mocker, default_conf, markets, tickers):

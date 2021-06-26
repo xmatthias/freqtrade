@@ -1100,7 +1100,7 @@ def order_book_l2():
 
 @pytest.fixture
 def order_book_l2_usd():
-    return MagicMock(return_value={
+    return get_mock_coro(return_value={
         'symbol': 'LTC/USDT',
         'bids': [
             [25.563, 49.269],

@@ -948,11 +948,12 @@ def test_exchange_has(default_conf, mocker):
     ("sell")
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_create_dry_run_order(default_conf, mocker, side, exchange_name):
+@pytest.mark.asyncio
+async def test_create_dry_run_order(default_conf, mocker, side, exchange_name):
     default_conf['dry_run'] = True
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
 
-    order = exchange.create_dry_run_order(
+    order = await exchange.create_dry_run_order(
         pair='ETH/BTC', ordertype='limit', side=side, amount=1, rate=200)
     assert 'id' in order
     assert f'dry_run_{side}_' in order["id"]
@@ -966,8 +967,9 @@ def test_create_dry_run_order(default_conf, mocker, side, exchange_name):
     ("sell", 25.566, 25.563)
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice, endprice,
-                                         exchange_name, order_book_l2_usd):
+@pytest.mark.asyncio
+async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice, endprice,
+                                               exchange_name, order_book_l2_usd):
     default_conf['dry_run'] = True
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
     mocker.patch.multiple('freqtrade.exchange.Exchange',
@@ -975,7 +977,7 @@ def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice,
                           fetch_l2_order_book=order_book_l2_usd,
                           )
 
-    order = exchange.create_dry_run_order(
+    order = await exchange.create_dry_run_order(
         pair='LTC/USDT', ordertype='limit', side=side, amount=1, rate=startprice)
     assert order_book_l2_usd.call_count == 1
     assert 'id' in order
@@ -985,7 +987,7 @@ def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice,
     assert order["symbol"] == "LTC/USDT"
     order_book_l2_usd.reset_mock()
 
-    order_closed = exchange.fetch_dry_run_order(order['id'])
+    order_closed = await exchange.fetch_dry_run_order(order['id'])
     assert order_book_l2_usd.call_count == 1
     assert order_closed['status'] == 'open'
     assert not order['fee']
@@ -993,7 +995,7 @@ def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice,
     order_book_l2_usd.reset_mock()
     order_closed['price'] = endprice
 
-    order_closed = exchange.fetch_dry_run_order(order['id'])
+    order_closed = await exchange.fetch_dry_run_order(order['id'])
     assert order_closed['status'] == 'closed'
     assert order['fee']
 
@@ -1012,8 +1014,9 @@ def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice,
     ("sell", 27, 10000, 25.65),  # max-slippage 5%
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-def test_create_dry_run_order_market_fill(default_conf, mocker, side, rate, amount, endprice,
-                                          exchange_name, order_book_l2_usd):
+@pytest.mark.asyncio
+async def test_create_dry_run_order_market_fill(default_conf, mocker, side, rate, amount, endprice,
+                                                exchange_name, order_book_l2_usd):
     default_conf['dry_run'] = True
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
     mocker.patch.multiple('freqtrade.exchange.Exchange',
@@ -1021,7 +1024,7 @@ def test_create_dry_run_order_market_fill(default_conf, mocker, side, rate, amou
                           fetch_l2_order_book=order_book_l2_usd,
                           )
 
-    order = exchange.create_dry_run_order(
+    order = await exchange.create_dry_run_order(
         pair='LTC/USDT', ordertype='market', side=side, amount=amount, rate=rate)
     assert 'id' in order
     assert f'dry_run_{side}_' in order["id"]
@@ -2286,7 +2289,8 @@ def test_get_historic_trades_notsupported(default_conf, mocker, caplog, exchange
 async def test_cancel_order_dry_run(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = True
     exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
-    mocker.patch('freqtrade.exchange.Exchange._is_dry_limit_order_filled', return_value=True)
+    mocker.patch('freqtrade.exchange.Exchange._is_dry_limit_order_filled',
+                 get_mock_coro(return_value=True))
     assert await exchange.cancel_order(order_id='123', pair='TKN/BTC') == {}
     assert await exchange.cancel_stoploss_order(order_id='123', pair='TKN/BTC') == {}
 

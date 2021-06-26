@@ -627,7 +627,8 @@ class Exchange:
         })
         return dry_order
 
-    async def get_dry_market_fill_price(self, pair: str, side: str, amount: float, rate: float) -> float:
+    async def get_dry_market_fill_price(self, pair: str, side: str, amount: float,
+                                        rate: float) -> float:
         """
         Get the market order fill price based on orderbook interpolation
         """
@@ -828,11 +829,11 @@ class Exchange:
     @retrier_async
     async def cancel_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
-            order = await self.fetch_dry_run_order(order_id)
-            if order:
+            try:
+                order = await self.fetch_dry_run_order(order_id)
                 order.update({'status': 'canceled', 'filled': 0.0, 'remaining': order['amount']})
                 return order
-            else:
+            except InvalidOrderException:
                 return {}
 
         try:

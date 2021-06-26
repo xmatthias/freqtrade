@@ -308,7 +308,7 @@ async def test_total_open_trades_stakes(mocker, default_conf, ticker, fee) -> No
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     freqtrade = FreqtradeBot(default_conf)
     patch_get_signal(freqtrade)
@@ -338,7 +338,7 @@ async def test_create_trade(default_conf, ticker, limit_buy_order, fee, mocker) 
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
 
     # Save state of current whitelist
@@ -2658,7 +2658,7 @@ async def test_execute_trade_exit_up(default_conf, ticker, fee, ticker_sell_up, 
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     patch_whitelist(mocker, default_conf)
     freqtrade = FreqtradeBot(default_conf)
@@ -2722,7 +2722,7 @@ async def test_execute_trade_exit_down(default_conf, ticker, fee, ticker_sell_do
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     patch_whitelist(mocker, default_conf)
     freqtrade = FreqtradeBot(default_conf)
@@ -2842,7 +2842,7 @@ async def test_execute_trade_exit_down_stoploss_on_exchange_dry_run(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     patch_whitelist(mocker, default_conf)
     freqtrade = FreqtradeBot(default_conf)
@@ -2950,7 +2950,7 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
         price_to_precision=lambda s, x, y: y,
         stoploss=stoploss,
         cancel_stoploss_order=cancel_order,
-        _is_dry_limit_order_filled=MagicMock(side_effect=[True, False]),
+        _is_dry_limit_order_filled=get_mock_coro(side_effect=[True, False]),
     )
 
     freqtrade = FreqtradeBot(default_conf)
@@ -2992,7 +2992,7 @@ async def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(
         get_fee=fee,
         amount_to_precision=lambda s, x, y: y,
         price_to_precision=lambda s, x, y: y,
-        _is_dry_limit_order_filled=MagicMock(side_effect=[False, True]),
+        _is_dry_limit_order_filled=get_mock_coro(side_effect=[False, True]),
     )
 
     stoploss = get_mock_coro(return_value={
@@ -3061,7 +3061,7 @@ async def test_execute_trade_exit_market_order(default_conf, ticker, fee,
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     patch_whitelist(mocker, default_conf)
     freqtrade = FreqtradeBot(default_conf)
@@ -3705,7 +3705,7 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf, limit_buy_order, l
             {'id': 1234553383}
         ]),
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     default_conf['ask_strategy'] = {
         'ignore_roi_if_buy_signal': False
