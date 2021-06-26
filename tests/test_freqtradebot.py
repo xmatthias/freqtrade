@@ -2981,8 +2981,8 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(default_conf, ticker
     assert rpc_mock.call_count == 3
 
 
-async def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(default_conf, ticker, fee,
-                                                                     mocker) -> None:
+async def test_may_execute_trade_exit_after_stoploss_on_exchange_hit(
+        default_conf, ticker, fee, mocker) -> None:
     default_conf['exchange']['name'] = 'binance'
     rpc_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)

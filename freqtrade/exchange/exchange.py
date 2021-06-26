@@ -579,8 +579,8 @@ class Exchange:
 
     # Dry-run methods
 
-    def create_dry_run_order(self, pair: str, ordertype: str, side: str, amount: float,
-                             rate: float, params: Dict = {}) -> Dict[str, Any]:
+    async def create_dry_run_order(self, pair: str, ordertype: str, side: str, amount: float,
+                                   rate: float, params: Dict = {}) -> Dict[str, Any]:
         order_id = f'dry_run_{side}_{datetime.now().timestamp()}'
         _amount = self.amount_to_precision(pair, amount)
         dry_order: Dict[str, Any] = {
@@ -604,14 +604,14 @@ class Exchange:
 
         if dry_order["type"] == "market":
             # Update market order pricing
-            average = self.get_dry_market_fill_price(pair, side, amount, rate)
+            average = await self.get_dry_market_fill_price(pair, side, amount, rate)
             dry_order.update({
                 'average': average,
                 'cost': dry_order['amount'] * average,
             })
             dry_order = self.add_dry_order_fee(pair, dry_order)
 
-        dry_order = self.check_dry_limit_order_filled(dry_order)
+        dry_order = await self.check_dry_limit_order_filled(dry_order)
 
         self._dry_run_open_orders[dry_order["id"]] = dry_order
         # Copy order and close it - so the returned order is open unless it's a market order
@@ -627,12 +627,12 @@ class Exchange:
         })
         return dry_order
 
-    def get_dry_market_fill_price(self, pair: str, side: str, amount: float, rate: float) -> float:
+    async def get_dry_market_fill_price(self, pair: str, side: str, amount: float, rate: float) -> float:
         """
         Get the market order fill price based on orderbook interpolation
         """
         if self.exchange_has('fetchL2OrderBook'):
-            ob = self.fetch_l2_order_book(pair, 20)
+            ob = await self.fetch_l2_order_book(pair, 20)
             ob_type = 'asks' if side == 'buy' else 'bids'
             slippage = 0.05
             max_slippage_val = rate * ((1 + slippage) if side == 'buy' else (1 - slippage))
@@ -667,10 +667,10 @@ class Exchange:
 
         return rate
 
-    def _is_dry_limit_order_filled(self, pair: str, side: str, limit: float) -> bool:
+    async def _is_dry_limit_order_filled(self, pair: str, side: str, limit: float) -> bool:
         if not self.exchange_has('fetchL2OrderBook'):
             return True
-        ob = self.fetch_l2_order_book(pair, 1)
+        ob = await self.fetch_l2_order_book(pair, 1)
         if side == 'buy':
             price = ob['asks'][0][0]
             logger.debug(f"{pair} checking dry buy-order: price={price}, limit={limit}")
@@ -683,13 +683,13 @@ class Exchange:
                 return True
         return False
 
-    def check_dry_limit_order_filled(self, order: Dict[str, Any]) -> Dict[str, Any]:
+    async def check_dry_limit_order_filled(self, order: Dict[str, Any]) -> Dict[str, Any]:
         """
         Check dry-run limit order fill and update fee (if it filled).
         """
         if order['status'] != "closed" and order['type'] in ["limit"]:
             pair = order['symbol']
-            if self._is_dry_limit_order_filled(pair, order['side'], order['price']):
+            if await self._is_dry_limit_order_filled(pair, order['side'], order['price']):
                 order.update({
                     'status': 'closed',
                     'filled': order['amount'],
@@ -699,14 +699,14 @@ class Exchange:
 
         return order
 
-    def fetch_dry_run_order(self, order_id) -> Dict[str, Any]:
+    async def fetch_dry_run_order(self, order_id) -> Dict[str, Any]:
         """
         Return dry-run order
         Only call if running in dry-run mode.
         """
         try:
             order = self._dry_run_open_orders[order_id]
-            order = self.check_dry_limit_order_filled(order)
+            order = await self.check_dry_limit_order_filled(order)
             return order
         except KeyError as e:
             # Gracefully handle errors with dry-run orders.
@@ -718,7 +718,7 @@ class Exchange:
                            rate: float, time_in_force: str = 'gtc') -> Dict:
 
         if self._config['dry_run']:
-            dry_order = self.create_dry_run_order(pair, ordertype, side, amount, rate)
+            dry_order = await self.create_dry_run_order(pair, ordertype, side, amount, rate)
             return dry_order
 
         params = self._params.copy()
@@ -781,7 +781,7 @@ class Exchange:
     @retrier_async(retries=API_FETCH_ORDER_RETRY_COUNT)
     async def fetch_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
-            return self.fetch_dry_run_order(order_id)
+            return await self.fetch_dry_run_order(order_id)
         try:
             order = await self._api_async.fetch_order(order_id, pair)
             self._log_exchange_response('fetch_order', order)
@@ -828,7 +828,7 @@ class Exchange:
     @retrier_async
     async def cancel_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
-            order = self.fetch_dry_run_order(order_id)
+            order = await self.fetch_dry_run_order(order_id)
             if order:
                 order.update({'status': 'canceled', 'filled': 0.0, 'remaining': order['amount']})
                 return order

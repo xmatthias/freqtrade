@@ -55,7 +55,7 @@ class Ftx(Exchange):
         stop_price = self.price_to_precision(pair, stop_price)
 
         if self._config['dry_run']:
-            dry_order = self.create_dry_run_order(
+            dry_order = await self.create_dry_run_order(
                 pair, ordertype, "sell", amount, stop_price)
             return dry_order
 
@@ -95,7 +95,7 @@ class Ftx(Exchange):
     @retrier_async(retries=API_FETCH_ORDER_RETRY_COUNT)
     async def fetch_stoploss_order(self, order_id: str, pair: str) -> Dict:
         if self._config['dry_run']:
-            return self.fetch_dry_run_order(order_id)
+            return await self.fetch_dry_run_order(order_id)
 
         try:
             orders = await self._api_async.fetch_orders(pair, None, params={'type': 'stop'})
