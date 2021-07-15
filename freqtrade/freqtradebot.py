@@ -169,6 +169,8 @@ class FreqtradeBot(LoggingMixin):
 
         strategy_safe_wrapper(self.strategy.bot_loop_start, supress_error=True)()
 
+        # This needs to be called from a "sync" method - otherwise dataprovider
+        # methods will no longer work.
         self.strategy.analyze(self.active_pair_whitelist)
 
         with self._exit_lock:
