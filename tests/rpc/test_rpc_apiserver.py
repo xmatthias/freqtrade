@@ -428,7 +428,7 @@ def test_api_balance(botclient, mocker, rpc_balance, tickers):
     ftbot.config['dry_run'] = False
     mocker.patch('freqtrade.exchange.Exchange.get_tickers', tickers)
 
-    mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value=rpc_balance)
+    mocker.patch('freqtrade.exchange.Exchange.get_balances', rpc_balance)
     mocker.patch('freqtrade.exchange.Exchange.get_valid_pair_combination',
                  side_effect=lambda a, b: f"{a}/{b}")
     # TODO: asyncio: fix this test - the below should be awaited.

@@ -512,7 +512,7 @@ def test_telegram_stats(default_conf, update, ticker, ticker_sell_up, fee,
 
 def test_telegram_balance_handle(default_conf, update, mocker, rpc_balance, tickers) -> None:
     default_conf['dry_run'] = False
-    mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value=rpc_balance)
+    mocker.patch('freqtrade.exchange.Exchange.get_balances', rpc_balance)
     mocker.patch('freqtrade.exchange.Exchange.get_tickers', tickers)
     mocker.patch('freqtrade.exchange.Exchange.get_valid_pair_combination',
                  side_effect=lambda a, b: f"{a}/{b}")

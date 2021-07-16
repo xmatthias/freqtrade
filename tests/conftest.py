@@ -1752,7 +1752,7 @@ def edge_conf(default_conf):
 
 @pytest.fixture
 def rpc_balance():
-    return {
+    return get_mock_coro(return_value={
         'BTC': {
             'total': 12.0,
             'free': 12.0,
@@ -1783,7 +1783,7 @@ def rpc_balance():
             'free': 10.0,
             'used': 0.0
         },
-    }
+    })
 
 
 @pytest.fixture
