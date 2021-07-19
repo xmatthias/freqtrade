@@ -687,6 +687,8 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
 def test_api_profit(botclient, mocker, ticker, fee, markets):
     ftbot, client = botclient
     patch_get_signal(ftbot)
+    # TODO: asyncio - this mock should not be needed if wallets update correctly.
+    mocker.patch("freqtrade.wallets.Wallets.get_starting_balance", return_value=1000.003260873)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         get_balances=MagicMock(return_value=ticker),

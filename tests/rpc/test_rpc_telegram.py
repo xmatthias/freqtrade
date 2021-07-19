@@ -430,6 +430,7 @@ def test_daily_wrong_input(default_conf, update, ticker, mocker) -> None:
 def test_profit_handle(default_conf, update, ticker, ticker_sell_up, fee,
                        limit_buy_order, limit_sell_order, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
+    mocker.patch("freqtrade.wallets.Wallets.get_starting_balance", return_value=1000)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,

@@ -2776,7 +2776,7 @@ async def test_execute_trade_exit_custom_exit_price(default_conf, ticker, fee, t
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=False),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     patch_whitelist(mocker, default_conf)
     freqtrade = FreqtradeBot(default_conf)
@@ -2784,7 +2784,7 @@ async def test_execute_trade_exit_custom_exit_price(default_conf, ticker, fee, t
     freqtrade.strategy.confirm_trade_exit = MagicMock(return_value=False)
 
     # Create some test data
-    freqtrade.enter_positions()
+    await freqtrade.enter_positions()
     rpc_mock.reset_mock()
 
     trade = Trade.query.first()
@@ -2803,7 +2803,7 @@ async def test_execute_trade_exit_custom_exit_price(default_conf, ticker, fee, t
     freqtrade.strategy.custom_exit_price = lambda **kwargs: 1.170e-05
 
     await freqtrade.execute_trade_exit(
-        trade=trade, limit=ticker_sell_up()['bid'],
+        trade=trade, limit=(await ticker_sell_up())['bid'],
         sell_reason=SellCheckTuple(sell_type=SellType.SELL_SIGNAL))
 
     # Sell price must be different to default bid price

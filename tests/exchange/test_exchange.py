@@ -85,6 +85,7 @@ def test_init_ccxt_kwargs(default_conf, mocker, caplog):
     conf = copy.deepcopy(default_conf)
     conf['exchange']['ccxt_async_config'] = {'aiohttp_trust_env': True, 'asyncio_loop': True}
     ex = Exchange(conf)
+    ex.init_exchange()
     assert log_has(
         "Applying additional ccxt config: {'aiohttp_trust_env': True, 'asyncio_loop': True}",
         caplog)
@@ -99,6 +100,8 @@ def test_init_ccxt_kwargs(default_conf, mocker, caplog):
     conf['exchange']['ccxt_async_config'] = {'asyncio_loop': True}
     asynclogmsg = "Applying additional ccxt config: {'TestKWARG': 11, 'asyncio_loop': True}"
     ex = Exchange(conf)
+    ex.init_exchange()
+
     assert not ex._api_async.aiohttp_trust_env
     assert hasattr(ex._api, 'TestKWARG')
     assert ex._api.TestKWARG == 11
@@ -128,18 +131,21 @@ def test_init_exception(default_conf, mocker):
 
     with pytest.raises(OperationalException,
                        match=f"Exchange {default_conf['exchange']['name']} is not supported"):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
     default_conf['exchange']['name'] = 'binance'
     with pytest.raises(OperationalException,
                        match=f"Exchange {default_conf['exchange']['name']} is not supported"):
         mocker.patch("ccxt.binance", MagicMock(side_effect=AttributeError))
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
     with pytest.raises(OperationalException,
                        match=r"Initialization of ccxt failed. Reason: DeadBeef"):
         mocker.patch("ccxt.binance", MagicMock(side_effect=ccxt.BaseError("DeadBeef")))
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_exchange_resolver(default_conf, mocker, caplog):
@@ -487,6 +493,8 @@ def test__load_async_markets(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     exchange = Exchange(default_conf)
+    exchange.init_exchange()
+
     exchange._api_async.load_markets = get_mock_coro(None)
     exchange._load_async_markets()
     assert exchange._api_async.load_markets.call_count == 1
@@ -507,7 +515,9 @@ def test__load_markets(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
-    Exchange(default_conf)
+    ex = Exchange(default_conf)
+    ex.init_exchange()
+
     assert log_has('Unable to initialize markets.', caplog)
 
     expected_return = {'ETH/BTC': 'available'}
@@ -516,6 +526,7 @@ def test__load_markets(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     default_conf['exchange']['pair_whitelist'] = ['ETH/BTC']
     ex = Exchange(default_conf)
+    ex.init_exchange()
 
     assert ex.markets == expected_return
 
@@ -592,7 +603,8 @@ def test_validate_stakecurrency_error(default_conf, mocker, caplog):
     with pytest.raises(OperationalException,
                        match=r'XRP is not available as stake on .*'
                        'Available currencies are: BTC, ETH, USDT'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
     type(api_mock).load_markets = MagicMock(side_effect=ccxt.NetworkError('No connection.'))
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
@@ -661,7 +673,8 @@ def test_validate_pairs_not_available(default_conf, mocker):
     mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
 
     with pytest.raises(OperationalException, match=r'not available'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_validate_pairs_exception(default_conf, mocker, caplog):
@@ -676,10 +689,13 @@ def test_validate_pairs_exception(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
 
     with pytest.raises(OperationalException, match=r'Pair ETH/BTC is not available on Binance'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value={}))
-    Exchange(default_conf)
+    ex = Exchange(default_conf)
+    ex.init_exchange()
+
     assert log_has('Unable to validate pairs (assuming they are correct).', caplog)
 
 
@@ -695,7 +711,9 @@ def test_validate_pairs_restricted(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
-    Exchange(default_conf)
+    ex = Exchange(default_conf)
+    ex.init_exchange()
+
     assert log_has("Pair XRP/BTC is restricted for some users on this exchange."
                    "Please check if you are impacted by this restriction "
                    "on the exchange and eventually remove XRP/BTC from your whitelist.", caplog)
@@ -729,11 +747,13 @@ def test_validate_pairs_stakecompatibility_downloaddata(default_conf, mocker, ca
     mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
-    Exchange(default_conf)
+    ex = Exchange(default_conf)
+    ex.init_exchange()
+
     assert type(api_mock).load_markets.call_count == 1
 
 
-def test_validate_pairs_stakecompatibility_fail(default_conf, mocker, caplog):
+def test_validate_pairs_stakecompatibility_fail(default_conf, mocker):
     default_conf['exchange']['pair_whitelist'].append('HELLO-WORLD')
     api_mock = MagicMock()
     type(api_mock).load_markets = MagicMock(return_value={
@@ -747,7 +767,8 @@ def test_validate_pairs_stakecompatibility_fail(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
     with pytest.raises(OperationalException, match=r"Stake-currency 'BTC' not compatible with.*"):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 @pytest.mark.parametrize("timeframe", [
@@ -788,12 +809,15 @@ def test_validate_timeframes_failed(default_conf, mocker):
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs', MagicMock())
     with pytest.raises(OperationalException,
                        match=r"Invalid timeframe '3m'. This exchange supports.*"):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
+
     default_conf["timeframe"] = "15s"
 
     with pytest.raises(OperationalException,
                        match=r"Timeframes < 1m are currently not supported by Freqtrade."):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_validate_timeframes_emulated_ohlcv_1(default_conf, mocker):
@@ -813,7 +837,8 @@ def test_validate_timeframes_emulated_ohlcv_1(default_conf, mocker):
                        match=r'The ccxt library does not provide the list of timeframes '
                              r'for the exchange ".*" and this exchange '
                              r'is therefore not supported. *'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_validate_timeframes_emulated_ohlcvi_2(default_conf, mocker):
@@ -834,7 +859,8 @@ def test_validate_timeframes_emulated_ohlcvi_2(default_conf, mocker):
                        match=r'The ccxt library does not provide the list of timeframes '
                              r'for the exchange ".*" and this exchange '
                              r'is therefore not supported. *'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_validate_timeframes_not_in_config(default_conf, mocker):
@@ -872,7 +898,6 @@ def test_validate_order_types(default_conf, mocker):
         'stoploss': 'market',
         'stoploss_on_exchange': False
     }
-    Exchange(default_conf)
 
     type(api_mock).has = PropertyMock(return_value={'createMarketOrder': False})
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
@@ -885,7 +910,8 @@ def test_validate_order_types(default_conf, mocker):
     }
     with pytest.raises(OperationalException,
                        match=r'Exchange .* does not support market orders.'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
     default_conf['order_types'] = {
         'buy': 'limit',
@@ -895,7 +921,8 @@ def test_validate_order_types(default_conf, mocker):
     }
     with pytest.raises(OperationalException,
                        match=r'On exchange stoploss is not supported for .*'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_validate_order_types_not_in_config(default_conf, mocker):
@@ -910,7 +937,7 @@ def test_validate_order_types_not_in_config(default_conf, mocker):
     Exchange(conf)
 
 
-def test_validate_required_startup_candles(default_conf, mocker, caplog):
+def test_validate_required_startup_candles(default_conf, mocker):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange.name', PropertyMock(return_value='Binance'))
 
@@ -922,11 +949,13 @@ def test_validate_required_startup_candles(default_conf, mocker, caplog):
 
     default_conf['startup_candle_count'] = 20
     ex = Exchange(default_conf)
+    ex.init_exchange()
     assert ex
     default_conf['startup_candle_count'] = 600
 
     with pytest.raises(OperationalException, match=r'This strategy requires 600.*'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_exchange_has(default_conf, mocker):
@@ -1722,7 +1751,6 @@ async def test__async_get_candle_history_empty(default_conf, mocker, caplog):
     # Monkey-patch async function
     exchange._api_async.fetch_ohlcv = get_mock_coro([])
 
-    exchange = Exchange(default_conf)
     pair = 'ETH/BTC'
     res = await exchange._async_get_candle_history(pair, "5m")
     assert type(res) is tuple

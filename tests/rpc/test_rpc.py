@@ -369,6 +369,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
         'freqtrade.rpc.fiat_convert.CoinGeckoAPI',
         get_price=MagicMock(return_value={'bitcoin': {'usd': 15000.0}}),
     )
+    mocker.patch("freqtrade.wallets.Wallets.get_starting_balance", return_value=1000)
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
     mocker.patch.multiple(
