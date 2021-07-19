@@ -46,8 +46,6 @@ http.cookies.Morsel._reserved["samesite"] = "SameSite"  # type: ignore
 
 class Exchange:
 
-    _config: Dict = {}
-
     # Parameters to add directly to ccxt sync/async initialization.
     _ccxt_config: Dict = {}
 
@@ -74,7 +72,7 @@ class Exchange:
     }
     _ft_has: Dict = {}
 
-    def __init__(self, config: Dict[str, Any], validate: bool = True) -> None:
+    def __init__(self, config: Dict[str, Any]) -> None:
         """
         Initializes this module with the given config,
         it does basic validation whether the specified exchange and pairs are valid.
@@ -84,7 +82,7 @@ class Exchange:
         self._api_async: ccxt_async.Exchange = None
         self._markets: Dict = {}
 
-        self._config.update(config)
+        self._config = config
 
         # Holds last candle refreshed time of each pair
         self._pairs_last_refresh_time: Dict[Tuple[str, str], int] = {}
@@ -124,6 +122,13 @@ class Exchange:
         self._trades_pagination = self._ft_has['trades_pagination']
         self._trades_pagination_arg = self._ft_has['trades_pagination_arg']
 
+        # Converts the interval provided in minutes in config to seconds
+        self.markets_refresh_interval: int = exchange_config.get(
+            "markets_refresh_interval", 60) * 60
+
+    def init_exchange(self, validate: bool = True) -> None:
+        exchange_config = self._config['exchange']
+
         # Initialize ccxt objects
         ccxt_config = self._ccxt_config.copy()
         ccxt_config = deep_merge_dicts(exchange_config.get('ccxt_config', {}), ccxt_config)
@@ -143,23 +148,19 @@ class Exchange:
 
         if validate:
             # Check if timeframe is available
-            self.validate_timeframes(config.get('timeframe'))
+            self.validate_timeframes(self._config.get('timeframe'))
 
             # Initial markets load
             self._load_markets()
 
             # Check if all pairs are available
-            self.validate_stakecurrency(config['stake_currency'])
+            self.validate_stakecurrency(self._config['stake_currency'])
             if not exchange_config.get('skip_pair_validation'):
-                self.validate_pairs(config['exchange']['pair_whitelist'])
-            self.validate_ordertypes(config.get('order_types', {}))
-            self.validate_order_time_in_force(config.get('order_time_in_force', {}))
-            self.validate_required_startup_candles(config.get('startup_candle_count', 0),
-                                                   config.get('timeframe', ''))
-
-        # Converts the interval provided in minutes in config to seconds
-        self.markets_refresh_interval: int = exchange_config.get(
-            "markets_refresh_interval", 60) * 60
+                self.validate_pairs(self._config['exchange']['pair_whitelist'])
+            self.validate_ordertypes(self._config.get('order_types', {}))
+            self.validate_order_time_in_force(self._config.get('order_time_in_force', {}))
+            self.validate_required_startup_candles(self._config.get('startup_candle_count', 0),
+                                                   self._config.get('timeframe', ''))
 
     def __del__(self):
         """
