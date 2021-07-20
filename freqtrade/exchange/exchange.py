@@ -147,7 +147,7 @@ class Exchange:
         logger.info('Using Exchange "%s"', self.name)
         if load_markets:
             # Initial markets load
-            self._load_markets()
+            self.load_markets_sync()
 
         if validate:
             # Check if timeframe is available
@@ -228,8 +228,8 @@ class Exchange:
     def markets(self) -> Dict:
         """exchange ccxt markets"""
         if not self._markets:
-            logger.info("Markets were not loaded. Loading them now..")
-            self._load_markets()
+            raise OperationalException("Load markets first!")
+
         return self._markets
 
     @property
@@ -323,26 +323,26 @@ class Exchange:
                     f"No Sandbox URL in CCXT for {name}, exiting. Please check your config.json")
                 raise OperationalException(f'Exchange {name} does not provide a sandbox api')
 
-    def _load_async_markets(self, reload: bool = False) -> None:
+    async def load_markets(self, reload: bool = False) -> None:
+        """ Initialize markets """
         try:
-            if self._api_async:
-                asyncio.get_event_loop().run_until_complete(
-                    self._api_async.load_markets(reload=reload))
+            self._markets = await self._api_async.load_markets(reload=reload)
 
-        except (asyncio.TimeoutError, ccxt.BaseError) as e:
-            logger.warning('Could not load async markets. Reason: %s', e)
-            return
-
-    def _load_markets(self) -> None:
-        """ Initialize markets both sync and async """
-        try:
-            self._markets = self._api.load_markets()
-            self._load_async_markets()
+            # TODO: asyncio - remove this call.
+            self._api.load_markets(reload=True)
             self._last_markets_refresh = arrow.utcnow().int_timestamp
-        except ccxt.BaseError:
-            logger.exception('Unable to initialize markets.')
+        except (asyncio.TimeoutError, ccxt.BaseError) as e:
+            logger.exception('Unable to initialize markets: Reason: %s', e)
 
-    def reload_markets(self) -> None:
+    def load_markets_sync(self) -> None:
+        """
+        Called only when initializing the Exchange objects.
+        """
+        asyncio.get_event_loop().run_until_complete(
+            self.load_markets()
+        )
+
+    async def reload_markets(self) -> None:
         """Reload markets both sync and async if refresh interval has passed """
         # Check whether markets have to be reloaded
         if (self._last_markets_refresh > 0) and (
@@ -351,9 +351,7 @@ class Exchange:
             return None
         logger.debug("Performing scheduled market reload..")
         try:
-            self._markets = self._api.load_markets(reload=True)
-            # Also reload async markets to avoid issues with newly listed pairs
-            self._load_async_markets(reload=True)
+            await self.load_markets(reload=True)
             self._last_markets_refresh = arrow.utcnow().int_timestamp
         except ccxt.BaseError:
             logger.exception("Could not reload markets.")
