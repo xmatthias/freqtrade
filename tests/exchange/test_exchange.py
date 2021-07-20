@@ -114,9 +114,10 @@ def test_init_ccxt_kwargs(default_conf, mocker, caplog):
     # Test additional headers case
     Exchange._headers = {'hello': 'world'}
     ex = Exchange(conf)
+    ex.init_exchange(load_markets=False, validate=False)
 
     assert log_has("Applying additional ccxt config: {'TestKWARG': 11, 'TestKWARG44': 11}", caplog)
-    assert ex._api.headers == {'hello': 'world'}
+    assert ex._api_async.headers == {'hello': 'world'}
     Exchange._headers = {}
 
 
@@ -611,7 +612,8 @@ def test_validate_stakecurrency_error(default_conf, mocker, caplog):
 
     with pytest.raises(OperationalException,
                        match=r'Could not load markets, therefore cannot start\. Please.*'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
+        ex.init_exchange()
 
 
 def test_get_quote_currencies(default_conf, mocker):

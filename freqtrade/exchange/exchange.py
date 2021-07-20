@@ -126,7 +126,7 @@ class Exchange:
         self.markets_refresh_interval: int = exchange_config.get(
             "markets_refresh_interval", 60) * 60
 
-    def init_exchange(self, validate: bool = True) -> None:
+    def init_exchange(self, load_markets: bool = True, validate: bool = True) -> None:
         exchange_config = self._config['exchange']
 
         # Initialize ccxt objects
@@ -145,13 +145,13 @@ class Exchange:
             exchange_config, ccxt_async, ccxt_kwargs=ccxt_async_config)
 
         logger.info('Using Exchange "%s"', self.name)
+        if load_markets:
+            # Initial markets load
+            self._load_markets()
 
         if validate:
             # Check if timeframe is available
             self.validate_timeframes(self._config.get('timeframe'))
-
-            # Initial markets load
-            self._load_markets()
 
             # Check if all pairs are available
             self.validate_stakecurrency(self._config['stake_currency'])

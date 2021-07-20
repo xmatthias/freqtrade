@@ -46,7 +46,8 @@ def start_download_data(args: Dict[str, Any]) -> None:
     pairs_not_available: List[str] = []
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config, validate=False)
+    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config,
+                                              load_markets=True, validate=False)
     # Manual validations of relevant settings
     if not config['exchange'].get('skip_pair_validation', False):
         exchange.validate_pairs(config['pairs'])

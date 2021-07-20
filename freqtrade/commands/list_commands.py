@@ -120,7 +120,8 @@ def start_list_timeframes(args: Dict[str, Any]) -> None:
     config['timeframe'] = None
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config, validate=False)
+    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config,
+                                              load_markets=False, validate=False)
 
     if args['print_one_column']:
         print('\n'.join(exchange.timeframes))
@@ -139,7 +140,8 @@ def start_list_markets(args: Dict[str, Any], pairs_only: bool = False) -> None:
     config = setup_utils_configuration(args, RunMode.UTIL_EXCHANGE)
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config, validate=False)
+    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config,
+                                              load_markets=True, validate=False)
 
     # By default only active pairs/markets are to be shown
     active_only = not args.get('list_pairs_all', False)
