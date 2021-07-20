@@ -332,7 +332,7 @@ class Exchange:
             self._api.load_markets(reload=True)
             self._last_markets_refresh = arrow.utcnow().int_timestamp
         except (asyncio.TimeoutError, ccxt.BaseError) as e:
-            logger.exception('Unable to initialize markets: Reason: %s', e)
+            logger.exception('Unable to initialize markets. Reason: %s', e)
 
     def load_markets_sync(self) -> None:
         """
@@ -350,11 +350,8 @@ class Exchange:
                 > arrow.utcnow().int_timestamp):
             return None
         logger.debug("Performing scheduled market reload..")
-        try:
-            await self.load_markets(reload=True)
-            self._last_markets_refresh = arrow.utcnow().int_timestamp
-        except ccxt.BaseError:
-            logger.exception("Could not reload markets.")
+        await self.load_markets(reload=True)
+        self._last_markets_refresh = arrow.utcnow().int_timestamp
 
     def validate_stakecurrency(self, stake_currency: str) -> None:
         """

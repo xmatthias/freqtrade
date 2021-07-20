@@ -79,13 +79,13 @@ def test_init(default_conf, mocker, caplog):
 
 
 def test_init_ccxt_kwargs(default_conf, mocker, caplog):
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync', MagicMock(return_value={}))
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     caplog.set_level(logging.INFO)
     conf = copy.deepcopy(default_conf)
     conf['exchange']['ccxt_async_config'] = {'aiohttp_trust_env': True, 'asyncio_loop': True}
     ex = Exchange(conf)
-    ex.init_exchange()
+    ex.init_exchange(load_markets=False, validate=False)
     assert log_has(
         "Applying additional ccxt config: {'aiohttp_trust_env': True, 'asyncio_loop': True}",
         caplog)
@@ -100,7 +100,7 @@ def test_init_ccxt_kwargs(default_conf, mocker, caplog):
     conf['exchange']['ccxt_async_config'] = {'asyncio_loop': True}
     asynclogmsg = "Applying additional ccxt config: {'TestKWARG': 11, 'asyncio_loop': True}"
     ex = Exchange(conf)
-    ex.init_exchange()
+    ex.init_exchange(load_markets=False, validate=False)
 
     assert not ex._api_async.aiohttp_trust_env
     assert hasattr(ex._api, 'TestKWARG')
@@ -151,7 +151,7 @@ def test_init_exception(default_conf, mocker):
 
 def test_exchange_resolver(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=MagicMock()))
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
@@ -487,43 +487,44 @@ def test_set_sandbox_exception(default_conf, mocker):
         exchange.set_sandbox(exchange._api, default_conf['exchange'], 'Logname')
 
 
-def test__load_async_markets(default_conf, mocker, caplog):
+@pytest.mark.asyncio
+async def test__load_async_markets(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_markets')
+    # mocker.patch('freqtrade.exchange.Exchange._load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     exchange = Exchange(default_conf)
-    exchange.init_exchange()
+    exchange.init_exchange(load_markets=False)
 
     exchange._api_async.load_markets = get_mock_coro(None)
-    exchange._load_async_markets()
-    assert exchange._api_async.load_markets.call_count == 1
+    await exchange.load_markets()
+    assert exchange._api_async.load_markets.call_count == 2
     caplog.set_level(logging.DEBUG)
 
     exchange._api_async.load_markets = Mock(side_effect=ccxt.BaseError("deadbeef"))
-    exchange._load_async_markets()
+    await exchange.load_markets()
 
-    assert log_has('Could not load async markets. Reason: deadbeef', caplog)
+    assert log_has('Unable to initialize markets. Reason: deadbeef', caplog)
 
 
 def test__load_markets(default_conf, mocker, caplog):
     caplog.set_level(logging.INFO)
     api_mock = MagicMock()
-    api_mock.load_markets = MagicMock(side_effect=ccxt.BaseError("SomeError"))
+    api_mock.load_markets = get_mock_coro(side_effect=ccxt.BaseError("SomeError"))
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
+    # mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     ex = Exchange(default_conf)
     ex.init_exchange()
 
-    assert log_has('Unable to initialize markets.', caplog)
+    assert log_has_re('Unable to initialize markets.*', caplog)
 
     expected_return = {'ETH/BTC': 'available'}
     api_mock = MagicMock()
-    api_mock.load_markets = MagicMock(return_value=expected_return)
+    api_mock.load_markets = get_mock_coro(return_value=expected_return)
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     default_conf['exchange']['pair_whitelist'] = ['ETH/BTC']
     ex = Exchange(default_conf)
@@ -532,47 +533,35 @@ def test__load_markets(default_conf, mocker, caplog):
     assert ex.markets == expected_return
 
 
-def test_reload_markets(default_conf, mocker, caplog):
+@pytest.mark.asyncio
+async def test_reload_markets(default_conf, mocker, caplog):
     caplog.set_level(logging.DEBUG)
     initial_markets = {'ETH/BTC': {}}
     updated_markets = {'ETH/BTC': {}, "LTC/BTC": {}}
 
     api_mock = MagicMock()
-    api_mock.load_markets = MagicMock(return_value=initial_markets)
+    api_mock.load_markets = get_mock_coro(return_value=initial_markets)
     default_conf['exchange']['markets_refresh_interval'] = 10
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="binance",
-                                    mock_markets=False)
-    exchange._load_async_markets = MagicMock()
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', return_value=api_mock)
+    exchange = Exchange(default_conf)
+    exchange.init_exchange(load_markets=False, validate=False)
+
+    assert exchange._last_markets_refresh == 0
+    await exchange.reload_markets()
+    assert exchange._last_markets_refresh != 0
+    assert exchange.markets == initial_markets
     exchange._last_markets_refresh = arrow.utcnow().int_timestamp
 
-    assert exchange.markets == initial_markets
-
     # less than 10 minutes have passed, no reload
-    exchange.reload_markets()
+    await exchange.reload_markets()
     assert exchange.markets == initial_markets
-    assert exchange._load_async_markets.call_count == 0
 
-    api_mock.load_markets = MagicMock(return_value=updated_markets)
+    api_mock.load_markets = get_mock_coro(return_value=updated_markets)
     # more than 10 minutes have passed, reload is executed
     exchange._last_markets_refresh = arrow.utcnow().int_timestamp - 15 * 60
-    exchange.reload_markets()
+    await exchange.reload_markets()
     assert exchange.markets == updated_markets
-    assert exchange._load_async_markets.call_count == 1
     assert log_has('Performing scheduled market reload..', caplog)
-
-
-def test_reload_markets_exception(default_conf, mocker, caplog):
-    caplog.set_level(logging.DEBUG)
-
-    api_mock = MagicMock()
-    api_mock.load_markets = MagicMock(side_effect=ccxt.NetworkError("LoadError"))
-    default_conf['exchange']['markets_refresh_interval'] = 10
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="binance")
-
-    # less than 10 minutes have passed, no reload
-    exchange.reload_markets()
-    assert exchange._last_markets_refresh == 0
-    assert log_has_re(r"Could not reload markets.*", caplog)
 
 
 @pytest.mark.parametrize("stake_currency", ['ETH', 'BTC', 'USDT'])
@@ -586,21 +575,19 @@ def test_validate_stakecurrency(default_conf, stake_currency, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     Exchange(default_conf)
 
 
 def test_validate_stakecurrency_error(default_conf, mocker, caplog):
     default_conf['stake_currency'] = 'XRP'
     api_mock = MagicMock()
-    type(api_mock).load_markets = MagicMock(return_value={
+    type(api_mock).load_markets = get_mock_coro(return_value={
         'ETH/BTC': {'quote': 'BTC'}, 'LTC/BTC': {'quote': 'BTC'},
         'XRP/ETH': {'quote': 'ETH'}, 'NEO/USDT': {'quote': 'USDT'},
     })
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     with pytest.raises(OperationalException,
                        match=r'XRP is not available as stake on .*'
                        'Available currencies are: BTC, ETH, USDT'):
@@ -659,20 +646,19 @@ def test_validate_pairs(default_conf, mocker):  # test exchange.validate_pairs d
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     Exchange(default_conf)
 
 
 def test_validate_pairs_not_available(default_conf, mocker):
     api_mock = MagicMock()
-    type(api_mock).markets = PropertyMock(return_value={
+    type(api_mock).load_markets = get_mock_coro(return_value={
         'XRP/BTC': {'inactive': True, 'base': 'XRP', 'quote': 'BTC'}
     })
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
 
     with pytest.raises(OperationalException, match=r'not available'):
         ex = Exchange(default_conf)
@@ -684,11 +670,10 @@ def test_validate_pairs_exception(default_conf, mocker, caplog):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange.name', PropertyMock(return_value='Binance'))
 
-    type(api_mock).markets = PropertyMock(return_value={})
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', api_mock)
+    api_mock.load_markets = get_mock_coro(return_value={'id': '11'})
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', return_value=api_mock)
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
 
     with pytest.raises(OperationalException, match=r'Pair ETH/BTC is not available on Binance'):
         ex = Exchange(default_conf)
@@ -703,14 +688,13 @@ def test_validate_pairs_exception(default_conf, mocker, caplog):
 
 def test_validate_pairs_restricted(default_conf, mocker, caplog):
     api_mock = MagicMock()
-    type(api_mock).load_markets = MagicMock(return_value={
+    api_mock.load_markets = get_mock_coro(return_value={
         'ETH/BTC': {'quote': 'BTC'}, 'LTC/BTC': {'quote': 'BTC'},
         'XRP/BTC': {'quote': 'BTC', 'info': {'prohibitedIn': ['US']}},
         'NEO/BTC': {'quote': 'BTC', 'info': 'TestString'},  # info can also be a string ...
     })
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', return_value=api_mock)
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
     ex = Exchange(default_conf)
@@ -723,49 +707,46 @@ def test_validate_pairs_restricted(default_conf, mocker, caplog):
 
 def test_validate_pairs_stakecompatibility(default_conf, mocker, caplog):
     api_mock = MagicMock()
-    type(api_mock).load_markets = MagicMock(return_value={
+    type(api_mock).load_markets = get_mock_coro(return_value={
         'ETH/BTC': {'quote': 'BTC'}, 'LTC/BTC': {'quote': 'BTC'},
         'XRP/BTC': {'quote': 'BTC'}, 'NEO/BTC': {'quote': 'BTC'},
         'HELLO-WORLD': {'quote': 'BTC'},
     })
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
-
+    # TODO: Does this test test something?
     Exchange(default_conf)
 
 
 def test_validate_pairs_stakecompatibility_downloaddata(default_conf, mocker, caplog):
     api_mock = MagicMock()
     default_conf['stake_currency'] = ''
-    type(api_mock).load_markets = MagicMock(return_value={
+    api_mock.load_markets = get_mock_coro(return_value={
         'ETH/BTC': {'quote': 'BTC'}, 'LTC/BTC': {'quote': 'BTC'},
         'XRP/BTC': {'quote': 'BTC'}, 'NEO/BTC': {'quote': 'BTC'},
         'HELLO-WORLD': {'quote': 'BTC'},
     })
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', return_value=api_mock)
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
     ex = Exchange(default_conf)
     ex.init_exchange()
-
-    assert type(api_mock).load_markets.call_count == 1
+    # Called twice, once for sync api object, once for async object
+    assert api_mock.load_markets.call_count == 2
 
 
 def test_validate_pairs_stakecompatibility_fail(default_conf, mocker):
     default_conf['exchange']['pair_whitelist'].append('HELLO-WORLD')
     api_mock = MagicMock()
-    type(api_mock).load_markets = MagicMock(return_value={
+    api_mock.load_markets = get_mock_coro(return_value={
         'ETH/BTC': {'quote': 'BTC'}, 'LTC/BTC': {'quote': 'BTC'},
         'XRP/BTC': {'quote': 'BTC'}, 'NEO/BTC': {'quote': 'BTC'},
         'HELLO-WORLD': {'quote': 'USDT'},
     })
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', return_value=api_mock)
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
     with pytest.raises(OperationalException, match=r"Stake-currency 'BTC' not compatible with.*"):
@@ -788,7 +769,7 @@ def test_validate_timeframes(default_conf, mocker, timeframe):
     type(api_mock).timeframes = timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     Exchange(default_conf)
@@ -807,7 +788,7 @@ def test_validate_timeframes_failed(default_conf, mocker):
     type(api_mock).timeframes = timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs', MagicMock())
     with pytest.raises(OperationalException,
                        match=r"Invalid timeframe '3m'. This exchange supports.*"):
@@ -832,7 +813,7 @@ def test_validate_timeframes_emulated_ohlcv_1(default_conf, mocker):
     del api_mock.timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     with pytest.raises(OperationalException,
@@ -853,8 +834,7 @@ def test_validate_timeframes_emulated_ohlcvi_2(default_conf, mocker):
     del api_mock.timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets',
-                 MagicMock(return_value={'timeframes': None}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs', MagicMock())
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     with pytest.raises(OperationalException,
@@ -877,7 +857,7 @@ def test_validate_timeframes_not_in_config(default_conf, mocker):
     type(api_mock).timeframes = timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     Exchange(default_conf)
@@ -888,7 +868,7 @@ def test_validate_order_types(default_conf, mocker):
 
     type(api_mock).has = PropertyMock(return_value={'createMarketOrder': True})
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
@@ -930,7 +910,7 @@ def test_validate_order_types(default_conf, mocker):
 def test_validate_order_types_not_in_config(default_conf, mocker):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
@@ -945,7 +925,7 @@ def test_validate_required_startup_candles(default_conf, mocker):
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', api_mock)
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange._load_async_markets')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
@@ -2687,7 +2667,7 @@ async def test_stoploss_order_unsupported_exchange(default_conf, mocker):
 def test_merge_ft_has_dict(default_conf, mocker):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           _init_ccxt=MagicMock(return_value=MagicMock()),
-                          _load_async_markets=MagicMock(),
+                          load_markets_sync=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           validate_stakecurrency=MagicMock()
@@ -2721,7 +2701,7 @@ def test_merge_ft_has_dict(default_conf, mocker):
 def test_get_valid_pair_combination(default_conf, mocker, markets):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           _init_ccxt=MagicMock(return_value=MagicMock()),
-                          _load_async_markets=MagicMock(),
+                          load_markets_sync=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           markets=PropertyMock(return_value=markets))
@@ -2794,7 +2774,7 @@ def test_get_markets(default_conf, mocker, markets,
                      expected_keys):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           _init_ccxt=MagicMock(return_value=MagicMock()),
-                          _load_async_markets=MagicMock(),
+                          load_markets_sync=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           markets=PropertyMock(return_value=markets))
