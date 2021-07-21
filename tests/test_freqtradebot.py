@@ -4198,7 +4198,7 @@ async def test_order_book_bid_strategy_exception(mocker, default_conf, caplog) -
     # orderbook shall be used even if tickers would be lower.
     with pytest.raises(PricingError):
         await freqtrade.exchange.get_rate('ETH/BTC', refresh=True, side="buy")
-    assert log_has_re(r'Buy Price from orderbook could not be determined.', caplog)
+    assert log_has_re(r'Buy Price at location 1 from orderbook could not be determined.', caplog)
 
 
 async def test_check_depth_of_market_buy(default_conf, mocker, order_book_l2) -> None:
@@ -4378,6 +4378,8 @@ async def test_update_open_orders(mocker, default_conf, fee, caplog):
     caplog.clear()
 
     freqtrade.config['dry_run'] = False
+    freqtrade.exchange._api_async.fetch_order = MagicMock(side_effect=ExchangeError('invalid or'))
+
     await freqtrade.update_open_orders()
 
     assert log_has_re(r"Error updating Order .*", caplog)
@@ -4388,7 +4390,7 @@ async def test_update_open_orders(mocker, default_conf, fee, caplog):
     matching_buy_order.update({
         'status': 'closed',
     })
-    mocker.patch('freqtrade.exchange.Exchange.fetch_order', return_value=matching_buy_order)
+    freqtrade.exchange._api_async.fetch_order = get_mock_coro(return_value=matching_buy_order)
     await freqtrade.update_open_orders()
     # Only stoploss and sell orders are kept open
     assert len(Order.get_open_orders()) == 2
