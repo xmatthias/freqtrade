@@ -1143,12 +1143,9 @@ class Exchange:
         try:
             if self._config['dry_run'] and self._config.get('fee', None) is not None:
                 return self._config['fee']
-            # validate that markets are loaded before trying to get fee
-            if self._api.markets is None or len(self._api.markets) == 0:
-                self._api.load_markets()
 
-            return self._api.calculate_fee(symbol=symbol, type=type, side=side, amount=amount,
-                                           price=price, takerOrMaker=taker_or_maker)['rate']
+            return self._api_async.calculate_fee(symbol=symbol, type=type, side=side, amount=amount,
+                                                 price=price, takerOrMaker=taker_or_maker)['rate']
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
