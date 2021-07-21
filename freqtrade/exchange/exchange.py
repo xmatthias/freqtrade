@@ -328,8 +328,6 @@ class Exchange:
         try:
             self._markets = await self._api_async.load_markets(reload=reload)
 
-            # TODO: asyncio - remove this call.
-            self._api.load_markets(reload=True)
             self._last_markets_refresh = arrow.utcnow().int_timestamp
         except (asyncio.TimeoutError, ccxt.BaseError) as e:
             logger.exception('Unable to initialize markets. Reason: %s', e)

@@ -499,7 +499,7 @@ async def test__load_async_markets(default_conf, mocker, caplog):
 
     exchange._api_async.load_markets = get_mock_coro(None)
     await exchange.load_markets()
-    assert exchange._api_async.load_markets.call_count == 2
+    assert exchange._api_async.load_markets.call_count == 1
     caplog.set_level(logging.DEBUG)
 
     exchange._api_async.load_markets = Mock(side_effect=ccxt.BaseError("deadbeef"))
@@ -733,8 +733,7 @@ def test_validate_pairs_stakecompatibility_downloaddata(default_conf, mocker, ca
 
     ex = Exchange(default_conf)
     ex.init_exchange()
-    # Called twice, once for sync api object, once for async object
-    assert api_mock.load_markets.call_count == 2
+    assert api_mock.load_markets.call_count == 1
 
 
 def test_validate_pairs_stakecompatibility_fail(default_conf, mocker):
