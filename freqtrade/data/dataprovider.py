@@ -152,6 +152,8 @@ class DataProvider:
         Clear pair dataframe cache.
         """
         self.__cached_pairs = {}
+        self.__cached_pairs_backtesting = {}
+        self.__slice_index = 0
 
     # Exchange functions
 

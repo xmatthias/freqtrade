@@ -70,7 +70,7 @@ def test_setup_edge_configuration_with_arguments(mocker, edge_conf, caplog) -> N
     assert log_has('Parameter --timerange detected: {} ...'.format(config['timerange']), caplog)
 
 
-def test_start(mocker, fee, edge_conf, caplog) -> None:
+def test_edge_cli_start(mocker, fee, edge_conf, caplog) -> None:
     start_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange.get_fee', fee)
     patch_exchange(mocker)

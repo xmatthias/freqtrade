@@ -87,10 +87,10 @@ class FreqtradeBot(LoggingMixin):
         self.dataprovider = DataProvider(self.config, self.exchange, asyncio.get_event_loop(),
                                          pairlists=self.pairlists)
 
-        # Attach Dataprovider to Strategy baseclass
-        IStrategy.dp = self.dataprovider
-        # Attach Wallets to Strategy baseclass
-        IStrategy.wallets = self.wallets
+        # Attach Dataprovider to strategy instance
+        self.strategy.dp = self.dataprovider
+        # Attach Wallets to strategy instance
+        self.strategy.wallets = self.wallets
 
         # Initializing Edge only if enabled
         self.edge = Edge(self.config, self.exchange, self.strategy) if \
@@ -143,7 +143,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Only update open orders on startup
         # This will update the database after the initial migration
-        asyncio.get_event_loop().run_until_complete(self.update_open_orders())
+        asyncio.get_event_loop().run_until_complete(self.startup_update_open_orders())
 
     def process(self) -> None:
         """
@@ -165,7 +165,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Refreshing candles
         self.dataprovider.refresh(self.pairlists.create_pair_list(self.active_pair_whitelist),
-                                  self.strategy.informative_pairs())
+                                  self.strategy.gather_informative_pairs())
 
         strategy_safe_wrapper(self.strategy.bot_loop_start, supress_error=True)()
 
@@ -244,7 +244,7 @@ class FreqtradeBot(LoggingMixin):
         open_trades = len(Trade.get_open_trades())
         return max(0, self.config['max_open_trades'] - open_trades)
 
-    async def update_open_orders(self):
+    async def startup_update_open_orders(self):
         """
         Updates open orders based on order list kept in the database.
         Mainly updates the state of orders - but may also close trades
@@ -1243,7 +1243,7 @@ class FreqtradeBot(LoggingMixin):
             'exchange': trade.exchange.capitalize(),
             'pair': trade.pair,
             'gain': gain,
-            'limit': profit_rate,
+            'limit': profit_rate or 0,
             'order_type': order_type,
             'amount': trade.amount,
             'open_rate': trade.open_rate,
@@ -1252,7 +1252,7 @@ class FreqtradeBot(LoggingMixin):
             'profit_ratio': profit_ratio,
             'sell_reason': trade.sell_reason,
             'open_date': trade.open_date,
-            'close_date': trade.close_date,
+            'close_date': trade.close_date or datetime.now(timezone.utc),
             'stake_currency': self.config['stake_currency'],
             'fiat_currency': self.config.get('fiat_display_currency', None),
             'reason': reason,
@@ -1318,14 +1318,26 @@ class FreqtradeBot(LoggingMixin):
         if not trade.is_open:
             if not stoploss_order and not trade.open_order_id:
                 await self._notify_exit(trade, '', True)
-            self.protections.stop_per_pair(trade.pair)
-            self.protections.global_stop()
+            self.handle_protections(trade.pair)
             await self.wallets.update()
         elif not trade.open_order_id:
             # Buy fill
             self._notify_enter_fill(trade)
 
         return False
+
+    def handle_protections(self, pair: str) -> None:
+        prot_trig = self.protections.stop_per_pair(pair)
+        if prot_trig:
+            msg = {'type': RPCMessageType.PROTECTION_TRIGGER, }
+            msg.update(prot_trig.to_json())
+            self.rpc.send_msg(msg)
+
+        prot_trig_glb = self.protections.global_stop()
+        if prot_trig_glb:
+            msg = {'type': RPCMessageType.PROTECTION_TRIGGER_GLOBAL, }
+            msg.update(prot_trig_glb.to_json())
+            self.rpc.send_msg(msg)
 
     async def apply_fee_conditional(self, trade: Trade, trade_base_currency: str,
                                     amount: float, fee_abs: float) -> float:

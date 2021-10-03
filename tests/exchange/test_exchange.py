@@ -1,5 +1,6 @@
 import copy
 import logging
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from math import isclose
 from random import randint
@@ -14,7 +15,7 @@ from freqtrade.exceptions import (DDosProtection, DependencyException, InvalidOr
                                   OperationalException, PricingError, TemporaryError)
 from freqtrade.exchange import Binance, Bittrex, Exchange, Kraken
 from freqtrade.exchange.common import (API_FETCH_ORDER_RETRY_COUNT, API_RETRY_COUNT,
-                                       calculate_backoff)
+                                       calculate_backoff, remove_credentials)
 from freqtrade.exchange.exchange import (market_is_active, timeframe_to_minutes, timeframe_to_msecs,
                                          timeframe_to_next_date, timeframe_to_prev_date,
                                          timeframe_to_seconds)
@@ -76,6 +77,22 @@ def test_init(default_conf, mocker, caplog):
     caplog.set_level(logging.INFO)
     get_patched_exchange(mocker, default_conf)
     assert log_has('Instance is running with dry_run enabled', caplog)
+
+
+def test_remove_credentials(default_conf, caplog) -> None:
+    conf = deepcopy(default_conf)
+    conf['dry_run'] = False
+    remove_credentials(conf)
+
+    assert conf['exchange']['key'] != ''
+    assert conf['exchange']['secret'] != ''
+
+    conf['dry_run'] = True
+    remove_credentials(conf)
+    assert conf['exchange']['key'] == ''
+    assert conf['exchange']['secret'] == ''
+    assert conf['exchange']['password'] == ''
+    assert conf['exchange']['uid'] == ''
 
 
 def test_init_ccxt_kwargs(default_conf, mocker, caplog):
@@ -192,7 +209,7 @@ def test_exchange_resolver(default_conf, mocker, caplog):
 
 def test_validate_order_time_in_force(default_conf, mocker, caplog):
     caplog.set_level(logging.INFO)
-    # explicitly test bittrex, exchanges implementing other policies need seperate tests
+    # explicitly test bittrex, exchanges implementing other policies need separate tests
     ex = get_patched_exchange(mocker, default_conf, id="bittrex")
     tif = {
         "buy": "gtc",
@@ -2508,7 +2525,7 @@ async def test_fetch_order(default_conf, mocker, exchange_name, caplog):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test_fetch_stoploss_order(default_conf, mocker, exchange_name):
-    # Don't test FTX here - that needs a seperate test
+    # Don't test FTX here - that needs a separate test
     if exchange_name == 'ftx':
         return
     default_conf['dry_run'] = True
@@ -2768,7 +2785,7 @@ def test_get_valid_pair_combination(default_conf, mocker, markets):
         (['LTC'], ['NONEXISTENT'], False, False,
          []),
     ])
-def test_get_markets(default_conf, mocker, markets,
+def test_get_markets(default_conf, mocker, markets_static,
                      base_currencies, quote_currencies, pairs_only, active_only,
                      expected_keys):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
@@ -2776,7 +2793,7 @@ def test_get_markets(default_conf, mocker, markets,
                           load_markets_sync=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
-                          markets=PropertyMock(return_value=markets))
+                          markets=PropertyMock(return_value=markets_static))
     ex = Exchange(default_conf)
     pairs = ex.get_markets(base_currencies, quote_currencies, pairs_only, active_only)
     assert sorted(pairs.keys()) == sorted(expected_keys)

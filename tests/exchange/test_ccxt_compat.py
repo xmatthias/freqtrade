@@ -66,6 +66,8 @@ def event_loop():
 def exchange_conf():
     config = get_default_conf((Path(__file__).parent / "testdata").resolve())
     config['exchange']['pair_whitelist'] = []
+    config['exchange']['key'] = ''
+    config['exchange']['secret'] = ''
     config['dry_run'] = False
     return config
 
