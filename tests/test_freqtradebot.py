@@ -3398,9 +3398,9 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf_usdt, limit_buy_ord
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=get_mock_coro(return_value={
-            'bid': 0.00000172,
-            'ask': 0.00000173,
-            'last': 0.00000172
+            'bid': 2.0,
+            'ask': 2.0,
+            'last': 2.0
         }),
         create_order=get_mock_coro(side_effect=[
             limit_buy_order_usdt_open,
@@ -3428,7 +3428,7 @@ async def test_disable_ignore_roi_if_buy_signal(default_conf_usdt, limit_buy_ord
     # Test if buy-signal is absent
     patch_get_signal(freqtrade, value=(False, True, None))
     assert await freqtrade.handle_trade(trade) is True
-    assert trade.sell_reason == SellType.SELL_SIGNAL.value
+    assert trade.sell_reason == SellType.ROI.value
 
 
 async def test_get_real_amount_quote(

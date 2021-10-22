@@ -605,16 +605,33 @@ def test_get_ui_download_url(mocker):
 def test_get_ui_download_url_direct(mocker):
     response = MagicMock()
     response.json = MagicMock(
-        side_effect=[[{
-            'assets_url': 'http://whatever.json',
-            'name': '0.0.1',
-            'assets': [{'browser_download_url': 'http://download11.zip'}]}]])
+        return_value=[
+            {
+                'assets_url': 'http://whatever.json',
+                'name': '0.0.2',
+                'assets': [{'browser_download_url': 'http://download22.zip'}]
+            },
+            {
+                'assets_url': 'http://whatever.json',
+                'name': '0.0.1',
+                'assets': [{'browser_download_url': 'http://download1.zip'}]
+            },
+        ])
     get_mock = mocker.patch("freqtrade.commands.deploy_commands.requests.get",
                             return_value=response)
     x, last_version = get_ui_download_url()
     assert get_mock.call_count == 1
+    assert last_version == '0.0.2'
+    assert x == 'http://download22.zip'
+    get_mock.reset_mock()
+    response.json.reset_mock()
+
+    x, last_version = get_ui_download_url('0.0.1')
     assert last_version == '0.0.1'
-    assert x == 'http://download11.zip'
+    assert x == 'http://download1.zip'
+
+    with pytest.raises(ValueError, match="UI-Version not found."):
+        x, last_version = get_ui_download_url('0.0.3')
 
 
 def test_download_data_keyboardInterrupt(mocker, caplog, markets):
@@ -735,6 +752,46 @@ def test_download_data_no_pairs(mocker, caplog):
     with pytest.raises(OperationalException,
                        match=r"Downloading data requires a list of pairs\..*"):
         start_download_data(pargs)
+
+
+def test_download_data_all_pairs(mocker, markets):
+
+    mocker.patch.object(Path, "exists", MagicMock(return_value=False))
+
+    dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
+                           MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
+    patch_exchange(mocker)
+    mocker.patch(
+        'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
+    )
+    args = [
+        "download-data",
+        "--exchange",
+        "binance",
+        "--pairs",
+        ".*/USDT"
+    ]
+    pargs = get_args(args)
+    pargs['config'] = None
+    start_download_data(pargs)
+    expected = set(['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT'])
+    assert set(dl_mock.call_args_list[0][1]['pairs']) == expected
+    assert dl_mock.call_count == 1
+
+    dl_mock.reset_mock()
+    args = [
+        "download-data",
+        "--exchange",
+        "binance",
+        "--pairs",
+        ".*/USDT",
+        "--include-inactive-pairs",
+    ]
+    pargs = get_args(args)
+    pargs['config'] = None
+    start_download_data(pargs)
+    expected = set(['ETH/USDT', 'LTC/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT'])
+    assert set(dl_mock.call_args_list[0][1]['pairs']) == expected
 
 
 def test_download_data_trades(mocker, caplog):

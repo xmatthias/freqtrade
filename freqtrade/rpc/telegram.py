@@ -26,6 +26,7 @@ from freqtrade.constants import DUST_PER_COIN
 from freqtrade.enums import RPCMessageType
 from freqtrade.exceptions import OperationalException
 from freqtrade.misc import chunks, plural, round_coin_value
+from freqtrade.persistence import Trade
 from freqtrade.rpc import RPC, RPCException, RPCHandler
 
 
@@ -61,6 +62,8 @@ def authorized_only(command_handler: Callable[..., None]) -> Callable[..., Any]:
             )
             return wrapper
 
+        # Rollback session to avoid getting data stored in a transaction.
+        Trade.query.session.rollback()
         logger.debug(f'Executing handler: {command_handler.__name__} for chat_id: {chat_id}')
         try:
             return command_handler(self, *args, **kwargs)

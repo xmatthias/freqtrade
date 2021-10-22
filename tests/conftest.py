@@ -237,7 +237,7 @@ def create_mock_trades(fee, use_db: bool = True):
     add_trade(trade)
 
     if use_db:
-        Trade.query.session.flush()
+        Trade.commit()
 
 
 def create_mock_trades_usdt(fee, use_db: bool = True):
@@ -270,7 +270,7 @@ def create_mock_trades_usdt(fee, use_db: bool = True):
     add_trade(trade)
 
     if use_db:
-        Trade.query.session.flush()
+        Trade.commit()
 
 
 @pytest.fixture(autouse=True)
