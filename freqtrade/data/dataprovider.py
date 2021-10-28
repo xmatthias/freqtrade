@@ -217,7 +217,7 @@ class DataProvider:
             raise OperationalException(NO_EXCHANGE_EXCEPTION)
         try:
 
-            return self._loop.run_until_complete(self._exchange.fetch_ticker(pair))
+            return self._exchange.fetch_ticker_sync(pair)
         except ExchangeError:
             return {}
 
@@ -231,4 +231,4 @@ class DataProvider:
         """
         if self._exchange is None:
             raise OperationalException(NO_EXCHANGE_EXCEPTION)
-        return self._loop.run_until_complete(self._exchange.fetch_l2_order_book(pair, maximum))
+        return self._exchange.fetch_l2_order_book_sync(pair, maximum)

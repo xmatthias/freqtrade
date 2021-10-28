@@ -950,6 +950,27 @@ class Exchange:
 
     # Pricing info
 
+    @retrier
+    def fetch_ticker_sync(self, pair: str) -> dict:
+        """
+        TODO: asyncio: Should be deprecated and removed sometime in the future
+        Sync version of fetch_ticker
+        Still needed for dataprovider support.
+        """
+        try:
+            if (pair not in self.markets or
+                    self.markets[pair].get('active', False) is False):
+                raise ExchangeError(f"Pair {pair} not available")
+            data = self._api.fetch_ticker(pair)
+            return data
+        except ccxt.DDoSProtection as e:
+            raise DDosProtection(e) from e
+        except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+            raise TemporaryError(
+                f'Could not load ticker due to {e.__class__.__name__}. Message: {e}') from e
+        except ccxt.BaseError as e:
+            raise OperationalException(e) from e
+
     @retrier_async
     async def fetch_ticker(self, pair: str) -> dict:
         try:
@@ -1009,7 +1030,9 @@ class Exchange:
     @retrier
     def fetch_l2_order_book_sync(self, pair: str, limit: int = 100) -> dict:
         """
-        TODO: asyncio: Can this be removed?
+        TODO: asyncio: Should be deprecated and removed sometime in the future
+        Sync version of fetch_l2_order_book - Still needed for dataprovider support.
+
         Get L2 order book from exchange.
         Can be limited to a certain amount (if supported).
         Returns a dict in the format

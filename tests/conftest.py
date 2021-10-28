@@ -1250,8 +1250,8 @@ def limit_sell_order(limit_sell_order_open):
 
 
 @pytest.fixture
-def order_book_l2():
-    return get_mock_coro(return_value={
+def order_book_l2_sync():
+    return MagicMock(return_value={
         'bids': [
             [0.043936, 10.442],
             [0.043935, 31.865],
@@ -1280,6 +1280,11 @@ def order_book_l2():
         'datetime': None,
         'nonce': 288004540
     })
+
+
+@pytest.fixture
+def order_book_l2(order_book_l2_sync):
+    return get_mock_coro(return_value=order_book_l2_sync.return_value)
 
 
 @pytest.fixture
@@ -1355,6 +1360,11 @@ def ohlcv_history(ohlcv_history_list):
 @pytest.fixture
 def tickers(tickers_base):
     return get_mock_coro(tickers_base)
+
+
+@pytest.fixture
+def tickers_sync(tickers_base):
+    return MagicMock(return_value=tickers_base)
 
 
 @pytest.fixture

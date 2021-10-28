@@ -105,6 +105,19 @@ class TestCCXTExchange():
         if EXCHANGES[exchangename].get('hasQuoteVolume'):
             assert tickers[pair]['quoteVolume'] is not None
 
+    async def test_ccxt_fetch_ticker_sync(self, exchange):
+        exchange, exchangename = exchange
+        pair = EXCHANGES[exchangename]['pair']
+
+        ticker = exchange.fetch_ticker(pair)
+        assert 'ask' in ticker
+        assert ticker['ask'] is not None
+        assert 'bid' in ticker
+        assert ticker['bid'] is not None
+        assert 'quoteVolume' in ticker
+        if EXCHANGES[exchangename].get('hasQuoteVolume'):
+            assert ticker['quoteVolume'] is not None
+
     @pytest.mark.asyncio
     async def test_ccxt_fetch_ticker(self, exchange):
         exchange, exchangename = exchange

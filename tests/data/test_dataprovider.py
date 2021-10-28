@@ -9,7 +9,7 @@ from freqtrade.data.dataprovider import DataProvider
 from freqtrade.enums import RunMode
 from freqtrade.exceptions import ExchangeError, OperationalException
 from freqtrade.plugins.pairlistmanager import PairListManager
-from tests.conftest import get_mock_coro, get_patched_exchange
+from tests.conftest import get_patched_exchange
 
 
 def test_ohlcv(mocker, default_conf, ohlcv_history):
@@ -149,16 +149,16 @@ def test_refresh(mocker, default_conf, ohlcv_history):
     assert refresh_mock.call_args[0][0] == pairs + pairs_non_trad
 
 
-def test_orderbook(mocker, default_conf, order_book_l2):
+def test_orderbook(mocker, default_conf, order_book_l2_sync):
     api_mock = MagicMock()
-    api_mock.fetch_l2_order_book = order_book_l2
+    api_mock.fetch_l2_order_book = order_book_l2_sync
     exchange = get_patched_exchange(mocker, default_conf, api_mock=api_mock)
 
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.orderbook('ETH/BTC', 5)
-    assert order_book_l2.call_count == 1
-    assert order_book_l2.call_args_list[0][0][0] == 'ETH/BTC'
-    assert order_book_l2.call_args_list[0][0][1] >= 5
+    assert order_book_l2_sync.call_count == 1
+    assert order_book_l2_sync.call_args_list[0][0][0] == 'ETH/BTC'
+    assert order_book_l2_sync.call_args_list[0][0][1] >= 5
 
     assert type(res) is dict
     assert 'bids' in res
@@ -181,11 +181,9 @@ def test_market(mocker, default_conf, markets):
     assert res is None
 
 
-# TODO: Reenable this test once async conversion is completed
-@pytest.mark.skip
-def test_ticker(mocker, default_conf, tickers):
-    ticker_mock = get_mock_coro(return_value=tickers()['ETH/BTC'])
-    mocker.patch("freqtrade.exchange.Exchange.fetch_ticker", ticker_mock)
+def test_ticker(mocker, default_conf, tickers_sync):
+    ticker_mock = MagicMock(return_value=tickers_sync()['ETH/BTC'])
+    mocker.patch("freqtrade.exchange.Exchange.fetch_ticker_sync", ticker_mock)
     exchange = get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('ETH/BTC')
@@ -193,8 +191,8 @@ def test_ticker(mocker, default_conf, tickers):
     assert 'symbol' in res
     assert res['symbol'] == 'ETH/BTC'
 
-    ticker_mock = test_ticker(side_effect=ExchangeError('Pair not found'))
-    mocker.patch("freqtrade.exchange.Exchange.fetch_ticker", ticker_mock)
+    ticker_mock = MagicMock(side_effect=ExchangeError('Pair not found'))
+    mocker.patch("freqtrade.exchange.Exchange.fetch_ticker_sync", ticker_mock)
     exchange = get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('UNITTEST/BTC')
