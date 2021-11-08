@@ -936,7 +936,7 @@ def test_validate_order_types_not_in_config(default_conf, mocker):
     Exchange(conf)
 
 
-def test_validate_required_startup_candles(default_conf, mocker):
+def test_validate_required_startup_candles(default_conf, mocker, caplog):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange.name', PropertyMock(return_value='Binance'))
 
@@ -950,10 +950,23 @@ def test_validate_required_startup_candles(default_conf, mocker):
     ex = Exchange(default_conf)
     ex.init_exchange()
     assert ex
-    default_conf['startup_candle_count'] = 600
+    # assumption is that the exchange provides 500 candles per call.s
+    assert ex.validate_required_startup_candles(200, '5m') == 1
+    assert ex.validate_required_startup_candles(499, '5m') == 1
+    assert ex.validate_required_startup_candles(600, '5m') == 2
+    assert ex.validate_required_startup_candles(501, '5m') == 2
+    assert ex.validate_required_startup_candles(499, '5m') == 1
+    assert ex.validate_required_startup_candles(1000, '5m') == 3
+    assert ex.validate_required_startup_candles(2499, '5m') == 5
+    assert log_has_re(r'Using 5 calls to get OHLCV. This.*', caplog)
 
-    with pytest.raises(OperationalException, match=r'This strategy requires 600.*'):
-        ex = Exchange(default_conf)
+    with pytest.raises(OperationalException, match=r'This strategy requires 2500.*'):
+        ex.validate_required_startup_candles(2500, '5m')
+
+    # Ensure the same also happens on init
+    default_conf['startup_candle_count'] = 6000
+    with pytest.raises(OperationalException, match=r'This strategy requires 6000.*'):
+        Exchange(default_conf)
         ex.init_exchange()
 
 
@@ -1584,6 +1597,7 @@ def test_get_historic_ohlcv(default_conf, mocker, caplog, exchange_name):
     assert exchange._async_get_candle_history.call_count == 2
     # Returns twice the above OHLCV data
     assert len(ret) == 2
+    assert log_has_re(r'Downloaded data for .* with length .*\.', caplog)
 
     caplog.clear()
 
@@ -1665,12 +1679,13 @@ async def test__async_get_historic_ohlcv(default_conf, mocker, caplog, exchange_
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
 
     pair = 'ETH/USDT'
-    res = await exchange._async_get_historic_ohlcv(pair, "5m",
-                                                   1500000000000, is_new_pair=False)
+    respair, restf, res = await exchange._async_get_historic_ohlcv(
+        pair, "5m", 1500000000000, is_new_pair=False)
+    assert respair == pair
+    assert restf == '5m'
     # Call with very old timestamp - causes tons of requests
     assert exchange._api_async.fetch_ohlcv.call_count > 200
     assert res[0] == ohlcv[0]
-    assert log_has_re(r'Downloaded data for .* with length .*\.', caplog)
 
 
 def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
@@ -1708,12 +1723,14 @@ def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
     assert exchange._api_async.fetch_ohlcv.call_count == 2
     exchange._api_async.fetch_ohlcv.reset_mock()
 
+    exchange.required_candle_call_count = 2
     res = exchange.refresh_latest_ohlcv(pairs)
     assert len(res) == len(pairs)
 
     assert log_has(f'Refreshing candle (OHLCV) data for {len(pairs)} pairs', caplog)
     assert exchange._klines
-    assert exchange._api_async.fetch_ohlcv.call_count == 2
+    assert exchange._api_async.fetch_ohlcv.call_count == 4
+    exchange._api_async.fetch_ohlcv.reset_mock()
     for pair in pairs:
         assert isinstance(exchange.klines(pair), DataFrame)
         assert len(exchange.klines(pair)) > 0
@@ -1729,7 +1746,7 @@ def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
     res = exchange.refresh_latest_ohlcv([('IOTA/ETH', '5m'), ('XRP/ETH', '5m')])
     assert len(res) == len(pairs)
 
-    assert exchange._api_async.fetch_ohlcv.call_count == 2
+    assert exchange._api_async.fetch_ohlcv.call_count == 0
     assert log_has(f"Using cached candle (OHLCV) data for pair {pairs[0][0]}, "
                    f"timeframe {pairs[0][1]} ...",
                    caplog)

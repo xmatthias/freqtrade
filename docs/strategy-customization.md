@@ -134,7 +134,7 @@ Additional technical libraries can be installed as necessary, or custom indicato
 
 ### Strategy startup period
 
-Most indicators have an instable startup period, in which they are either not available, or the calculation is incorrect. This can lead to inconsistencies, since Freqtrade does not know how long this instable period should be.
+Most indicators have an instable startup period, in which they are either not available (NaN), or the calculation is incorrect. This can lead to inconsistencies, since Freqtrade does not know how long this instable period should be.
 To account for this, the strategy can be assigned the `startup_candle_count` attribute.
 This should be set to the maximum number of candles that the strategy requires to calculate stable indicators.
 
@@ -146,8 +146,14 @@ In this example strategy, this should be set to 100 (`startup_candle_count = 100
 
 By letting the bot know how much history is needed, backtest trades can start at the specified timerange during backtesting and hyperopt.
 
+!!! Warning "Using x calls to get OHLCV"
+    If you receive a warning like `WARNING - Using 3 calls to get OHLCV. This can result in slower operations for the bot. Please check if you really need 1500 candles for your strategy` - you should consider if you really need this much historic data for your signals.
+    Having this will cause Freqtrade to make multiple calls for the same pair, which will obviously be slower than one network request.
+    As a consequence, Freqtrade will take longer to refresh candles - and should therefore be avoided if possible.
+    This is capped to 5 total calls to avoid overloading the exchange, or make freqtrade too slow.
+
 !!! Warning
-    `startup_candle_count` should be below `ohlcv_candle_limit` (which is 500 for most exchanges) - since only this amount of candles will be available during Dry-Run/Live Trade operations.
+    `startup_candle_count` should be below `ohlcv_candle_limit * 5` (which is 500 * 5 for most exchanges) - since only this amount of candles will be available during Dry-Run/Live Trade operations.
 
 #### Example
 
@@ -511,9 +517,9 @@ The strategy might look something like this:
 
 *Scan through the top 10 pairs by volume using the `VolumePairList` every 5 minutes and use a 14 day RSI to buy and sell.*
 
-Due to the limited available data, it's very difficult to resample our `5m` candles into daily candles for use in a 14 day RSI. Most exchanges limit us to just 500 candles which effectively gives us around 1.74 daily candles. We need 14 days at least!
+Due to the limited available data, it's very difficult to resample `5m` candles into daily candles for use in a 14 day RSI. Most exchanges limit us to just 500 candles which effectively gives us around 1.74 daily candles. We need 14 days at least!
 
-Since we can't resample our data we will have to use an informative pair; and since our whitelist will be dynamic we don't know which pair(s) to use.
+Since we can't resample the data we will have to use an informative pair; and since the whitelist will be dynamic we don't know which pair(s) to use.
 
 This is where calling `self.dp.current_whitelist()` comes in handy.
 
@@ -896,7 +902,8 @@ Sometimes it may be desired to lock a pair after certain events happen (e.g. mul
 Freqtrade has an easy method to do this from within the strategy, by calling `self.lock_pair(pair, until, [reason])`.
 `until` must be a datetime object in the future, after which trading will be re-enabled for that pair, while `reason` is an optional string detailing why the pair was locked.
 
-Locks can also be lifted manually, by calling `self.unlock_pair(pair)`.
+Locks can also be lifted manually, by calling `self.unlock_pair(pair)` or `self.unlock_reason(<reason>)` - providing reason the pair was locked with.
+`self.unlock_reason(<reason>)` will unlock all pairs currently locked with the provided reason.
 
 To verify if a pair is currently locked, use `self.is_pair_locked(pair)`.
 
@@ -968,7 +975,7 @@ The following lists some common patterns which should be avoided to prevent frus
 
 ## Further strategy ideas
 
-To get additional Ideas for strategies, head over to our [strategy repository](https://github.com/freqtrade/freqtrade-strategies). Feel free to use them as they are - but results will depend on the current market situation, pairs used etc. - therefore please backtest the strategy for your exchange/desired pairs first, evaluate carefully, use at your own risk.
+To get additional Ideas for strategies, head over to the [strategy repository](https://github.com/freqtrade/freqtrade-strategies). Feel free to use them as they are - but results will depend on the current market situation, pairs used etc. - therefore please backtest the strategy for your exchange/desired pairs first, evaluate carefully, use at your own risk.
 Feel free to use any of them as inspiration for your own strategies.
 We're happy to accept Pull Requests containing new Strategies to that repo.
 
