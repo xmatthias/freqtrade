@@ -99,7 +99,8 @@ class RPC:
             self._fiat_converter = CryptoToFiatConverter()
 
     @staticmethod
-    def _rpc_show_config(config, botstate: Union[State, str]) -> Dict[str, Any]:
+    def _rpc_show_config(config, botstate: Union[State, str],
+                         strategy_version: Optional[str] = None) -> Dict[str, Any]:
         """
         Return a dict of config options.
         Explicitly does NOT return the full config to avoid leakage of sensitive
@@ -107,6 +108,7 @@ class RPC:
         """
         val = {
             'version': __version__,
+            'strategy_version': strategy_version,
             'dry_run': config['dry_run'],
             'stake_currency': config['stake_currency'],
             'stake_currency_decimals': decimals_per_coin(config['stake_currency']),
@@ -642,7 +644,8 @@ class RPC:
 
         return {'status': 'No more buy will occur from now. Run /reload_config to reset.'}
 
-    async def _rpc_forcesell(self, trade_id: str) -> Dict[str, str]:
+    async def _rpc_forcesell(
+            self, trade_id: str, ordertype: Optional[str] = None) -> Dict[str, str]:
         """
         Handler for forcesell <id>.
         Sells the given trade at current price
@@ -671,7 +674,10 @@ class RPC:
                 current_rate = await self._freqtrade.exchange.get_rate(
                     trade.pair, refresh=False, side="sell")
                 sell_reason = SellCheckTuple(sell_type=SellType.FORCE_SELL)
-                await self._freqtrade.execute_trade_exit(trade, current_rate, sell_reason)
+                order_type = ordertype or self._freqtrade.strategy.order_types.get(
+                    "forcesell", self._freqtrade.strategy.order_types["sell"])
+                await self._freqtrade.execute_trade_exit(
+                    trade, current_rate, sell_reason, ordertype=order_type)
         # ---- EOF def _exec_forcesell ----
 
         if self._freqtrade.state != State.RUNNING:
@@ -700,7 +706,8 @@ class RPC:
             await self._freqtrade.wallets.update()
             return {'result': f'Created sell order for trade {trade_id}.'}
 
-    async def _rpc_forcebuy(self, pair: str, price: Optional[float]) -> Optional[Trade]:
+    async def _rpc_forcebuy(self, pair: str, price: Optional[float],
+                            order_type: Optional[str] = None) -> Optional[Trade]:
         """
         Handler for forcebuy <asset> <price>
         Buys a pair trade at the given or current price
@@ -728,7 +735,10 @@ class RPC:
         stakeamount = await self._freqtrade.wallets.get_trade_stake_amount(pair)
 
         # execute buy
-        if await self._freqtrade.execute_entry(pair, stakeamount, price, forcebuy=True):
+        if not order_type:
+            order_type = self._freqtrade.strategy.order_types.get(
+                'forcebuy', self._freqtrade.strategy.order_types['buy'])
+        if await self._freqtrade.execute_entry(pair, stakeamount, price, ordertype=order_type):
             Trade.commit()
             trade = Trade.get_trades([Trade.is_open.is_(True), Trade.pair == pair]).first()
             return trade
@@ -857,6 +867,20 @@ class RPC:
                'whitelist': self._freqtrade.active_pair_whitelist
                }
         return res
+
+    def _rpc_blacklist_delete(self, delete: List[str]) -> Dict:
+        """ Removes pairs from currently active blacklist """
+        errors = {}
+        for pair in delete:
+            if pair in self._freqtrade.pairlists.blacklist:
+                self._freqtrade.pairlists.blacklist.remove(pair)
+            else:
+                errors[pair] = {
+                    'error_msg': f"Pair {pair} is not in the current blacklist."
+                    }
+        resp = self._rpc_blacklist()
+        resp['errors'] = errors
+        return resp
 
     def _rpc_blacklist(self, add: List[str] = None) -> Dict:
         """ Returns the currently active blacklist"""

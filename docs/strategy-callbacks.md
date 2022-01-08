@@ -115,7 +115,7 @@ class AwesomeStrategy(IStrategy):
             return 'unclog'
 ```
 
-See [Dataframe access](#dataframe-access) for more information about dataframe use in strategy callbacks.
+See [Dataframe access](strategy-advanced.md#dataframe-access) for more information about dataframe use in strategy callbacks.
 
 ## Custom stoploss
 
@@ -322,7 +322,7 @@ class AwesomeStrategy(IStrategy):
         return 1
 ```
 
-See [Dataframe access](#dataframe-access) for more information about dataframe use in strategy callbacks.
+See [Dataframe access](strategy-advanced.md#dataframe-access) for more information about dataframe use in strategy callbacks.
 
 ### Common helpers for stoploss calculations
 
@@ -383,13 +383,14 @@ class AwesomeStrategy(IStrategy):
 ```
 
 !!! Warning
-    Modifying entry and exit prices will only work for limit orders. Depending on the price chosen, this can result in a lot of unfilled orders. By default the maximum allowed distance between the current price and the custom price is 2%, this value can be changed in config with the `custom_price_max_distance_ratio` parameter.
+    Modifying entry and exit prices will only work for limit orders. Depending on the price chosen, this can result in a lot of unfilled orders. By default the maximum allowed distance between the current price and the custom price is 2%, this value can be changed in config with the `custom_price_max_distance_ratio` parameter.  
+    **Example**:  
+    If the new_entryprice is 97, the proposed_rate is 100 and the `custom_price_max_distance_ratio` is set to 2%, The retained valid custom entry price will be 98, which is 2% below the current (proposed) rate.
 
-!!! Example
-    If the new_entryprice is 97, the proposed_rate is 100 and the `custom_price_max_distance_ratio` is set to 2%, The retained valid custom entry price will be 98.
-
-!!! Warning "No backtesting support"
-    Custom entry-prices are currently not supported during backtesting.
+!!! Warning "Backtesting"
+    While Custom prices are supported in backtesting (starting with 2021.12), prices will be moved to within the candle's high/low prices.
+    This behavior is currently being tested, and might be changed at a later point.
+    `custom_exit_price()` is only called for sells of type Sell_signal and Custom sell. All other sell-types will use regular backtesting prices.
 
 ## Custom order timeout rules
 
@@ -484,6 +485,9 @@ class AwesomeStrategy(IStrategy):
 ---
 
 ## Bot order confirmation
+
+Confirm trade entry / exits.
+This are the last methods that will be called before an order is placed.
 
 ### Trade entry (buy order) confirmation
 

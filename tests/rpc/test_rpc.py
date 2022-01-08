@@ -432,7 +432,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     assert stats['trade_count'] == 2
     assert stats['first_trade_date'] == 'just now'
     assert stats['latest_trade_date'] == 'just now'
-    assert stats['avg_duration'] in ('0:00:00', '0:00:01')
+    assert stats['avg_duration'] in ('0:00:00', '0:00:01', '0:00:02')
     assert stats['best_pair'] == 'ETH/BTC'
     assert prec_satoshi(stats['best_rate'], 6.2)
 
@@ -443,7 +443,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     assert stats['trade_count'] == 2
     assert stats['first_trade_date'] == 'just now'
     assert stats['latest_trade_date'] == 'just now'
-    assert stats['avg_duration'] in ('0:00:00', '0:00:01')
+    assert stats['avg_duration'] in ('0:00:00', '0:00:01', '0:00:02')
     assert stats['best_pair'] == 'ETH/BTC'
     assert prec_satoshi(stats['best_rate'], 6.2)
     assert isnan(stats['profit_all_coin'])
@@ -1107,7 +1107,7 @@ async def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_op
     with pytest.raises(RPCException, match=r'position for ETH/BTC already open - id: 1'):
         await rpc._rpc_forcebuy(pair, 0.0001)
     pair = 'XRP/BTC'
-    trade = await rpc._rpc_forcebuy(pair, 0.0001)
+    trade = await rpc._rpc_forcebuy(pair, 0.0001, order_type='limit')
     assert isinstance(trade, Trade)
     assert trade.pair == pair
     assert trade.open_rate == 0.0001
@@ -1235,6 +1235,16 @@ def test_rpc_blacklist(mocker, default_conf) -> None:
     assert len(ret['blacklist']) == 4
     assert ret['blacklist'] == default_conf['exchange']['pair_blacklist']
     assert ret['blacklist'] == ['DOGE/BTC', 'HOT/BTC', 'ETH/BTC', 'XRP/.*']
+    assert ret['blacklist_expanded'] == ['ETH/BTC', 'XRP/BTC', 'XRP/USDT']
+    assert 'errors' in ret
+    assert isinstance(ret['errors'], dict)
+
+    ret = rpc._rpc_blacklist_delete(["DOGE/BTC", 'HOT/BTC'])
+
+    assert 'StaticPairList' in ret['method']
+    assert len(ret['blacklist']) == 2
+    assert ret['blacklist'] == default_conf['exchange']['pair_blacklist']
+    assert ret['blacklist'] == ['ETH/BTC', 'XRP/.*']
     assert ret['blacklist_expanded'] == ['ETH/BTC', 'XRP/BTC', 'XRP/USDT']
     assert 'errors' in ret
     assert isinstance(ret['errors'], dict)
