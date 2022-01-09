@@ -10,6 +10,9 @@ from freqtrade.plugins.protectionmanager import ProtectionManager
 from tests.conftest import get_patched_freqtradebot, log_has_re
 
 
+pytestmark = pytest.mark.asyncio
+
+
 def generate_mock_trade(pair: str, fee: float, is_open: bool,
                         sell_reason: str = SellType.SELL_SIGNAL,
                         min_ago_open: int = None, min_ago_close: int = None,
@@ -37,10 +40,10 @@ def generate_mock_trade(pair: str, fee: float, is_open: bool,
     return trade
 
 
-def test_protectionmanager(mocker, default_conf):
+async def test_protectionmanager(mocker, default_conf):
     default_conf['protections'] = [{'method': protection}
                                    for protection in constants.AVAILABLE_PROTECTIONS]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 
     for handler in freqtrade.protections._protection_handlers:
         assert handler.name in constants.AVAILABLE_PROTECTIONS
@@ -77,14 +80,14 @@ def test_protections_init(mocker, default_conf, timeframe, expected, protconf):
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_stoploss_guard(mocker, default_conf, fee, caplog):
+async def test_stoploss_guard(mocker, default_conf, fee, caplog):
     default_conf['protections'] = [{
         "method": "StoplossGuard",
         "lookback_period": 60,
         "stop_duration": 40,
         "trade_limit": 3
     }]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     message = r"Trading stopped due to .*"
     assert not freqtrade.protections.global_stop()
     assert not log_has_re(message, caplog)
@@ -131,7 +134,7 @@ def test_stoploss_guard(mocker, default_conf, fee, caplog):
 
 @pytest.mark.parametrize('only_per_pair', [False, True])
 @pytest.mark.usefixtures("init_persistence")
-def test_stoploss_guard_perpair(mocker, default_conf, fee, caplog, only_per_pair):
+async def test_stoploss_guard_perpair(mocker, default_conf, fee, caplog, only_per_pair):
     default_conf['protections'] = [{
         "method": "StoplossGuard",
         "lookback_period": 60,
@@ -139,7 +142,7 @@ def test_stoploss_guard_perpair(mocker, default_conf, fee, caplog, only_per_pair
         "stop_duration": 60,
         "only_per_pair": only_per_pair
     }]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     message = r"Trading stopped due to .*"
     pair = 'XRP/BTC'
     assert not freqtrade.protections.stop_per_pair(pair)
@@ -189,12 +192,12 @@ def test_stoploss_guard_perpair(mocker, default_conf, fee, caplog, only_per_pair
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_CooldownPeriod(mocker, default_conf, fee, caplog):
+async def test_CooldownPeriod(mocker, default_conf, fee, caplog):
     default_conf['protections'] = [{
         "method": "CooldownPeriod",
         "stop_duration": 60,
     }]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     message = r"Trading stopped due to .*"
     assert not freqtrade.protections.global_stop()
     assert not freqtrade.protections.stop_per_pair('XRP/BTC')
@@ -225,7 +228,7 @@ def test_CooldownPeriod(mocker, default_conf, fee, caplog):
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_LowProfitPairs(mocker, default_conf, fee, caplog):
+async def test_LowProfitPairs(mocker, default_conf, fee, caplog):
     default_conf['protections'] = [{
         "method": "LowProfitPairs",
         "lookback_period": 400,
@@ -233,7 +236,7 @@ def test_LowProfitPairs(mocker, default_conf, fee, caplog):
         "trade_limit": 2,
         "required_profit": 0.0,
     }]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     message = r"Trading stopped due to .*"
     assert not freqtrade.protections.global_stop()
     assert not freqtrade.protections.stop_per_pair('XRP/BTC')
@@ -284,7 +287,7 @@ def test_LowProfitPairs(mocker, default_conf, fee, caplog):
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_MaxDrawdown(mocker, default_conf, fee, caplog):
+async def test_MaxDrawdown(mocker, default_conf, fee, caplog):
     default_conf['protections'] = [{
         "method": "MaxDrawdown",
         "lookback_period": 1000,
@@ -292,7 +295,7 @@ def test_MaxDrawdown(mocker, default_conf, fee, caplog):
         "trade_limit": 3,
         "max_allowed_drawdown": 0.15
     }]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     message = r"Trading stopped due to Max.*"
 
     assert not freqtrade.protections.global_stop()
@@ -401,11 +404,11 @@ def test_MaxDrawdown(mocker, default_conf, fee, caplog):
      None
      ),
 ])
-def test_protection_manager_desc(mocker, default_conf, protectionconf,
+async def test_protection_manager_desc(mocker, default_conf, protectionconf,
                                  desc_expected, exception_expected):
 
     default_conf['protections'] = [protectionconf]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 
     short_desc = str(freqtrade.protections.short_desc())
     assert short_desc == desc_expected
