@@ -603,9 +603,10 @@ def load_and_plot_trades(config: Dict[str, Any]):
     :return: None
     """
     strategy = StrategyResolver.load_strategy(config)
-
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config)
-    IStrategy.dp = DataProvider(config, exchange, asyncio.get_event_loop())
+    loop = asyncio.get_event_loop()
+    exchange = loop.run_until_complete(
+        ExchangeResolver.load_exchange(config['exchange']['name'], config))
+    IStrategy.dp = DataProvider(config, exchange, loop)
     plot_elements = init_plotscript(config, list(exchange.markets), strategy.startup_candle_count)
     timerange = plot_elements['timerange']
     trades = plot_elements['trades']
@@ -647,7 +648,8 @@ def plot_profit(config: Dict[str, Any]) -> None:
     if 'timeframe' not in config:
         raise OperationalException('Timeframe must be set in either config or via --timeframe.')
 
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config)
+    exchange = asyncio.get_event_loop().run_until_complete(
+        ExchangeResolver.load_exchange(config['exchange']['name'], config))
     plot_elements = init_plotscript(config, list(exchange.markets))
     trades = plot_elements['trades']
     # Filter trades to relevant pairs
