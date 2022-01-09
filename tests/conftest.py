@@ -115,10 +115,10 @@ def patch_exchange(mocker, api_mock=None, id='binance', mock_markets=True) -> No
 
     if api_mock:
         mocker.patch('freqtrade.exchange.Exchange._init_ccxt',
-            get_mock_coro(return_value=api_mock))
+                     get_mock_coro(return_value=api_mock))
     else:
         mocker.patch('freqtrade.exchange.Exchange._init_ccxt',
-            get_mock_coro(return_value=MagicMock()))
+                     get_mock_coro(return_value=MagicMock()))
 
 
 async def get_patched_exchange(mocker, config, api_mock=None, id='binance',

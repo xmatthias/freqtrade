@@ -109,7 +109,7 @@ def test_load_data_startup_candles(mocker, caplog, default_conf, testdatadir) ->
 
 
 async def test_load_data_with_new_pair_1min(ohlcv_history_list, mocker, caplog,
-                                      default_conf, tmpdir) -> None:
+                                            default_conf, tmpdir) -> None:
     """
     Test load_pair_history() with 1 min timeframe
     """
@@ -510,7 +510,7 @@ async def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplo
 
 
 async def test_download_trades_history(trades_history, mocker, default_conf, testdatadir, caplog,
-                                 tmpdir) -> None:
+                                       tmpdir) -> None:
     tmpdir1 = Path(tmpdir)
     ght_mock = MagicMock(side_effect=lambda pair, *args, **kwargs: (pair, trades_history))
     mocker.patch('freqtrade.exchange.Exchange.get_historic_trades',

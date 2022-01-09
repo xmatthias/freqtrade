@@ -2,7 +2,6 @@
 This module loads custom exchanges
 """
 import logging
-from asyncio import AbstractEventLoop
 
 import freqtrade.exchange as exchanges
 from freqtrade.exchange import MAP_EXCHANGE_CHILDCLASS, Exchange

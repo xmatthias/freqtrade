@@ -405,7 +405,7 @@ async def test_MaxDrawdown(mocker, default_conf, fee, caplog):
      ),
 ])
 async def test_protection_manager_desc(mocker, default_conf, protectionconf,
-                                 desc_expected, exception_expected):
+                                       desc_expected, exception_expected):
 
     default_conf['protections'] = [protectionconf]
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)

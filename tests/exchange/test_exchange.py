@@ -30,7 +30,7 @@ EXCHANGES = ['bittrex', 'binance', 'kraken', 'ftx']
 
 
 async def ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           fun, mock_ccxt_fun, retries=API_RETRY_COUNT + 1, **kwargs):
+                                 fun, mock_ccxt_fun, retries=API_RETRY_COUNT + 1, **kwargs):
 
     with patch('freqtrade.exchange.common.time.sleep'):
         with pytest.raises(DDosProtection):
@@ -169,7 +169,7 @@ async def test_init_exception(default_conf, mocker):
 
 
 async def test_exchange_resolver(default_conf, mocker, caplog):
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt',get_mock_coro(return_value=MagicMock()))
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', get_mock_coro(return_value=MagicMock()))
     mocker.patch('freqtrade.exchange.Exchange.load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
@@ -246,7 +246,8 @@ async def test_validate_order_time_in_force(default_conf, mocker, caplog):
     (2.9909, 4, 0.005, 2.990),
     (2.9999, 4, 0.005, 2.995),
 ])
-async def test_amount_to_precision(default_conf, mocker, amount, precision_mode, precision, expected):
+async def test_amount_to_precision(
+        default_conf, mocker, amount, precision_mode, precision, expected):
     """
     Test rounds down
     """
@@ -2435,7 +2436,7 @@ async def test_get_historic_trades(default_conf, mocker, caplog, exchange_name, 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test_get_historic_trades_notsupported(default_conf, mocker, caplog, exchange_name,
-                                          trades_history):
+                                                trades_history):
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=False)
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
 
@@ -3049,7 +3050,7 @@ def test_timeframe_to_next_date():
     ("BTC-PERP", 'BTC', 'USD', "ftx", {'spot': False}, False),  # Can only trade spot markets
 ])
 async def test_market_is_tradable(mocker, default_conf, market_symbol, base,
-                            quote, add_dict, exchange, expected_result) -> None:
+                                  quote, add_dict, exchange, expected_result) -> None:
     ex = await get_patched_exchange(mocker, default_conf, id=exchange)
     market = {
         'symbol': market_symbol,

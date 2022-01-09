@@ -108,7 +108,8 @@ async def start_convert_trades(args: Dict[str, Any]) -> None:
             "Please check the documentation on how to configure this.")
 
     # Init exchange
-    exchange = await ExchangeResolver.load_exchange(config['exchange']['name'], config, validate=False)
+    exchange = await ExchangeResolver.load_exchange(
+        config['exchange']['name'], config, validate=False)
     # Manual validations of relevant settings
     if not config['exchange'].get('skip_pair_validation', False):
         exchange.validate_pairs(config['pairs'])

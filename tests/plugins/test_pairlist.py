@@ -187,7 +187,8 @@ async def test_refresh_static_pairlist(mocker, markets, static_pl_conf):
     (['NOEXIST/BTC', r'*/BTC'],  # This is an invalid regex
      []),
 ])
-async def test_refresh_static_pairlist_noexist(mocker, markets, static_pl_conf, pairs, expected, caplog):
+async def test_refresh_static_pairlist_noexist(
+        mocker, markets, static_pl_conf, pairs, expected, caplog):
 
     static_pl_conf['pairlists'][0]['allow_inactive'] = True
     static_pl_conf['exchange']['pair_whitelist'] += pairs
@@ -481,8 +482,8 @@ async def test_VolumePairList_refresh_empty(mocker, markets_empty, whitelist_con
      "USDT", [])
 ])
 async def test_VolumePairList_whitelist_gen(mocker, whitelist_conf, shitcoinmarkets, tickers,
-                                      ohlcv_history, pairlists, base_currency,
-                                      whitelist_result, caplog) -> None:
+                                            ohlcv_history, pairlists, base_currency,
+                                            whitelist_result, caplog) -> None:
     whitelist_conf['pairlists'] = pairlists
     whitelist_conf['stake_currency'] = base_currency
 
@@ -595,8 +596,9 @@ async def test_VolumePairList_whitelist_gen(mocker, whitelist_conf, shitcoinmark
        "lookback_timeframe": "1d", "lookback_period": 1, "refresh_period": 86400}],
      "BTC", "ftx", ['HOT/BTC', 'LTC/BTC', 'ETH/BTC', 'TKN/BTC', 'XRP/BTC']),
 ])
-async def test_VolumePairList_range(mocker, whitelist_conf, shitcoinmarkets, tickers, ohlcv_history,
-                              pairlists, base_currency, exchange, volumefilter_result) -> None:
+async def test_VolumePairList_range(
+        mocker, whitelist_conf, shitcoinmarkets, tickers, ohlcv_history, pairlists,
+        base_currency, exchange, volumefilter_result) -> None:
     whitelist_conf['pairlists'] = pairlists
     whitelist_conf['stake_currency'] = base_currency
     whitelist_conf['exchange']['name'] = exchange
@@ -781,8 +783,8 @@ async def test_pairlist_class(mocker, whitelist_conf, markets, pairlist):
     # XLTCUSDT is not a valid pair
     (['ETH/BTC', 'TKN/BTC', 'XLTCUSDT'], "is not tradable with Freqtrade"),
 ])
-async def test__whitelist_for_active_markets(mocker, whitelist_conf, markets, pairlist, whitelist, caplog,
-                                       log_message, tickers):
+async def test__whitelist_for_active_markets(
+        mocker, whitelist_conf, markets, pairlist, whitelist, caplog, log_message, tickers):
     whitelist_conf['pairlists'][0]['method'] = pairlist
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           markets=PropertyMock(return_value=markets),
@@ -990,8 +992,9 @@ async def test_rangestabilityfilter_checks(mocker, default_conf, markets, ticker
     (0.01, 0.99, 5),
     (0.05, 0.0, 0),  # Setting min rate_of_change to 5% removes all pairs from the whitelist.
 ])
-async def test_rangestabilityfilter_caching(mocker, markets, default_conf, tickers, ohlcv_history,
-                                      min_rate_of_change, max_rate_of_change, expected_length):
+async def test_rangestabilityfilter_caching(
+        mocker, markets, default_conf, tickers, ohlcv_history, min_rate_of_change,
+        max_rate_of_change, expected_length):
     default_conf['pairlists'] = [{'method': 'VolumePairList', 'number_assets': 10},
                                  {'method': 'RangeStabilityFilter', 'lookback_days': 2,
                                   'min_rate_of_change': min_rate_of_change,
@@ -1111,7 +1114,7 @@ async def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers_
      ),
 ])
 async def test_pricefilter_desc(mocker, whitelist_conf, markets, pairlistconfig,
-                          desc_expected, exception_expected):
+                                desc_expected, exception_expected):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           markets=PropertyMock(return_value=markets),
                           exchange_has=MagicMock(return_value=True)
