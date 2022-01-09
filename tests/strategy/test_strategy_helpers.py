@@ -145,7 +145,8 @@ def test_stoploss_from_absolute():
     assert stoploss_from_absolute(0, 100) == 1
 
 
-def test_informative_decorator(mocker, default_conf):
+@pytest.mark.asyncio
+async def test_informative_decorator(mocker, default_conf):
     test_data_5m = generate_test_data('5m', 40)
     test_data_30m = generate_test_data('30m', 40)
     test_data_1h = generate_test_data('1h', 40)
@@ -166,7 +167,7 @@ def test_informative_decorator(mocker, default_conf):
     from .strats.informative_decorator_strategy import InformativeDecoratorTest
     default_conf['stake_currency'] = 'USDT'
     strategy = InformativeDecoratorTest(config=default_conf)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     strategy.dp = DataProvider({}, exchange, None)
     mocker.patch.object(strategy.dp, 'current_whitelist', return_value=[
         'XRP/USDT', 'LTC/USDT', 'NEO/USDT'

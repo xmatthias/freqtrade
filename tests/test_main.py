@@ -12,7 +12,7 @@ from freqtrade.exceptions import FreqtradeException, OperationalException
 from freqtrade.freqtradebot import FreqtradeBot
 from freqtrade.main import main
 from freqtrade.worker import Worker
-from tests.conftest import (log_has, log_has_re, patch_exchange,
+from tests.conftest import (get_mock_coro, log_has, log_has_re, patch_exchange,
                             patched_configuration_load_config_file)
 
 
@@ -174,7 +174,7 @@ def test_main_reload_config(mocker, default_conf, caplog) -> None:
 
 def test_reconfigure(mocker, default_conf) -> None:
     patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', MagicMock())
+    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', get_mock_coro())
     mocker.patch(
         'freqtrade.worker.Worker._worker',
         MagicMock(side_effect=OperationalException('Oh snap!'))
