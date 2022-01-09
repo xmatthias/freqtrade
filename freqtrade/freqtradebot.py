@@ -67,7 +67,7 @@ class FreqtradeBot(LoggingMixin):
         validate_config_consistency(self.config)
 
         self.exchange = await ExchangeResolver.load_exchange(
-            self.config['exchange']['name'], self.config, loop=self.loop)
+            self.config['exchange']['name'], self.config)
 
         init_db(self.config.get('db_url', None), clean_open_orders=self.config['dry_run'])
 

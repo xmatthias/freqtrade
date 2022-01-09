@@ -19,8 +19,8 @@ class ExchangeResolver(IResolver):
     object_type = Exchange
 
     @staticmethod
-    def load_exchange(exchange_name: str, config: dict, load_markets: bool = True,
-                      validate: bool = True, loop: AbstractEventLoop = None) -> Exchange:
+    async def load_exchange(exchange_name: str, config: dict, *, load_markets: bool = True,
+                            validate: bool = True) -> Exchange:
         """
         Load the custom class from config parameter
         :param exchange_name: name of the Exchange to load
@@ -38,9 +38,7 @@ class ExchangeResolver(IResolver):
                 f"No {exchange_name} specific subclass found. Using the generic class instead.")
         if not exchange:
             exchange = Exchange(config)
-        loop.run_until_complete(
-            exchange.init_exchange(load_markets=load_markets, validate=validate)
-        )
+        await exchange.init_exchange(load_markets=load_markets, validate=validate)
         return exchange
 
     @staticmethod
