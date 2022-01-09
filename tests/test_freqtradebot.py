@@ -59,12 +59,12 @@ async def test_process_stopped(mocker, default_conf_usdt) -> None:
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     coo_mock = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cancel_all_open_orders')
-    freqtrade.process_stopped()
+    await freqtrade.process_stopped()
     assert coo_mock.call_count == 0
 
     default_conf_usdt['cancel_open_orders_on_exit'] = True
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
-    freqtrade.process_stopped()
+    await freqtrade.process_stopped()
     assert coo_mock.call_count == 1
 
 
@@ -258,6 +258,7 @@ async def test_total_open_trades_stakes(mocker, default_conf_usdt, ticker_usdt, 
         _is_dry_limit_order_filled=get_mock_coro(return_value=False),
     )
     freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
     patch_get_signal(freqtrade)
     await freqtrade.enter_positions()
     trade = Trade.query.first()
@@ -1537,6 +1538,7 @@ async def test_tsl_on_exchange_compatible_with_edge(
     edge_conf['minimal_roi']['0'] = 999999999
 
     freqtrade = FreqtradeBot(edge_conf)
+    await freqtrade.init_bot()
 
     # enabling stoploss on exchange
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True
@@ -2046,7 +2048,7 @@ async def test_check_handle_timedout_buy_usercustom(
         get_fee=fee
     )
     freqtrade = FreqtradeBot(default_conf_usdt)
-
+    await freqtrade.init_bot()
     Trade.query.session.add(open_trade)
 
     # Ensure default is to return empty (so not mocked yet)
@@ -2097,6 +2099,7 @@ async def test_check_handle_timedout_buy(
         get_fee=fee
     )
     freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
 
     Trade.query.session.add(open_trade)
 
@@ -4005,13 +4008,13 @@ async def test_startup_trade_reinit(default_conf_usdt, edge_conf, mocker):
     mocker.patch('freqtrade.persistence.Trade.stoploss_reinitialization', reinit_mock)
 
     ftbot = await get_patched_freqtradebot(mocker, default_conf_usdt)
-    ftbot.startup()
+    await ftbot.startup()
     assert reinit_mock.call_count == 1
 
     reinit_mock.reset_mock()
 
     ftbot = await get_patched_freqtradebot(mocker, edge_conf)
-    ftbot.startup()
+    await ftbot.startup()
     assert reinit_mock.call_count == 0
 
 

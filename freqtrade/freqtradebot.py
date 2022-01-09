@@ -136,7 +136,7 @@ class FreqtradeBot(LoggingMixin):
         cleanup_db()
         self.exchange.close()
 
-    def startup(self) -> None:
+    async def startup(self) -> None:
         """
         Called on startup and after reloading the bot - triggers notifications and
         performs startup tasks
@@ -148,7 +148,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Only update open orders on startup
         # This will update the database after the initial migration
-        asyncio.get_event_loop().run_until_complete(self.startup_update_open_orders())
+        await self.startup_update_open_orders()
 
     async def process(self) -> None:
         """
@@ -200,12 +200,12 @@ class FreqtradeBot(LoggingMixin):
 
         Trade.commit()
 
-    def process_stopped(self) -> None:
+    async def process_stopped(self) -> None:
         """
         Close all orders that were left open
         """
         if self.config['cancel_open_orders_on_exit']:
-            asyncio.get_event_loop().run_until_complete(self.cancel_all_open_orders())
+            await self.cancel_all_open_orders()
 
     def check_for_open_trades(self):
         """

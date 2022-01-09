@@ -51,6 +51,7 @@ class Worker:
 
         # Init the instance of the bot
         self.freqtrade = FreqtradeBot(self._config)
+        asyncio.get_event_loop().run_until_complete(self.freqtrade.init_bot())
 
         internals_config = self._config.get('internals', {})
         self._throttle_secs = internals_config.get('process_throttle_secs',
@@ -93,7 +94,7 @@ class Worker:
             logger.info(
                 f"Changing state{f' from {old_state.name}' if old_state else ''} to: {state.name}")
             if state == State.RUNNING:
-                self.freqtrade.startup()
+                asyncio.get_event_loop().run_until_complete(self.freqtrade.startup())
 
             if state == State.STOPPED:
                 self.freqtrade.check_for_open_trades()
@@ -146,7 +147,7 @@ class Worker:
         return result
 
     def _process_stopped(self) -> None:
-        self.freqtrade.process_stopped()
+        asyncio.get_event_loop().run_until_complete(self.freqtrade.process_stopped())
 
     def _process_running(self) -> None:
         try:
