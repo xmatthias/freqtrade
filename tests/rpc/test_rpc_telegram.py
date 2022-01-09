@@ -2078,11 +2078,11 @@ def test__send_msg_network_error(default_conf, mocker, caplog) -> None:
     assert log_has('Telegram NetworkError: Oh snap! Trying one more time.', caplog)
 
 
-def test__send_msg_keyboard(default_conf, mocker, caplog) -> None:
+async def test__send_msg_keyboard(default_conf, mocker, caplog) -> None:
     mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
     bot = MagicMock()
     bot.send_message = MagicMock()
-    freqtradebot = get_patched_freqtradebot(mocker, default_conf)
+    freqtradebot = await get_patched_freqtradebot(mocker, default_conf)
     rpc = RPC(freqtradebot)
 
     invalid_keys_list = [['/not_valid', '/profit'], ['/daily'], ['/alsoinvalid']]

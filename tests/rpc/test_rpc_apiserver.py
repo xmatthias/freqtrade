@@ -28,13 +28,16 @@ from tests.conftest import (create_mock_trades, get_mock_coro, get_patched_freqt
                             log_has_re, patch_get_signal)
 
 
+pytestmark = pytest.mark.asyncio
+
+
 BASE_URI = "/api/v1"
 _TEST_USER = "FreqTrader"
 _TEST_PASS = "SuperSecurePassword1!"
 
 
 @pytest.fixture
-def botclient(default_conf, mocker):
+async def botclient(default_conf, mocker):
     setup_logging_pre()
     setup_logging(default_conf)
     default_conf['runmode'] = RunMode.DRY_RUN
@@ -46,7 +49,7 @@ def botclient(default_conf, mocker):
                                         "password": _TEST_PASS,
                                         }})
 
-    ftbot = get_patched_freqtradebot(mocker, default_conf)
+    ftbot = await get_patched_freqtradebot(mocker, default_conf)
     rpc = RPC(ftbot)
     mocker.patch('freqtrade.rpc.api_server.ApiServer.start_api', MagicMock())
     try:
@@ -240,7 +243,7 @@ def test_api_stop_workflow(botclient):
     assert rc.json() == {'status': 'already running'}
 
 
-def test_api__init__(default_conf, mocker):
+async def test_api__init__(default_conf, mocker):
     """
     Test __init__() method
     """
@@ -253,10 +256,10 @@ def test_api__init__(default_conf, mocker):
     mocker.patch('freqtrade.rpc.telegram.Updater', MagicMock())
     mocker.patch('freqtrade.rpc.api_server.webserver.ApiServer.start_api', MagicMock())
     apiserver = ApiServer(default_conf)
-    apiserver.add_rpc_handler(RPC(get_patched_freqtradebot(mocker, default_conf)))
+    apiserver.add_rpc_handler(RPC(await get_patched_freqtradebot(mocker, default_conf)))
     assert apiserver._config == default_conf
     with pytest.raises(OperationalException, match="RPC Handler already attached."):
-        apiserver.add_rpc_handler(RPC(get_patched_freqtradebot(mocker, default_conf)))
+        apiserver.add_rpc_handler(RPC(await get_patched_freqtradebot(mocker, default_conf)))
 
     ApiServer.shutdown()
 
@@ -311,7 +314,7 @@ def test_api_UvicornServer_run_no_uvloop(mocker, import_fails):
     assert serve_mock.call_count == 1
 
 
-def test_api_run(default_conf, mocker, caplog):
+async def test_api_run(default_conf, mocker, caplog):
     default_conf.update({"api_server": {"enabled": True,
                                         "listen_ip_address": "127.0.0.1",
                                         "listen_port": 8080,
@@ -327,7 +330,7 @@ def test_api_run(default_conf, mocker, caplog):
     mocker.patch('freqtrade.rpc.api_server.webserver.UvicornServer', server_mock)
 
     apiserver = ApiServer(default_conf)
-    apiserver.add_rpc_handler(RPC(get_patched_freqtradebot(mocker, default_conf)))
+    apiserver.add_rpc_handler(RPC(await get_patched_freqtradebot(mocker, default_conf)))
 
     assert server_mock.call_count == 1
     assert apiserver._config == default_conf
@@ -388,7 +391,7 @@ def test_api_run(default_conf, mocker, caplog):
     ApiServer.shutdown()
 
 
-def test_api_cleanup(default_conf, mocker, caplog):
+async def test_api_cleanup(default_conf, mocker, caplog):
     default_conf.update({"api_server": {"enabled": True,
                                         "listen_ip_address": "127.0.0.1",
                                         "listen_port": 8080,
@@ -402,7 +405,7 @@ def test_api_cleanup(default_conf, mocker, caplog):
     mocker.patch('freqtrade.rpc.api_server.webserver.UvicornServer', server_mock)
 
     apiserver = ApiServer(default_conf)
-    apiserver.add_rpc_handler(RPC(get_patched_freqtradebot(mocker, default_conf)))
+    apiserver.add_rpc_handler(RPC(await get_patched_freqtradebot(mocker, default_conf)))
 
     apiserver.cleanup()
     assert apiserver._server.cleanup.call_count == 1
