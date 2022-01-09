@@ -65,7 +65,7 @@ async def start_download_data(args: Dict[str, Any]) -> None:
     try:
 
         if config.get('download_trades'):
-            pairs_not_available = refresh_backtest_trades_data(
+            pairs_not_available = await refresh_backtest_trades_data(
                 exchange, pairs=expanded_pairs, datadir=config['datadir'],
                 timerange=timerange, new_pairs_days=config['new_pairs_days'],
                 erase=bool(config.get('erase')), data_format=config['dataformat_trades'])

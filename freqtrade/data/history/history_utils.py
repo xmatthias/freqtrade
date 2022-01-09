@@ -260,12 +260,12 @@ async def refresh_backtest_ohlcv_data(exchange: Exchange, pairs: List[str], time
     return pairs_not_available
 
 
-def _download_trades_history(exchange: Exchange,
-                             pair: str, *,
-                             new_pairs_days: int = 30,
-                             timerange: Optional[TimeRange] = None,
-                             data_handler: IDataHandler
-                             ) -> bool:
+async def _download_trades_history(exchange: Exchange,
+                                   pair: str, *,
+                                   new_pairs_days: int = 30,
+                                   timerange: Optional[TimeRange] = None,
+                                   data_handler: IDataHandler
+                                   ) -> bool:
     """
     Download trade history from the exchange.
     Appends to previously downloaded trades data.
@@ -304,11 +304,11 @@ def _download_trades_history(exchange: Exchange,
         logger.info(f"Current Amount of trades: {len(trades)}")
 
         # Default since_ms to 30 days if nothing is given
-        new_trades = exchange.get_historic_trades(pair=pair,
-                                                  since=since,
-                                                  until=until,
-                                                  from_id=from_id,
-                                                  )
+        new_trades = await exchange.get_historic_trades(pair=pair,
+                                                        since=since,
+                                                        until=until,
+                                                        from_id=from_id,
+                                                        )
         trades.extend(new_trades[1])
         # Remove duplicates to make sure we're not storing data we don't need
         trades = trades_remove_duplicates(trades)
@@ -326,9 +326,9 @@ def _download_trades_history(exchange: Exchange,
         return False
 
 
-def refresh_backtest_trades_data(exchange: Exchange, pairs: List[str], datadir: Path,
-                                 timerange: TimeRange, new_pairs_days: int = 30,
-                                 erase: bool = False, data_format: str = 'jsongz') -> List[str]:
+async def refresh_backtest_trades_data(
+        exchange: Exchange, pairs: List[str], datadir: Path, timerange: TimeRange,
+        new_pairs_days: int = 30, erase: bool = False, data_format: str = 'jsongz') -> List[str]:
     """
     Refresh stored trades data for backtesting and hyperopt operations.
     Used by freqtrade download-data subcommand.
@@ -347,11 +347,11 @@ def refresh_backtest_trades_data(exchange: Exchange, pairs: List[str], datadir: 
                 logger.info(f'Deleting existing data for pair {pair}.')
 
         logger.info(f'Downloading trades for pair {pair}.')
-        _download_trades_history(exchange=exchange,
-                                 pair=pair,
-                                 new_pairs_days=new_pairs_days,
-                                 timerange=timerange,
-                                 data_handler=data_handler)
+        await _download_trades_history(exchange=exchange,
+                                       pair=pair,
+                                       new_pairs_days=new_pairs_days,
+                                       timerange=timerange,
+                                       data_handler=data_handler)
     return pairs_not_available
 
 

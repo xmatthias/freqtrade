@@ -2422,8 +2422,8 @@ async def test_get_historic_trades(default_conf, mocker, caplog, exchange_name, 
 
     exchange._async_get_trade_history_id = get_mock_coro((pair, trades_history))
     exchange._async_get_trade_history_time = get_mock_coro((pair, trades_history))
-    ret = exchange.get_historic_trades(pair, since=trades_history[0][0],
-                                       until=trades_history[-1][0])
+    ret = await exchange.get_historic_trades(pair, since=trades_history[0][0],
+                                             until=trades_history[-1][0])
 
     # Depending on the exchange, one or the other method should be called
     assert sum([exchange._async_get_trade_history_id.call_count,
@@ -2444,8 +2444,8 @@ async def test_get_historic_trades_notsupported(default_conf, mocker, caplog, ex
 
     with pytest.raises(OperationalException,
                        match="This exchange does not support downloading Trades."):
-        exchange.get_historic_trades(pair, since=trades_history[0][0],
-                                     until=trades_history[-1][0])
+        await exchange.get_historic_trades(pair, since=trades_history[0][0],
+                                           until=trades_history[-1][0])
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)

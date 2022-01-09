@@ -1588,10 +1588,9 @@ class Exchange:
             raise OperationalException(f"Exchange {self.name} does use neither time, "
                                        f"nor id based pagination")
 
-    def get_historic_trades(self, pair: str,
-                            since: Optional[int] = None,
-                            until: Optional[int] = None,
-                            from_id: Optional[str] = None) -> Tuple[str, List]:
+    async def get_historic_trades(
+            self, pair: str, since: Optional[int] = None, until: Optional[int] = None,
+            from_id: Optional[str] = None) -> Tuple[str, List]:
         """
         Get trade history data using asyncio.
         Handles all async work and returns the list of candles.
@@ -1605,9 +1604,8 @@ class Exchange:
         if not self.exchange_has("fetchTrades"):
             raise OperationalException("This exchange does not support downloading Trades.")
 
-        return self.loop.run_until_complete(
-            self._async_get_trade_history(pair=pair, since=since,
-                                          until=until, from_id=from_id))
+        return await self._async_get_trade_history(pair=pair, since=since,
+                                                   until=until, from_id=from_id)
 
 
 def is_exchange_known_ccxt(exchange_name: str, ccxt_module: CcxtModuleType = None) -> bool:

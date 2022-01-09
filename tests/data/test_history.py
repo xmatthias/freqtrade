@@ -485,7 +485,7 @@ async def test_download_data_no_markets(mocker, default_conf, caplog, testdatadi
 
 async def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplog, testdatadir):
     dl_mock = mocker.patch('freqtrade.data.history.history_utils._download_trades_history',
-                           MagicMock())
+                           get_mock_coro())
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
     )
@@ -494,11 +494,10 @@ async def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplo
 
     ex = await get_patched_exchange(mocker, default_conf)
     timerange = TimeRange.parse_timerange("20190101-20190102")
-    unavailable_pairs = refresh_backtest_trades_data(exchange=ex,
-                                                     pairs=["ETH/BTC", "XRP/BTC", "XRP/ETH"],
-                                                     datadir=testdatadir,
-                                                     timerange=timerange, erase=True
-                                                     )
+    unavailable_pairs = await refresh_backtest_trades_data(
+        exchange=ex, pairs=["ETH/BTC", "XRP/BTC", "XRP/ETH"],
+        datadir=testdatadir, timerange=timerange, erase=True
+        )
 
     assert dl_mock.call_count == 2
     assert dl_mock.call_args[1]['timerange'].starttype == 'date'
@@ -511,7 +510,7 @@ async def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplo
 async def test_download_trades_history(trades_history, mocker, default_conf, testdatadir, caplog,
                                        tmpdir) -> None:
     tmpdir1 = Path(tmpdir)
-    ght_mock = MagicMock(side_effect=lambda pair, *args, **kwargs: (pair, trades_history))
+    ght_mock = get_mock_coro(side_effect=lambda pair, *args, **kwargs: (pair, trades_history))
     mocker.patch('freqtrade.exchange.Exchange.get_historic_trades',
                  ght_mock)
     exchange = await get_patched_exchange(mocker, default_conf)
@@ -520,8 +519,8 @@ async def test_download_trades_history(trades_history, mocker, default_conf, tes
 
     assert not file1.is_file()
 
-    assert _download_trades_history(data_handler=data_handler, exchange=exchange,
-                                    pair='ETH/BTC')
+    assert await _download_trades_history(data_handler=data_handler, exchange=exchange,
+                                          pair='ETH/BTC')
     assert log_has("New Amount of trades: 5", caplog)
     assert file1.is_file()
 
@@ -529,8 +528,8 @@ async def test_download_trades_history(trades_history, mocker, default_conf, tes
     since_time = int(trades_history[-3][0] // 1000)
     since_time2 = int(trades_history[-1][0] // 1000)
     timerange = TimeRange('date', None, since_time, 0)
-    assert _download_trades_history(data_handler=data_handler, exchange=exchange,
-                                    pair='ETH/BTC', timerange=timerange)
+    assert await _download_trades_history(data_handler=data_handler, exchange=exchange,
+                                          pair='ETH/BTC', timerange=timerange)
 
     assert ght_mock.call_count == 1
     # Check this in seconds - since we had to convert to seconds above too.
@@ -540,10 +539,10 @@ async def test_download_trades_history(trades_history, mocker, default_conf, tes
     file1.unlink()
 
     mocker.patch('freqtrade.exchange.Exchange.get_historic_trades',
-                 MagicMock(side_effect=ValueError))
+                 get_mock_coro(side_effect=ValueError))
 
-    assert not _download_trades_history(data_handler=data_handler, exchange=exchange,
-                                        pair='ETH/BTC')
+    assert not await _download_trades_history(data_handler=data_handler, exchange=exchange,
+                                              pair='ETH/BTC')
     assert log_has_re('Failed to download historic trades for pair: "ETH/BTC".*', caplog)
 
     file2 = tmpdir1 / 'XRP_ETH-trades.json.gz'
@@ -556,8 +555,8 @@ async def test_download_trades_history(trades_history, mocker, default_conf, tes
     since_time = int(trades_history[0][0] // 1000) - 500
     timerange = TimeRange('date', None, since_time, 0)
 
-    assert _download_trades_history(data_handler=data_handler, exchange=exchange,
-                                    pair='XRP/ETH', timerange=timerange)
+    assert await _download_trades_history(data_handler=data_handler, exchange=exchange,
+                                          pair='XRP/ETH', timerange=timerange)
 
     assert ght_mock.call_count == 1
 
