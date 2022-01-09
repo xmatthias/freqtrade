@@ -19,7 +19,7 @@ from freqtrade.resolvers import ExchangeResolver
 logger = logging.getLogger(__name__)
 
 
-def start_download_data(args: Dict[str, Any]) -> None:
+async def start_download_data(args: Dict[str, Any]) -> None:
     """
     Download data (former download_backtest_data.py script)
     """
@@ -47,8 +47,8 @@ def start_download_data(args: Dict[str, Any]) -> None:
     pairs_not_available: List[str] = []
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config,
-                                              load_markets=True, validate=False)
+    exchange = await ExchangeResolver.load_exchange(config['exchange']['name'], config,
+                                                    load_markets=True, validate=False)
     markets = [p for p, m in exchange.markets.items() if market_is_active(m)
                or config.get('include_inactive')]
     expanded_pairs = expand_pairlist(config['pairs'], markets)
@@ -93,7 +93,7 @@ def start_download_data(args: Dict[str, Any]) -> None:
                         f"on exchange {exchange.name}.")
 
 
-def start_convert_trades(args: Dict[str, Any]) -> None:
+async def start_convert_trades(args: Dict[str, Any]) -> None:
 
     config = setup_utils_configuration(args, RunMode.UTIL_EXCHANGE)
 
@@ -108,7 +108,7 @@ def start_convert_trades(args: Dict[str, Any]) -> None:
             "Please check the documentation on how to configure this.")
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config, validate=False)
+    exchange = await ExchangeResolver.load_exchange(config['exchange']['name'], config, validate=False)
     # Manual validations of relevant settings
     if not config['exchange'].get('skip_pair_validation', False):
         exchange.validate_pairs(config['pairs'])

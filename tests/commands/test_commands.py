@@ -637,7 +637,7 @@ def test_get_ui_download_url_direct(mocker):
         x, last_version = get_ui_download_url('0.0.3')
 
 
-def test_download_data_keyboardInterrupt(mocker, caplog, markets):
+async def test_download_data_keyboardInterrupt(mocker, caplog, markets):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
                            MagicMock(side_effect=KeyboardInterrupt))
     patch_exchange(mocker)
@@ -650,12 +650,12 @@ def test_download_data_keyboardInterrupt(mocker, caplog, markets):
         "--pairs", "ETH/BTC", "XRP/BTC",
     ]
     with pytest.raises(SystemExit):
-        start_download_data(get_args(args))
+        await start_download_data(get_args(args))
 
     assert dl_mock.call_count == 1
 
 
-def test_download_data_timerange(mocker, caplog, markets):
+async def test_download_data_timerange(mocker, caplog, markets):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
                            MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker)
@@ -671,7 +671,7 @@ def test_download_data_timerange(mocker, caplog, markets):
     ]
     with pytest.raises(OperationalException,
                        match=r"--days and --timerange are mutually.*"):
-        start_download_data(get_args(args))
+        await start_download_data(get_args(args))
     assert dl_mock.call_count == 0
 
     args = [
@@ -680,7 +680,7 @@ def test_download_data_timerange(mocker, caplog, markets):
         "--pairs", "ETH/BTC", "XRP/BTC",
         "--days", "20",
     ]
-    start_download_data(get_args(args))
+    await start_download_data(get_args(args))
     assert dl_mock.call_count == 1
     # 20days ago
     days_ago = arrow.get(arrow.now().shift(days=-20).date()).int_timestamp
@@ -693,14 +693,14 @@ def test_download_data_timerange(mocker, caplog, markets):
         "--pairs", "ETH/BTC", "XRP/BTC",
         "--timerange", "20200101-"
     ]
-    start_download_data(get_args(args))
+    await start_download_data(get_args(args))
     assert dl_mock.call_count == 1
 
     assert dl_mock.call_args_list[0][1]['timerange'].startts == arrow.Arrow(
         2020, 1, 1).int_timestamp
 
 
-def test_download_data_no_markets(mocker, caplog):
+async def test_download_data_no_markets(mocker, caplog):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
                            MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker, id='binance')
@@ -713,12 +713,12 @@ def test_download_data_no_markets(mocker, caplog):
         "--pairs", "ETH/BTC", "XRP/BTC",
         "--days", "20"
     ]
-    start_download_data(get_args(args))
+    await start_download_data(get_args(args))
     assert dl_mock.call_args[1]['timerange'].starttype == "date"
     assert log_has("Pairs [ETH/BTC,XRP/BTC] not available on exchange Binance.", caplog)
 
 
-def test_download_data_no_exchange(mocker, caplog):
+async def test_download_data_no_exchange(mocker, caplog):
     mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
                  MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker)
@@ -732,10 +732,10 @@ def test_download_data_no_exchange(mocker, caplog):
     pargs['config'] = None
     with pytest.raises(OperationalException,
                        match=r"This command requires a configured exchange.*"):
-        start_download_data(pargs)
+        await start_download_data(pargs)
 
 
-def test_download_data_no_pairs(mocker, caplog):
+async def test_download_data_no_pairs(mocker, caplog):
 
     mocker.patch.object(Path, "exists", MagicMock(return_value=False))
 
@@ -754,10 +754,10 @@ def test_download_data_no_pairs(mocker, caplog):
     pargs['config'] = None
     with pytest.raises(OperationalException,
                        match=r"Downloading data requires a list of pairs\..*"):
-        start_download_data(pargs)
+        await start_download_data(pargs)
 
 
-def test_download_data_all_pairs(mocker, markets):
+async def test_download_data_all_pairs(mocker, markets):
 
     mocker.patch.object(Path, "exists", MagicMock(return_value=False))
 
@@ -776,7 +776,7 @@ def test_download_data_all_pairs(mocker, markets):
     ]
     pargs = get_args(args)
     pargs['config'] = None
-    start_download_data(pargs)
+    await start_download_data(pargs)
     expected = set(['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT'])
     assert set(dl_mock.call_args_list[0][1]['pairs']) == expected
     assert dl_mock.call_count == 1
@@ -792,12 +792,12 @@ def test_download_data_all_pairs(mocker, markets):
     ]
     pargs = get_args(args)
     pargs['config'] = None
-    start_download_data(pargs)
+    await start_download_data(pargs)
     expected = set(['ETH/USDT', 'LTC/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT'])
     assert set(dl_mock.call_args_list[0][1]['pairs']) == expected
 
 
-def test_download_data_trades(mocker, caplog):
+async def test_download_data_trades(mocker, caplog):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_trades_data',
                            MagicMock(return_value=[]))
     convert_mock = mocker.patch('freqtrade.commands.data_commands.convert_trades_to_ohlcv',
@@ -813,13 +813,13 @@ def test_download_data_trades(mocker, caplog):
         "--days", "20",
         "--dl-trades"
     ]
-    start_download_data(get_args(args))
+    await start_download_data(get_args(args))
     assert dl_mock.call_args[1]['timerange'].starttype == "date"
     assert dl_mock.call_count == 1
     assert convert_mock.call_count == 1
 
 
-def test_start_convert_trades(mocker, caplog):
+async def test_start_convert_trades(mocker, caplog):
     convert_mock = mocker.patch('freqtrade.commands.data_commands.convert_trades_to_ohlcv',
                                 MagicMock(return_value=[]))
     patch_exchange(mocker)
@@ -831,7 +831,7 @@ def test_start_convert_trades(mocker, caplog):
         "--exchange", "kraken",
         "--pairs", "ETH/BTC", "XRP/BTC",
     ]
-    start_convert_trades(get_args(args))
+    await start_convert_trades(get_args(args))
     assert convert_mock.call_count == 1
 
 
@@ -882,7 +882,7 @@ def test_start_list_strategies(mocker, caplog, capsys):
     assert "LOAD FAILED" in captured.out
 
 
-def test_start_test_pairlist(mocker, caplog, tickers, default_conf, capsys):
+async def test_start_test_pairlist(mocker, caplog, tickers, default_conf, capsys):
     patch_exchange(mocker, mock_markets=True)
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           exchange_has=MagicMock(return_value=True),
@@ -905,7 +905,7 @@ def test_start_test_pairlist(mocker, caplog, tickers, default_conf, capsys):
         '-c', 'config_examples/config_bittrex.example.json'
     ]
 
-    start_test_pairlist(get_args(args))
+    await start_test_pairlist(get_args(args))
 
     assert log_has_re(r"^Using resolved pairlist VolumePairList.*", caplog)
     assert log_has_re(r"^Using resolved pairlist PrecisionFilter.*", caplog)
@@ -919,7 +919,7 @@ def test_start_test_pairlist(mocker, caplog, tickers, default_conf, capsys):
         '-c', 'config_examples/config_bittrex.example.json',
         '--one-column',
     ]
-    start_test_pairlist(get_args(args))
+    await start_test_pairlist(get_args(args))
     captured = capsys.readouterr()
     assert re.match(r"ETH/BTC\nTKN/BTC\nBLK/BTC\nLTC/BTC\nXRP/BTC\n", captured.out)
 
@@ -928,7 +928,7 @@ def test_start_test_pairlist(mocker, caplog, tickers, default_conf, capsys):
         '-c', 'config_examples/config_bittrex.example.json',
         '--print-json',
     ]
-    start_test_pairlist(get_args(args))
+    await start_test_pairlist(get_args(args))
     captured = capsys.readouterr()
     try:
         json_pairs = json.loads(captured.out)
