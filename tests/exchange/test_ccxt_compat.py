@@ -91,11 +91,10 @@ def exchange_conf():
 
 
 @pytest.fixture(params=EXCHANGES, scope="class")
-def exchange(request, exchange_conf, event_loop):
+async def exchange(request, exchange_conf):
     exchange_conf['exchange']['name'] = request.param
     exchange_conf['stake_currency'] = EXCHANGES[request.param]['stake_currency']
-    exchange = ExchangeResolver.load_exchange(request.param, exchange_conf, validate=True,
-                                              loop=event_loop)
+    exchange = await ExchangeResolver.load_exchange(request.param, exchange_conf, validate=True)
 
     yield exchange, request.param
 

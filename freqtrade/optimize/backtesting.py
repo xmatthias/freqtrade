@@ -66,9 +66,11 @@ class Backtesting:
         config['dry_run'] = True
         self.strategylist: List[IStrategy] = []
         self.all_results: Dict[str, Dict] = {}
-
-        self.exchange = ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config)
-        self.dataprovider = DataProvider(self.config, self.exchange, asyncio.get_event_loop())
+        self.loop = asyncio.get_event_loop()
+        # TODO: asyncio: FIXME
+        self.exchange = self.loop.run_until_complete(
+            ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config))
+        self.dataprovider = DataProvider(self.config, self.exchange, loop=self.loop)
 
         if self.config.get('strategy_list', None):
             for strat in list(self.config['strategy_list']):

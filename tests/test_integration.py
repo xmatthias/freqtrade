@@ -77,7 +77,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     wallets_mock = mocker.patch("freqtrade.wallets.Wallets.update", get_mock_coro())
     mocker.patch("freqtrade.wallets.Wallets.get_free", MagicMock(return_value=1000))
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True
     # Switch ordertype to market to close trade immediately
     freqtrade.strategy.order_types['sell'] = 'market'
@@ -166,7 +166,7 @@ async def test_forcebuy_last_unlimited(default_conf, ticker, fee, mocker, balanc
     )
     mocker.patch("freqtrade.strategy.interface.IStrategy.should_sell", should_sell_mock)
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     rpc = RPC(freqtrade)
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True
     # Switch ordertype to market to close trade immediately

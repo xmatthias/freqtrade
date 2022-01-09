@@ -12,10 +12,13 @@ from freqtrade.plugins.pairlistmanager import PairListManager
 from tests.conftest import get_patched_exchange
 
 
-def test_ohlcv(mocker, default_conf, ohlcv_history):
+pytestmark = pytest.mark.asyncio
+
+
+async def test_ohlcv(mocker, default_conf, ohlcv_history):
     default_conf["runmode"] = RunMode.DRY_RUN
     timeframe = default_conf["timeframe"]
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     exchange._klines[("XRP/BTC", timeframe)] = ohlcv_history
     exchange._klines[("UNITTEST/BTC", timeframe)] = ohlcv_history
 
@@ -78,10 +81,10 @@ def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     jsonloadmock.assert_not_called()
 
 
-def test_get_pair_dataframe(mocker, default_conf, ohlcv_history):
+async def test_get_pair_dataframe(mocker, default_conf, ohlcv_history):
     default_conf["runmode"] = RunMode.DRY_RUN
     timeframe = default_conf["timeframe"]
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     exchange._klines[("XRP/BTC", timeframe)] = ohlcv_history
     exchange._klines[("UNITTEST/BTC", timeframe)] = ohlcv_history
 
@@ -112,8 +115,8 @@ def test_get_pair_dataframe(mocker, default_conf, ohlcv_history):
     # assert dp.get_pair_dataframe("NONESENSE/AAA", timeframe).empty
 
 
-def test_available_pairs(mocker, default_conf, ohlcv_history):
-    exchange = get_patched_exchange(mocker, default_conf)
+async def test_available_pairs(mocker, default_conf, ohlcv_history):
+    exchange = await get_patched_exchange(mocker, default_conf)
     timeframe = default_conf["timeframe"]
     exchange._klines[("XRP/BTC", timeframe)] = ohlcv_history
     exchange._klines[("UNITTEST/BTC", timeframe)] = ohlcv_history
@@ -123,11 +126,11 @@ def test_available_pairs(mocker, default_conf, ohlcv_history):
     assert dp.available_pairs == [("XRP/BTC", timeframe), ("UNITTEST/BTC", timeframe), ]
 
 
-def test_refresh(mocker, default_conf, ohlcv_history):
+async def test_refresh(mocker, default_conf):
     refresh_mock = MagicMock()
     mocker.patch("freqtrade.exchange.Exchange.refresh_latest_ohlcv", refresh_mock)
 
-    exchange = get_patched_exchange(mocker, default_conf, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, id="binance")
     timeframe = default_conf["timeframe"]
     pairs = [("XRP/BTC", timeframe), ("UNITTEST/BTC", timeframe)]
 
@@ -149,10 +152,10 @@ def test_refresh(mocker, default_conf, ohlcv_history):
     assert refresh_mock.call_args[0][0] == pairs + pairs_non_trad
 
 
-def test_orderbook(mocker, default_conf, order_book_l2_sync):
+async def test_orderbook(mocker, default_conf, order_book_l2_sync):
     api_mock = MagicMock()
     api_mock.fetch_l2_order_book = order_book_l2_sync
-    exchange = get_patched_exchange(mocker, default_conf, api_mock=api_mock)
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock=api_mock)
 
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.orderbook('ETH/BTC', 5)
@@ -165,10 +168,10 @@ def test_orderbook(mocker, default_conf, order_book_l2_sync):
     assert 'asks' in res
 
 
-def test_market(mocker, default_conf, markets):
+async def test_market(mocker, default_conf, markets):
     api_mock = MagicMock()
     api_mock.markets = markets
-    exchange = get_patched_exchange(mocker, default_conf, api_mock=api_mock)
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock=api_mock)
 
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.market('ETH/BTC')
@@ -181,10 +184,10 @@ def test_market(mocker, default_conf, markets):
     assert res is None
 
 
-def test_ticker(mocker, default_conf, tickers_sync):
+async def test_ticker(mocker, default_conf, tickers_sync):
     ticker_mock = MagicMock(return_value=tickers_sync()['ETH/BTC'])
     mocker.patch("freqtrade.exchange.Exchange.fetch_ticker_sync", ticker_mock)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('ETH/BTC')
     assert type(res) is dict
@@ -193,20 +196,20 @@ def test_ticker(mocker, default_conf, tickers_sync):
 
     ticker_mock = MagicMock(side_effect=ExchangeError('Pair not found'))
     mocker.patch("freqtrade.exchange.Exchange.fetch_ticker_sync", ticker_mock)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('UNITTEST/BTC')
     assert res == {}
 
 
-def test_current_whitelist(mocker, default_conf, tickers):
+async def test_current_whitelist(mocker, default_conf, tickers):
     # patch default conf to volumepairlist
     default_conf['pairlists'][0] = {'method': 'VolumePairList', "number_assets": 5}
 
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           exchange_has=MagicMock(return_value=True),
                           get_tickers=tickers)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
 
     pairlist = PairListManager(exchange, default_conf, asyncio.get_event_loop())
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop(), pairlist)

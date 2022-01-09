@@ -33,7 +33,9 @@ class EdgeCli:
         # Ensure using dry-run
         self.config['dry_run'] = True
         self.config['stake_amount'] = constants.UNLIMITED_STAKE_AMOUNT
-        self.exchange = ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config)
+        # TODO: asyncio: FIXME
+        self.exchange = asyncio.get_event_loop().run_until_complete(
+            ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config))
         self.strategy = StrategyResolver.load_strategy(self.config)
         self.strategy.dp = DataProvider(config, None, asyncio.get_event_loop())
 

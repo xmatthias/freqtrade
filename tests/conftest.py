@@ -114,17 +114,19 @@ def patch_exchange(mocker, api_mock=None, id='binance', mock_markets=True) -> No
                      PropertyMock(return_value=mock_markets))
 
     if api_mock:
-        mocker.patch('freqtrade.exchange.Exchange._init_ccxt', get_mock_coro(return_value=api_mock))
+        mocker.patch('freqtrade.exchange.Exchange._init_ccxt',
+            get_mock_coro(return_value=api_mock))
     else:
-        mocker.patch('freqtrade.exchange.Exchange._init_ccxt', get_mock_coro(return_value=MagicMock()))
+        mocker.patch('freqtrade.exchange.Exchange._init_ccxt',
+            get_mock_coro(return_value=MagicMock()))
 
 
-def get_patched_exchange(mocker, config, api_mock=None, id='binance',
-                         mock_markets=True) -> Exchange:
+async def get_patched_exchange(mocker, config, api_mock=None, id='binance',
+                               mock_markets=True) -> Exchange:
     patch_exchange(mocker, api_mock, id, mock_markets)
     config['exchange']['name'] = id
     try:
-        exchange = ExchangeResolver.load_exchange(id, config)
+        exchange = await ExchangeResolver.load_exchange(id, config)
     except ImportError:
         exchange = Exchange(config)
     return exchange
