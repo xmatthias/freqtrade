@@ -61,10 +61,12 @@ class FreqtradeBot(LoggingMixin):
 
         self.strategy: IStrategy = StrategyResolver.load_strategy(self.config)
 
-        # Check config consistency here since strategies can set certain options
-        validate_config_consistency(config)
+    async def init_bot(self):
 
-        self.exchange = ExchangeResolver.load_exchange(
+        # Check config consistency here since strategies can set certain options
+        validate_config_consistency(self.config)
+
+        self.exchange = await ExchangeResolver.load_exchange(
             self.config['exchange']['name'], self.config, loop=self.loop)
 
         init_db(self.config.get('db_url', None), clean_open_orders=self.config['dry_run'])

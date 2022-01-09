@@ -34,7 +34,7 @@ async def test_sync_wallet_at_boot(mocker, default_conf):
         })
     )
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     await freqtrade.wallets.update()
 
     assert len(freqtrade.wallets._wallets) == 3
@@ -104,7 +104,7 @@ async def test_sync_wallet_missing_data(mocker, default_conf):
         })
     )
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     await freqtrade.wallets.update()
     assert len(freqtrade.wallets._wallets) == 2
     assert freqtrade.wallets._wallets['BNT'].free == 1.0
@@ -118,7 +118,7 @@ async def test_sync_wallet_missing_data(mocker, default_conf):
 
 async def test_get_trade_stake_amount_no_stake_amount(default_conf, mocker) -> None:
     patch_wallet(mocker, free=default_conf['stake_amount'] * 0.5)
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     await freqtrade.wallets.update()
 
     with pytest.raises(DependencyException, match=r'.*stake amount.*'):
@@ -136,7 +136,6 @@ async def test_get_trade_stake_amount_no_stake_amount(default_conf, mocker) -> N
                         (0.50, 50, 25, 0.0),
                         (0.50, 10, 5, 0.0),
 ])
-@pytest.mark.asyncio
 async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, balance_ratio, capital,
                                                        result1, result2, limit_buy_order_open,
                                                        fee, mocker) -> None:
@@ -155,7 +154,7 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
     if capital is not None:
         conf['available_capital'] = capital
 
-    freqtrade = get_patched_freqtradebot(mocker, conf)
+    freqtrade = await get_patched_freqtradebot(mocker, conf)
 
     # no open trades, order amount should be 'balance / max_open_trades'
     result = await freqtrade.wallets.get_trade_stake_amount('ETH/USDT')
@@ -195,9 +194,9 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
     (20, 50, 100, 0),  # Below min stake and stake * 1.3 > min_stake
 
 ])
-def test_validate_stake_amount(mocker, default_conf,
-                               stake_amount, min_stake_amount, max_stake_amount, expected):
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+async def test_validate_stake_amount(mocker, default_conf,
+                                     stake_amount, min_stake_amount, max_stake_amount, expected):
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 
     mocker.patch("freqtrade.wallets.Wallets.get_available_stake_amount",
                  return_value=max_stake_amount)
@@ -217,8 +216,8 @@ def test_validate_stake_amount(mocker, default_conf,
     (1235, 2250, 2, 5, 1235),
     (1235, -2250, 2, 5, 1235),
 ])
-def test_get_starting_balance(mocker, default_conf, available_capital, closed_profit,
-                              open_stakes, free, expected):
+async def test_get_starting_balance(mocker, default_conf, available_capital, closed_profit,
+                                    open_stakes, free, expected):
     if available_capital:
         default_conf['available_capital'] = available_capital
     mocker.patch("freqtrade.persistence.models.Trade.get_total_closed_profit",
@@ -227,6 +226,6 @@ def test_get_starting_balance(mocker, default_conf, available_capital, closed_pr
                  return_value=open_stakes)
     mocker.patch("freqtrade.wallets.Wallets.get_free", return_value=free)
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 
     assert freqtrade.wallets.get_starting_balance() == expected

@@ -114,9 +114,9 @@ def patch_exchange(mocker, api_mock=None, id='binance', mock_markets=True) -> No
                      PropertyMock(return_value=mock_markets))
 
     if api_mock:
-        mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
+        mocker.patch('freqtrade.exchange.Exchange._init_ccxt', get_mock_coro(return_value=api_mock))
     else:
-        mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock())
+        mocker.patch('freqtrade.exchange.Exchange._init_ccxt', get_mock_coro(return_value=MagicMock()))
 
 
 def get_patched_exchange(mocker, config, api_mock=None, id='binance',
@@ -174,7 +174,7 @@ def patch_freqtradebot(mocker, config) -> None:
     patch_whitelist(mocker, config)
 
 
-def get_patched_freqtradebot(mocker, config) -> FreqtradeBot:
+async def get_patched_freqtradebot(mocker, config) -> FreqtradeBot:
     """
     This function patches _init_modules() to not call dependencies
     :param mocker: a Mocker object to apply patches
@@ -183,7 +183,9 @@ def get_patched_freqtradebot(mocker, config) -> FreqtradeBot:
     """
     patch_freqtradebot(mocker, config)
     config['datadir'] = Path(config['datadir'])
-    return FreqtradeBot(config)
+    ftbot = FreqtradeBot(config)
+    await ftbot.init_bot()
+    return ftbot
 
 
 def get_patched_worker(mocker, config) -> Worker:
