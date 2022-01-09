@@ -150,7 +150,7 @@ class Worker:
 
     def _process_running(self) -> None:
         try:
-            self.freqtrade.process()
+            asyncio.get_event_loop().run_until_complete(self.freqtrade.process())
         except TemporaryError as error:
             logger.warning(f"Error: {error}, retrying in {constants.RETRY_TIMEOUT} seconds...")
             time.sleep(constants.RETRY_TIMEOUT)

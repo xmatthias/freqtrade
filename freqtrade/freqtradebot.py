@@ -150,7 +150,7 @@ class FreqtradeBot(LoggingMixin):
         # This will update the database after the initial migration
         asyncio.get_event_loop().run_until_complete(self.startup_update_open_orders())
 
-    def process(self) -> None:
+    async def process(self) -> None:
         """
         Queries the persistence layer for open trades and handles them,
         otherwise a new trade is created.
@@ -158,10 +158,9 @@ class FreqtradeBot(LoggingMixin):
         """
 
         # Check whether markets have to be reloaded and reload them when it's needed
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.exchange.reload_markets())
+        await self.exchange.reload_markets()
 
-        loop.run_until_complete(self.update_closed_trades_without_assigned_fees())
+        await self.update_closed_trades_without_assigned_fees()
 
         # Query trades from persistence layer
         trades = Trade.get_open_trades()
@@ -180,7 +179,7 @@ class FreqtradeBot(LoggingMixin):
 
         with self._exit_lock:
             # Check and handle any timed out open orders
-            loop.run_until_complete(self.check_handle_timedout())
+            await self.check_handle_timedout()
 
         # Protect from collisions with forcesell.
         # Without this, freqtrade my try to recreate stoploss_on_exchange orders
@@ -188,7 +187,7 @@ class FreqtradeBot(LoggingMixin):
         with self._exit_lock:
             trades = Trade.get_open_trades()
             # First process current opened trades (positions)
-            loop.run_until_complete(self.exit_positions(trades))
+            await self.exit_positions(trades)
 
         # Check if we need to adjust our current positions before attempting to buy new trades.
         if self.strategy.position_adjustment_enable:
@@ -197,7 +196,7 @@ class FreqtradeBot(LoggingMixin):
 
         # Then looking for buy opportunities
         if self.get_free_open_trades():
-            loop.run_until_complete(self.enter_positions())
+            await self.enter_positions()
 
         Trade.commit()
 

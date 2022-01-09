@@ -182,7 +182,7 @@ async def test_edge_called_in_process(mocker, edge_conf) -> None:
     freqtrade = FreqtradeBot(edge_conf)
     await freqtrade.init_bot()
     patch_get_signal(freqtrade)
-    freqtrade.process()
+    await freqtrade.process()
     assert freqtrade.active_pair_whitelist == ['NEO/BTC', 'LTC/BTC']
 
 
@@ -552,7 +552,7 @@ async def test_process_trade_creation(default_conf_usdt, ticker_usdt, limit_buy_
     trades = Trade.query.filter(Trade.is_open.is_(True)).all()
     assert not trades
 
-    freqtrade.process()
+    await freqtrade.process()
 
     trades = Trade.query.filter(Trade.is_open.is_(True)).all()
     assert len(trades) == 1
@@ -623,18 +623,18 @@ async def test_process_trade_handling(
 
     trades = Trade.query.filter(Trade.is_open.is_(True)).all()
     assert not trades
-    freqtrade.process()
+    await freqtrade.process()
 
     trades = Trade.query.filter(Trade.is_open.is_(True)).all()
     assert len(trades) == 1
 
     # Nothing happened ...
-    freqtrade.process()
+    await freqtrade.process()
     assert len(trades) == 1
 
 
-def test_process_trade_no_whitelist_pair(default_conf_usdt, ticker_usdt, limit_buy_order_usdt,
-                                         fee, mocker) -> None:
+async def test_process_trade_no_whitelist_pair(default_conf_usdt, ticker_usdt, limit_buy_order_usdt,
+                                               fee, mocker) -> None:
     """ Test process with trade not in pair list """
     patch_RPCManager(mocker)
     patch_exchange(mocker)
@@ -646,6 +646,7 @@ def test_process_trade_no_whitelist_pair(default_conf_usdt, ticker_usdt, limit_b
         get_fee=fee,
     )
     freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
     patch_get_signal(freqtrade)
     pair = 'BLK/BTC'
     # Ensure the pair is not in the whitelist!
@@ -674,13 +675,13 @@ def test_process_trade_no_whitelist_pair(default_conf_usdt, ticker_usdt, limit_b
     ))
 
     assert pair not in freqtrade.active_pair_whitelist
-    freqtrade.process()
+    await freqtrade.process()
     assert pair in freqtrade.active_pair_whitelist
     # Make sure each pair is only in the list once
     assert len(freqtrade.active_pair_whitelist) == len(set(freqtrade.active_pair_whitelist))
 
 
-def test_process_informative_pairs_added(default_conf_usdt, ticker_usdt, mocker) -> None:
+async def test_process_informative_pairs_added(default_conf_usdt, ticker_usdt, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
 
@@ -699,10 +700,11 @@ def test_process_informative_pairs_added(default_conf_usdt, ticker_usdt, mocker)
     mocker.patch('time.sleep', return_value=None)
 
     freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
     freqtrade.strategy.informative_pairs = inf_pairs
     # patch_get_signal(freqtrade)
 
-    freqtrade.process()
+    await freqtrade.process()
     assert inf_pairs.call_count == 1
     assert refresh_mock.call_count == 1
     assert ("BTC/ETH", "1m") in refresh_mock.call_args[0][0]
@@ -2018,7 +2020,7 @@ async def test_bot_loop_start_called_once(mocker, default_conf_usdt, caplog):
     ftbot.strategy.bot_loop_start = MagicMock(side_effect=ValueError)
     ftbot.strategy.analyze = MagicMock()
 
-    ftbot.process()
+    await ftbot.process()
     assert log_has_re(r'Strategy caused the following exception.*', caplog)
     assert ftbot.strategy.bot_loop_start.call_count == 1
     assert ftbot.strategy.analyze.call_count == 1

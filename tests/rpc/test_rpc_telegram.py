@@ -61,7 +61,7 @@ class DummyCls(Telegram):
         raise Exception('test')
 
 
-def get_telegram_testobject(mocker, default_conf, mock=True, ftbot=None):
+async def get_telegram_testobject(mocker, default_conf, mock=True, ftbot=None):
     msg_mock = MagicMock()
     if mock:
         mocker.patch.multiple(
@@ -70,7 +70,7 @@ def get_telegram_testobject(mocker, default_conf, mock=True, ftbot=None):
             _send_msg=msg_mock
         )
     if not ftbot:
-        ftbot = get_patched_freqtradebot(mocker, default_conf)
+        ftbot = await get_patched_freqtradebot(mocker, default_conf)
     rpc = RPC(ftbot)
     telegram = Telegram(rpc, default_conf)
 
