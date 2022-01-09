@@ -99,13 +99,13 @@ def load_data(datadir: Path,
     return result
 
 
-def refresh_data(datadir: Path,
-                 timeframe: str,
-                 pairs: List[str],
-                 exchange: Exchange,
-                 data_format: str = None,
-                 timerange: Optional[TimeRange] = None,
-                 ) -> None:
+async def refresh_data(datadir: Path,
+                       timeframe: str,
+                       pairs: List[str],
+                       exchange: Exchange,
+                       data_format: str = None,
+                       timerange: Optional[TimeRange] = None,
+                       ) -> None:
     """
     Refresh ohlcv history data for a list of pairs.
 
@@ -119,9 +119,10 @@ def refresh_data(datadir: Path,
     data_handler = get_datahandler(datadir, data_format)
     for idx, pair in enumerate(pairs):
         process = f'{idx}/{len(pairs)}'
-        _download_pair_history(pair=pair, process=process,
-                               timeframe=timeframe, datadir=datadir,
-                               timerange=timerange, exchange=exchange, data_handler=data_handler)
+        await _download_pair_history(pair=pair, process=process,
+                                     timeframe=timeframe, datadir=datadir,
+                                     timerange=timerange, exchange=exchange,
+                                     data_handler=data_handler)
 
 
 def _load_cached_data_for_updating(pair: str, timeframe: str, timerange: Optional[TimeRange],
@@ -154,14 +155,14 @@ def _load_cached_data_for_updating(pair: str, timeframe: str, timerange: Optiona
     return data, start_ms
 
 
-def _download_pair_history(pair: str, *,
-                           datadir: Path,
-                           exchange: Exchange,
-                           timeframe: str = '5m',
-                           process: str = '',
-                           new_pairs_days: int = 30,
-                           data_handler: IDataHandler = None,
-                           timerange: Optional[TimeRange] = None) -> bool:
+async def _download_pair_history(pair: str, *,
+                                 datadir: Path,
+                                 exchange: Exchange,
+                                 timeframe: str = '5m',
+                                 process: str = '',
+                                 new_pairs_days: int = 30,
+                                 data_handler: IDataHandler = None,
+                                 timerange: Optional[TimeRange] = None) -> bool:
     """
     Download latest candles from the exchange for the pair and timeframe passed in parameters
     The data is downloaded starting from the last correct data that
@@ -193,13 +194,14 @@ def _download_pair_history(pair: str, *,
                      f"{data.iloc[-1]['date']:%Y-%m-%d %H:%M:%S}" if not data.empty else 'None')
 
         # Default since_ms to 30 days if nothing is given
-        new_data = exchange.get_historic_ohlcv(pair=pair,
-                                               timeframe=timeframe,
-                                               since_ms=since_ms if since_ms else
-                                               arrow.utcnow().shift(
-                                                   days=-new_pairs_days).int_timestamp * 1000,
-                                               is_new_pair=data.empty
-                                               )
+        new_data = await exchange.get_historic_ohlcv(
+            pair=pair,
+            timeframe=timeframe,
+            since_ms=since_ms if since_ms else
+            arrow.utcnow().shift(
+                days=-new_pairs_days).int_timestamp * 1000,
+            is_new_pair=data.empty
+            )
         # TODO: Maybe move parsing to exchange class (?)
         new_dataframe = ohlcv_to_dataframe(new_data, timeframe, pair,
                                            fill_missing=False, drop_incomplete=True)
@@ -226,10 +228,10 @@ def _download_pair_history(pair: str, *,
         return False
 
 
-def refresh_backtest_ohlcv_data(exchange: Exchange, pairs: List[str], timeframes: List[str],
-                                datadir: Path, timerange: Optional[TimeRange] = None,
-                                new_pairs_days: int = 30, erase: bool = False,
-                                data_format: str = None) -> List[str]:
+async def refresh_backtest_ohlcv_data(exchange: Exchange, pairs: List[str], timeframes: List[str],
+                                      datadir: Path, timerange: Optional[TimeRange] = None,
+                                      new_pairs_days: int = 30, erase: bool = False,
+                                      data_format: str = None) -> List[str]:
     """
     Refresh stored ohlcv data for backtesting and hyperopt operations.
     Used by freqtrade download-data subcommand.
@@ -251,10 +253,10 @@ def refresh_backtest_ohlcv_data(exchange: Exchange, pairs: List[str], timeframes
 
             logger.info(f'Downloading pair {pair}, interval {timeframe}.')
             process = f'{idx}/{len(pairs)}'
-            _download_pair_history(pair=pair, process=process,
-                                   datadir=datadir, exchange=exchange,
-                                   timerange=timerange, data_handler=data_handler,
-                                   timeframe=str(timeframe), new_pairs_days=new_pairs_days)
+            await _download_pair_history(pair=pair, process=process,
+                                         datadir=datadir, exchange=exchange,
+                                         timerange=timerange, data_handler=data_handler,
+                                         timeframe=str(timeframe), new_pairs_days=new_pairs_days)
     return pairs_not_available
 
 

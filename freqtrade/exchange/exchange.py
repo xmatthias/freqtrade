@@ -1257,8 +1257,8 @@ class Exchange:
 
     # Historic data
 
-    def get_historic_ohlcv(self, pair: str, timeframe: str,
-                           since_ms: int, is_new_pair: bool = False) -> List:
+    async def get_historic_ohlcv(self, pair: str, timeframe: str,
+                                 since_ms: int, is_new_pair: bool = False) -> List:
         """
         Get candle history using asyncio and returns the list of candles.
         Handles all async work for this.
@@ -1268,14 +1268,13 @@ class Exchange:
         :param since_ms: Timestamp in milliseconds to get history from
         :return: List with candle (OHLCV) data
         """
-        pair, timeframe, data = self.loop.run_until_complete(
-            self._async_get_historic_ohlcv(pair=pair, timeframe=timeframe,
-                                           since_ms=since_ms, is_new_pair=is_new_pair))
+        pair, timeframe, data = await self._async_get_historic_ohlcv(
+            pair=pair, timeframe=timeframe, since_ms=since_ms, is_new_pair=is_new_pair)
         logger.info(f"Downloaded data for {pair} with length {len(data)}.")
         return data
 
-    def get_historic_ohlcv_as_df(self, pair: str, timeframe: str,
-                                 since_ms: int) -> DataFrame:
+    async def get_historic_ohlcv_as_df(self, pair: str, timeframe: str,
+                                       since_ms: int) -> DataFrame:
         """
         Minimal wrapper around get_historic_ohlcv - converting the result into a dataframe
         :param pair: Pair to download
@@ -1283,7 +1282,7 @@ class Exchange:
         :param since_ms: Timestamp in milliseconds to get history from
         :return: OHLCV DataFrame
         """
-        ticks = self.get_historic_ohlcv(pair, timeframe, since_ms=since_ms)
+        ticks = await self.get_historic_ohlcv(pair, timeframe, since_ms=since_ms)
         return ohlcv_to_dataframe(ticks, timeframe, pair=pair, fill_missing=True,
                                   drop_incomplete=self._ohlcv_partial_candle)
 

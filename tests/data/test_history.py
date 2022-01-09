@@ -26,7 +26,7 @@ from freqtrade.data.history.jsondatahandler import JsonDataHandler, JsonGzDataHa
 from freqtrade.exchange import timeframe_to_minutes
 from freqtrade.misc import file_dump_json
 from freqtrade.resolvers import StrategyResolver
-from tests.conftest import get_patched_exchange, log_has, log_has_re, patch_exchange
+from tests.conftest import get_mock_coro, get_patched_exchange, log_has, log_has_re, patch_exchange
 
 
 pytestmark = pytest.mark.asyncio
@@ -127,8 +127,8 @@ async def test_load_data_with_new_pair_1min(ohlcv_history_list, mocker, caplog,
     )
 
     # download a new pair if refresh_pairs is set
-    refresh_data(datadir=tmpdir1, timeframe='1m', pairs=['MEME/BTC'],
-                 exchange=exchange)
+    await refresh_data(datadir=tmpdir1, timeframe='1m', pairs=['MEME/BTC'],
+                       exchange=exchange)
     load_pair_history(datadir=tmpdir1, timeframe='1m', pair='MEME/BTC')
     assert file.is_file()
     assert log_has_re(
@@ -239,12 +239,12 @@ async def test_download_pair_history(ohlcv_history_list, mocker, default_conf, t
     assert not file1_1.is_file()
     assert not file2_1.is_file()
 
-    assert _download_pair_history(datadir=tmpdir1, exchange=exchange,
-                                  pair='MEME/BTC',
-                                  timeframe='1m')
-    assert _download_pair_history(datadir=tmpdir1, exchange=exchange,
-                                  pair='CFI/BTC',
-                                  timeframe='1m')
+    assert await _download_pair_history(datadir=tmpdir1, exchange=exchange,
+                                        pair='MEME/BTC',
+                                        timeframe='1m')
+    assert await _download_pair_history(datadir=tmpdir1, exchange=exchange,
+                                        pair='CFI/BTC',
+                                        timeframe='1m')
     assert not exchange._pairs_last_refresh_time
     assert file1_1.is_file()
     assert file2_1.is_file()
@@ -256,12 +256,12 @@ async def test_download_pair_history(ohlcv_history_list, mocker, default_conf, t
     assert not file1_5.is_file()
     assert not file2_5.is_file()
 
-    assert _download_pair_history(datadir=tmpdir1, exchange=exchange,
-                                  pair='MEME/BTC',
-                                  timeframe='5m')
-    assert _download_pair_history(datadir=tmpdir1, exchange=exchange,
-                                  pair='CFI/BTC',
-                                  timeframe='5m')
+    assert await _download_pair_history(datadir=tmpdir1, exchange=exchange,
+                                        pair='MEME/BTC',
+                                        timeframe='5m')
+    assert await _download_pair_history(datadir=tmpdir1, exchange=exchange,
+                                        pair='CFI/BTC',
+                                        timeframe='5m')
     assert not exchange._pairs_last_refresh_time
     assert file1_5.is_file()
     assert file2_5.is_file()
@@ -277,22 +277,21 @@ async def test_download_pair_history2(mocker, default_conf, testdatadir) -> None
         return_value=None)
     mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv', return_value=tick)
     exchange = await get_patched_exchange(mocker, default_conf)
-    _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
-                           timeframe='1m')
-    _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
-                           timeframe='3m')
+    await _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
+                                 timeframe='1m')
+    await _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
+                                 timeframe='3m')
     assert json_dump_mock.call_count == 2
 
 
-def test_download_backtesting_data_exception(mocker, caplog, default_conf, tmpdir) -> None:
+async def test_download_backtesting_data_exception(mocker, caplog, default_conf, tmpdir) -> None:
     mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv',
                  side_effect=Exception('File Error'))
     tmpdir1 = Path(tmpdir)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
 
-    assert not _download_pair_history(datadir=tmpdir1, exchange=exchange,
-                                      pair='MEME/BTC',
-                                      timeframe='1m')
+    assert not await _download_pair_history(datadir=tmpdir1, exchange=exchange,
+                                            pair='MEME/BTC', timeframe='1m')
     assert log_has('Failed to download history data for pair: "MEME/BTC", timeframe: 1m.', caplog)
 
 
@@ -443,7 +442,7 @@ def test_validate_backtest_data(default_conf, mocker, caplog, testdatadir) -> No
 
 async def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog, testdatadir):
     dl_mock = mocker.patch('freqtrade.data.history.history_utils._download_pair_history',
-                           MagicMock())
+                           get_mock_coro())
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
     )
@@ -452,10 +451,10 @@ async def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog
 
     ex = await get_patched_exchange(mocker, default_conf)
     timerange = TimeRange.parse_timerange("20190101-20190102")
-    refresh_backtest_ohlcv_data(exchange=ex, pairs=["ETH/BTC", "XRP/BTC"],
-                                timeframes=["1m", "5m"], datadir=testdatadir,
-                                timerange=timerange, erase=True
-                                )
+    await refresh_backtest_ohlcv_data(exchange=ex, pairs=["ETH/BTC", "XRP/BTC"],
+                                      timeframes=["1m", "5m"], datadir=testdatadir,
+                                      timerange=timerange, erase=True
+                                      )
 
     assert dl_mock.call_count == 4
     assert dl_mock.call_args[1]['timerange'].starttype == 'date'
@@ -465,18 +464,18 @@ async def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog
 
 async def test_download_data_no_markets(mocker, default_conf, caplog, testdatadir):
     dl_mock = mocker.patch('freqtrade.data.history.history_utils._download_pair_history',
-                           MagicMock())
+                           get_mock_coro())
 
     ex = await get_patched_exchange(mocker, default_conf)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value={})
     )
     timerange = TimeRange.parse_timerange("20190101-20190102")
-    unav_pairs = refresh_backtest_ohlcv_data(exchange=ex, pairs=["BTT/BTC", "LTC/USDT"],
-                                             timeframes=["1m", "5m"],
-                                             datadir=testdatadir,
-                                             timerange=timerange, erase=False
-                                             )
+    unav_pairs = await refresh_backtest_ohlcv_data(exchange=ex, pairs=["BTT/BTC", "LTC/USDT"],
+                                                   timeframes=["1m", "5m"],
+                                                   datadir=testdatadir,
+                                                   timerange=timerange, erase=False
+                                                   )
 
     assert dl_mock.call_count == 0
     assert "BTT/BTC" in unav_pairs

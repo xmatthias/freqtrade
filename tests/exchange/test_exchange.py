@@ -1591,7 +1591,7 @@ async def test_get_historic_ohlcv(default_conf, mocker, caplog, exchange_name):
     # one_call calculation * 1.8 should do 2 calls
 
     since = 5 * 60 * exchange.ohlcv_candle_limit('5m') * 1.8
-    ret = exchange.get_historic_ohlcv(pair, "5m", int((
+    ret = await exchange.get_historic_ohlcv(pair, "5m", int((
         arrow.utcnow().int_timestamp - since) * 1000))
 
     assert exchange._async_get_candle_history.call_count == 2
@@ -1605,7 +1605,7 @@ async def test_get_historic_ohlcv(default_conf, mocker, caplog, exchange_name):
         raise TimeoutError()
 
     exchange._async_get_candle_history = MagicMock(side_effect=mock_get_candle_hist_error)
-    ret = exchange.get_historic_ohlcv(pair, "5m", int(
+    ret = await exchange.get_historic_ohlcv(pair, "5m", int(
         (arrow.utcnow().int_timestamp - since) * 1000))
     assert log_has_re(r"Async code raised an exception: .*", caplog)
 
@@ -1648,7 +1648,7 @@ async def test_get_historic_ohlcv_as_df(default_conf, mocker, exchange_name):
     # one_call calculation * 1.8 should do 2 calls
 
     since = 5 * 60 * exchange.ohlcv_candle_limit('5m') * 1.8
-    ret = exchange.get_historic_ohlcv_as_df(pair, "5m", int((
+    ret = await exchange.get_historic_ohlcv_as_df(pair, "5m", int((
         arrow.utcnow().int_timestamp - since) * 1000))
 
     assert exchange._async_get_candle_history.call_count == 2

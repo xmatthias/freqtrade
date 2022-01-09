@@ -19,8 +19,8 @@ from freqtrade.commands.deploy_commands import (clean_ui_subdir, download_and_in
 from freqtrade.configuration import setup_utils_configuration
 from freqtrade.enums import RunMode
 from freqtrade.exceptions import OperationalException
-from tests.conftest import (create_mock_trades, get_args, log_has, log_has_re, patch_exchange,
-                            patched_configuration_load_config_file)
+from tests.conftest import (create_mock_trades, get_args, get_mock_coro, log_has, log_has_re,
+                            patch_exchange, patched_configuration_load_config_file)
 from tests.conftest_trades import MOCK_TRADE_COUNT
 
 
@@ -639,7 +639,7 @@ def test_get_ui_download_url_direct(mocker):
 
 async def test_download_data_keyboardInterrupt(mocker, caplog, markets):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                           MagicMock(side_effect=KeyboardInterrupt))
+                           get_mock_coro(side_effect=KeyboardInterrupt))
     patch_exchange(mocker)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
@@ -657,7 +657,7 @@ async def test_download_data_keyboardInterrupt(mocker, caplog, markets):
 
 async def test_download_data_timerange(mocker, caplog, markets):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                           MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
+                           get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
@@ -702,7 +702,7 @@ async def test_download_data_timerange(mocker, caplog, markets):
 
 async def test_download_data_no_markets(mocker, caplog):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                           MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
+                           get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker, id='binance')
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value={})
@@ -720,7 +720,7 @@ async def test_download_data_no_markets(mocker, caplog):
 
 async def test_download_data_no_exchange(mocker, caplog):
     mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                 MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
+                 get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value={})
@@ -740,7 +740,7 @@ async def test_download_data_no_pairs(mocker, caplog):
     mocker.patch.object(Path, "exists", MagicMock(return_value=False))
 
     mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                 MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
+                 get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value={})
@@ -762,7 +762,7 @@ async def test_download_data_all_pairs(mocker, markets):
     mocker.patch.object(Path, "exists", MagicMock(return_value=False))
 
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                           MagicMock(return_value=["ETH/BTC", "XRP/BTC"]))
+                           get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
     patch_exchange(mocker)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
