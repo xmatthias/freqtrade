@@ -156,7 +156,7 @@ async def test_refresh_market_pair_not_in_whitelist(mocker, markets, static_pl_c
     freqtrade = await get_patched_freqtradebot(mocker, static_pl_conf)
 
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets))
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     # List ordered by BaseVolume
     whitelist = ['ETH/BTC', 'TKN/BTC']
     # Ensure all except those in whitelist are removed
@@ -173,7 +173,7 @@ async def test_refresh_static_pairlist(mocker, markets, static_pl_conf):
         exchange_has=MagicMock(return_value=True),
         markets=PropertyMock(return_value=markets),
     )
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     # List ordered by BaseVolume
     whitelist = ['ETH/BTC', 'TKN/BTC']
     # Ensure all except those in whitelist are removed
@@ -197,7 +197,7 @@ async def test_refresh_static_pairlist_noexist(mocker, markets, static_pl_conf, 
         exchange_has=MagicMock(return_value=True),
         markets=PropertyMock(return_value=markets),
     )
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
 
     # Ensure all except those in whitelist are removed
     assert set(expected) == set(freqtrade.pairlists.whitelist)
@@ -214,7 +214,7 @@ async def test_invalid_blacklist(mocker, markets, static_pl_conf, caplog):
         exchange_has=MagicMock(return_value=True),
         markets=PropertyMock(return_value=markets),
     )
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     whitelist = []
     # Ensure all except those in whitelist are removed
     assert set(whitelist) == set(freqtrade.pairlists.whitelist)
@@ -230,7 +230,7 @@ async def test_remove_logs_for_pairs_already_in_blacklist(mocker, markets, stati
         exchange_has=MagicMock(return_value=True),
         markets=PropertyMock(return_value=markets),
     )
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     whitelist = ['ETH/BTC', 'TKN/BTC']
     caplog.clear()
     caplog.set_level(logging.INFO)
@@ -265,7 +265,7 @@ async def test_refresh_pairlist_dynamic(mocker, shitcoinmarkets, tickers, whitel
     )
     # argument: use the whitelist dynamically by exchange-volume
     whitelist = ['ETH/BTC', 'TKN/BTC', 'LTC/BTC', 'XRP/BTC', 'HOT/BTC']
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert whitelist == freqtrade.pairlists.whitelist
 
     whitelist_conf['pairlists'] = [{'method': 'VolumePairList'}]
@@ -291,14 +291,14 @@ async def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers_base,
     )
 
     whitelist = ['ETH/BTC', 'TKN/BTC', 'LTC/BTC', 'XRP/BTC', 'HOT/BTC']
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert whitelist == freqtrade.pairlists.whitelist
 
     # Delay to allow 0 TTL cache to expire...
     time.sleep(1)
     whitelist = ['FUEL/BTC', 'ETH/BTC', 'TKN/BTC', 'LTC/BTC', 'XRP/BTC']
     tickers_base['FUEL/BTC']['quoteVolume'] = 10000.0
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert whitelist == freqtrade.pairlists.whitelist
 
 
@@ -314,7 +314,7 @@ async def test_VolumePairList_refresh_empty(mocker, markets_empty, whitelist_con
     # argument: use the whitelist dynamically by exchange-volume
     whitelist = []
     whitelist_conf['exchange']['pair_whitelist'] = []
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     pairslist = whitelist_conf['exchange']['pair_whitelist']
 
     assert set(whitelist) == set(pairslist)
@@ -519,9 +519,9 @@ async def test_VolumePairList_whitelist_gen(mocker, whitelist_conf, shitcoinmark
         with pytest.raises(OperationalException,
                            match=r"This Pairlist Handler should not be used at the first position "
                                  r"in the list of Pairlist Handlers."):
-            freqtrade.pairlists.refresh_pairlist()
+            await freqtrade.pairlists.refresh_pairlist()
     else:
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         whitelist = freqtrade.pairlists.whitelist
 
         assert isinstance(whitelist, list)
@@ -667,7 +667,7 @@ async def test_VolumePairList_range(mocker, whitelist_conf, shitcoinmarkets, tic
             refresh_latest_ohlcv=MagicMock(return_value=ohlcv_data),
         )
 
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         whitelist = freqtrade.pairlists.whitelist
 
         assert isinstance(whitelist, list)
@@ -692,7 +692,7 @@ async def test_PerformanceFilter_error(mocker, whitelist_conf, caplog) -> None:
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
     exchange = await get_patched_exchange(mocker, whitelist_conf)
     pm = PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
-    pm.refresh_pairlist()
+    await pm.refresh_pairlist()
 
     assert log_has("PerformanceFilter is not available in this mode.", caplog)
 
@@ -723,23 +723,23 @@ async def test_PerformanceFilter_lookback(mocker, whitelist_conf, fee, caplog) -
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
     exchange = await get_patched_exchange(mocker, whitelist_conf)
     pm = PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
-    pm.refresh_pairlist()
+    await pm.refresh_pairlist()
 
     assert pm.whitelist == ['ETH/BTC', 'TKN/BTC', 'XRP/BTC']
 
     with time_machine.travel("2021-09-01 05:00:00 +00:00") as t:
         create_mock_trades(fee)
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
         assert pm.whitelist == ['XRP/BTC']
         assert log_has_re(r'Removing pair .* since .* is below .*', caplog)
 
         # Move to "outside" of lookback window, so original sorting is restored.
         t.move_to("2021-09-01 07:00:00 +00:00")
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
         assert pm.whitelist == ['ETH/BTC', 'TKN/BTC', 'XRP/BTC']
 
 
-def test_gen_pair_whitelist_not_supported(mocker, default_conf, tickers) -> None:
+async def test_gen_pair_whitelist_not_supported(mocker, default_conf, tickers) -> None:
     default_conf['pairlists'] = [{'method': 'VolumePairList', 'number_assets': 10}]
 
     mocker.patch.multiple('freqtrade.exchange.Exchange',
@@ -749,7 +749,7 @@ def test_gen_pair_whitelist_not_supported(mocker, default_conf, tickers) -> None
 
     with pytest.raises(OperationalException,
                        match=r'Exchange does not support dynamic whitelist.*'):
-        get_patched_freqtradebot(mocker, default_conf)
+        await get_patched_freqtradebot(mocker, default_conf)
 
 
 @pytest.mark.parametrize("pairlist", AVAILABLE_PAIRLISTS)
@@ -817,13 +817,13 @@ async def test__whitelist_for_active_markets_empty(mocker, whitelist_conf, pairl
         pairlist_handler._whitelist_for_active_markets(['ETH/BTC'])
 
 
-def test_volumepairlist_invalid_sortvalue(mocker, whitelist_conf):
+async def test_volumepairlist_invalid_sortvalue(mocker, whitelist_conf):
     whitelist_conf['pairlists'][0].update({"sort_key": "asdf"})
 
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
     with pytest.raises(OperationalException,
                        match=r"key asdf not in .*"):
-        get_patched_freqtradebot(mocker, whitelist_conf)
+        await get_patched_freqtradebot(mocker, whitelist_conf)
 
 
 async def test_volumepairlist_caching(mocker, markets, whitelist_conf, tickers):
@@ -836,11 +836,11 @@ async def test_volumepairlist_caching(mocker, markets, whitelist_conf, tickers):
     freqtrade = await get_patched_freqtradebot(mocker, whitelist_conf)
     assert len(freqtrade.pairlists._pairlist_handlers[0]._pair_cache) == 0
     assert tickers.call_count == 0
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert tickers.call_count == 1
 
     assert len(freqtrade.pairlists._pairlist_handlers[0]._pair_cache) == 1
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert tickers.call_count == 2
 
 
@@ -908,11 +908,11 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
 
         freqtrade = await get_patched_freqtradebot(mocker, whitelist_conf_agefilter)
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 0
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count > 0
 
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         # Call to XRP/BTC cached
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 2
@@ -924,14 +924,14 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
             ('XRP/BTC', '1d'): ohlcv_history.iloc[[0]],
         }
         mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', return_value=ohlcv_data)
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 1
 
         # Move to next day
         t.move_to("2021-09-02 01:00:00 +00:00")
         mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', return_value=ohlcv_data)
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 1
 
@@ -945,7 +945,7 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
             ('XRP/BTC', '1d'): ohlcv_history,
         }
         mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', return_value=ohlcv_data)
-        freqtrade.pairlists.refresh_pairlist()
+        await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 4
         # Called once (only for XRP/BTC)
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 1
@@ -963,7 +963,7 @@ def test_OffsetFilter_error(mocker, whitelist_conf) -> None:
         PairListManager(MagicMock, whitelist_conf, asyncio.get_event_loop())
 
 
-def test_rangestabilityfilter_checks(mocker, default_conf, markets, tickers):
+async def test_rangestabilityfilter_checks(mocker, default_conf, markets, tickers):
     default_conf['pairlists'] = [{'method': 'VolumePairList', 'number_assets': 10},
                                  {'method': 'RangeStabilityFilter', 'lookback_days': 99999}]
 
@@ -976,14 +976,14 @@ def test_rangestabilityfilter_checks(mocker, default_conf, markets, tickers):
     with pytest.raises(OperationalException,
                        match=r'RangeStabilityFilter requires lookback_days to not exceed '
                              r'exchange max request size \([0-9]+\)'):
-        get_patched_freqtradebot(mocker, default_conf)
+        await get_patched_freqtradebot(mocker, default_conf)
 
     default_conf['pairlists'] = [{'method': 'VolumePairList', 'number_assets': 10},
                                  {'method': 'RangeStabilityFilter', 'lookback_days': 0}]
 
     with pytest.raises(OperationalException,
                        match='RangeStabilityFilter requires lookback_days to be >= 1'):
-        get_patched_freqtradebot(mocker, default_conf)
+        await get_patched_freqtradebot(mocker, default_conf)
 
 
 @pytest.mark.parametrize('min_rate_of_change,max_rate_of_change,expected_length', [
@@ -1017,12 +1017,12 @@ async def test_rangestabilityfilter_caching(mocker, markets, default_conf, ticke
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 0
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert len(freqtrade.pairlists.whitelist) == expected_length
     assert freqtrade.exchange.refresh_latest_ohlcv.call_count > 0
 
     previous_call_count = freqtrade.exchange.refresh_latest_ohlcv.call_count
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     assert len(freqtrade.pairlists.whitelist) == expected_length
     # Should not have increased since first call.
     assert freqtrade.exchange.refresh_latest_ohlcv.call_count == previous_call_count
@@ -1039,7 +1039,7 @@ async def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers_
                           )
 
     ftbot = await get_patched_freqtradebot(mocker, default_conf)
-    ftbot.pairlists.refresh_pairlist()
+    await ftbot.pairlists.refresh_pairlist()
 
     assert len(ftbot.pairlists.whitelist) == 5
 
@@ -1048,7 +1048,7 @@ async def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers_
     del tickers_base['LTC/BTC']
     mocker.patch.multiple('freqtrade.exchange.Exchange', get_tickers=get_mock_coro(tickers_base))
 
-    ftbot.pairlists.refresh_pairlist()
+    await ftbot.pairlists.refresh_pairlist()
     assert log_has_re(r'Removed .* invalid ticker data.*', caplog)
 
     assert len(ftbot.pairlists.whitelist) == 2
@@ -1128,14 +1128,14 @@ async def test_pricefilter_desc(mocker, whitelist_conf, markets, pairlistconfig,
             freqtrade = await get_patched_freqtradebot(mocker, whitelist_conf)
 
 
-def test_pairlistmanager_no_pairlist(mocker, whitelist_conf):
+async def test_pairlistmanager_no_pairlist(mocker, whitelist_conf):
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
 
     whitelist_conf['pairlists'] = []
 
     with pytest.raises(OperationalException,
                        match=r"No Pairlist Handlers defined"):
-        get_patched_freqtradebot(mocker, whitelist_conf)
+        await get_patched_freqtradebot(mocker, whitelist_conf)
 
 
 @pytest.mark.parametrize("pairlists,pair_allowlist,overall_performance,allowlist_result", [
@@ -1175,8 +1175,9 @@ def test_pairlistmanager_no_pairlist(mocker, whitelist_conf):
       {'pair': 'ETH/BTC', 'profit_ratio': -0.0501, 'count': 1}],
      ['ETH/BTC', 'LTC/BTC', 'TKN/BTC']),
 ])
-async def test_performance_filter(mocker, whitelist_conf, pairlists, pair_allowlist, overall_performance,
-                            allowlist_result, tickers, markets, ohlcv_history_list):
+async def test_performance_filter(
+        mocker, whitelist_conf, pairlists, pair_allowlist, overall_performance,
+        allowlist_result, tickers, markets, ohlcv_history_list):
     allowlist_conf = whitelist_conf
     allowlist_conf['pairlists'] = pairlists
     allowlist_conf['exchange']['pair_whitelist'] = pair_allowlist
@@ -1194,7 +1195,7 @@ async def test_performance_filter(mocker, whitelist_conf, pairlists, pair_allowl
     mocker.patch.multiple('freqtrade.persistence.Trade',
                           get_overall_performance=MagicMock(return_value=overall_performance),
                           )
-    freqtrade.pairlists.refresh_pairlist()
+    await freqtrade.pairlists.refresh_pairlist()
     allowlist = freqtrade.pairlists.whitelist
     assert allowlist == allowlist_result
 

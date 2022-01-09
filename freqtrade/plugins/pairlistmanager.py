@@ -73,13 +73,12 @@ class PairListManager(LoggingMixin):
         """List of short_desc for each Pairlist Handler"""
         return [{p.name: p.short_desc()} for p in self._pairlist_handlers]
 
-    def refresh_pairlist(self) -> None:
+    async def refresh_pairlist(self) -> None:
         """Run pairlist through all configured Pairlist Handlers."""
         # Tickers should be cached to avoid calling the exchange on each call.
         tickers: Dict = {}
         if self._tickers_needed:
-            # TODO: asyncio - improve this?
-            tickers = self._loop.run_until_complete(self._exchange.get_tickers())
+            tickers = await self._exchange.get_tickers()
 
         # Generate the pairlist with first Pairlist Handler in the chain
         pairlist = self._pairlist_handlers[0].gen_pairlist(tickers)

@@ -100,7 +100,7 @@ class FreqtradeBot(LoggingMixin):
         self.edge = Edge(self.config, self.exchange, self.strategy) if \
             self.config.get('edge', {}).get('enabled', False) else None
 
-        self.active_pair_whitelist = self._refresh_active_whitelist()
+        self.active_pair_whitelist = await self._refresh_active_whitelist()
 
         # Set initial bot state from config
         initial_state = self.config.get('initial_state')
@@ -165,7 +165,7 @@ class FreqtradeBot(LoggingMixin):
         # Query trades from persistence layer
         trades = Trade.get_open_trades()
 
-        self.active_pair_whitelist = self._refresh_active_whitelist(trades)
+        self.active_pair_whitelist = await self._refresh_active_whitelist(trades)
 
         # Refreshing candles
         self.dataprovider.refresh(self.pairlists.create_pair_list(self.active_pair_whitelist),
@@ -226,13 +226,13 @@ class FreqtradeBot(LoggingMixin):
             }
             self.rpc.send_msg(msg)
 
-    def _refresh_active_whitelist(self, trades: List[Trade] = []) -> List[str]:
+    async def _refresh_active_whitelist(self, trades: List[Trade] = []) -> List[str]:
         """
         Refresh active whitelist from pairlist or edge and extend it with
         pairs that have open trades.
         """
         # Refresh whitelist
-        self.pairlists.refresh_pairlist()
+        await self.pairlists.refresh_pairlist()
         _whitelist = self.pairlists.whitelist
 
         # Calculating Edge positioning

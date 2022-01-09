@@ -29,7 +29,7 @@ async def start_test_pairlist(args: Dict[str, Any]) -> None:
     for curr in quote_currencies:
         config['stake_currency'] = curr
         pairlists = PairListManager(exchange, config, asyncio.get_running_loop())
-        pairlists.refresh_pairlist()
+        await pairlists.refresh_pairlist()
         results[curr] = pairlists.whitelist
 
     for curr, pairlist in results.items():

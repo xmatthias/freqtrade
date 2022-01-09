@@ -103,7 +103,7 @@ class Backtesting:
             )
 
         self.dataprovider.add_pairlisthandler(self.pairlists)
-        self.pairlists.refresh_pairlist()
+        self.loop.run_until_complete(self.pairlists.refresh_pairlist())
 
         if len(self.pairlists.whitelist) == 0:
             raise OperationalException("No pair in whitelist.")
