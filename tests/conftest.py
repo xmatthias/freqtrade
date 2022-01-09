@@ -208,7 +208,7 @@ def patch_get_signal(freqtrade: FreqtradeBot, value=(True, False, None, None)) -
     :return: None
     """
     freqtrade.strategy.get_signal = lambda e, s, x: value
-    freqtrade.exchange.refresh_latest_ohlcv = lambda p: None
+    freqtrade.exchange.refresh_latest_ohlcv = get_mock_coro(return_value=None)
 
 
 def create_mock_trades(fee, use_db: bool = True):

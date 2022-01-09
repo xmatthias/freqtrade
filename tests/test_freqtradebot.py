@@ -686,7 +686,7 @@ async def test_process_informative_pairs_added(default_conf_usdt, ticker_usdt, m
     patch_RPCManager(mocker)
     patch_exchange(mocker)
 
-    refresh_mock = MagicMock()
+    refresh_mock = get_mock_coro()
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_usdt,

@@ -198,12 +198,13 @@ class TestCCXTExchange():
                     assert len(l2['asks']) == next_limit
                     assert len(l2['asks']) == next_limit
 
-    def test_fetch_ohlcv(self, exchange):
+    @pytest.mark.asyncio
+    async def test_fetch_ohlcv(self, exchange):
         exchange, exchangename = exchange
         pair = EXCHANGES[exchangename]['pair']
         timeframe = EXCHANGES[exchangename]['timeframe']
         pair_tf = (pair, timeframe)
-        ohlcv = exchange.refresh_latest_ohlcv([pair_tf])
+        ohlcv = await exchange.refresh_latest_ohlcv([pair_tf])
         assert isinstance(ohlcv, dict)
         assert len(ohlcv[pair_tf]) == len(exchange.klines(pair_tf))
         # assert len(exchange.klines(pair_tf)) > 200

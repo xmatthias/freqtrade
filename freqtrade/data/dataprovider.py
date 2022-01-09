@@ -157,18 +157,17 @@ class DataProvider:
 
     # Exchange functions
 
-    def refresh(self,
-                pairlist: ListPairsWithTimeframes,
-                helping_pairs: ListPairsWithTimeframes = None) -> None:
+    async def refresh(self, pairlist: ListPairsWithTimeframes,
+                      helping_pairs: ListPairsWithTimeframes = None) -> None:
         """
         Refresh data, called with each cycle
         """
         if self._exchange is None:
             raise OperationalException(NO_EXCHANGE_EXCEPTION)
         if helping_pairs:
-            self._exchange.refresh_latest_ohlcv(pairlist + helping_pairs)
+            await self._exchange.refresh_latest_ohlcv(pairlist + helping_pairs)
         else:
-            self._exchange.refresh_latest_ohlcv(pairlist)
+            await self._exchange.refresh_latest_ohlcv(pairlist)
 
     @property
     def available_pairs(self) -> ListPairsWithTimeframes:

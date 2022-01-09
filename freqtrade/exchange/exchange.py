@@ -1326,9 +1326,9 @@ class Exchange:
         data = sorted(data, key=lambda x: x[0])
         return pair, timeframe, data
 
-    def refresh_latest_ohlcv(self, pair_list: ListPairsWithTimeframes, *,
-                             since_ms: Optional[int] = None, cache: bool = True
-                             ) -> Dict[Tuple[str, str], DataFrame]:
+    async def refresh_latest_ohlcv(self, pair_list: ListPairsWithTimeframes, *,
+                                   since_ms: Optional[int] = None, cache: bool = True
+                                   ) -> Dict[Tuple[str, str], DataFrame]:
         """
         Refresh in-memory OHLCV asynchronously and set `_klines` with the result
         Loops asynchronously over pair_list and downloads all pairs async (semi-parallel).
@@ -1370,10 +1370,7 @@ class Exchange:
         results_df = {}
         # Chunk requests into batches of 100 to avoid overwelming ccxt Throttling
         for input_coro in chunks(input_coroutines, 100):
-            async def gather_stuff():
-                return await asyncio.gather(*input_coro, return_exceptions=True)
-
-            results = self.loop.run_until_complete(gather_stuff())
+            results = await asyncio.gather(*input_coro, return_exceptions=True)
 
             # handle caching
             for res in results:

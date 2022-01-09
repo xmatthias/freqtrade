@@ -1714,7 +1714,7 @@ async def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
     pairs = [('IOTA/ETH', '5m'), ('XRP/ETH', '5m')]
     # empty dicts
     assert not exchange._klines
-    res = exchange.refresh_latest_ohlcv(pairs, cache=False)
+    res = await exchange.refresh_latest_ohlcv(pairs, cache=False)
     # No caching
     assert not exchange._klines
 
@@ -1723,7 +1723,7 @@ async def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
     exchange._api_async.fetch_ohlcv.reset_mock()
 
     exchange.required_candle_call_count = 2
-    res = exchange.refresh_latest_ohlcv(pairs)
+    res = await exchange.refresh_latest_ohlcv(pairs)
     assert len(res) == len(pairs)
 
     assert log_has(f'Refreshing candle (OHLCV) data for {len(pairs)} pairs', caplog)
@@ -1742,7 +1742,7 @@ async def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
         assert exchange.klines(pair, copy=False) is exchange.klines(pair, copy=False)
 
     # test caching
-    res = exchange.refresh_latest_ohlcv([('IOTA/ETH', '5m'), ('XRP/ETH', '5m')])
+    res = await exchange.refresh_latest_ohlcv([('IOTA/ETH', '5m'), ('XRP/ETH', '5m')])
     assert len(res) == len(pairs)
 
     assert exchange._api_async.fetch_ohlcv.call_count == 0
@@ -1750,15 +1750,15 @@ async def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
     assert log_has(f"Using cached candle (OHLCV) data for pair {pairs[0][0]}, "
                    f"timeframe {pairs[0][1]} ...",
                    caplog)
-    res = exchange.refresh_latest_ohlcv([('IOTA/ETH', '5m'), ('XRP/ETH', '5m'), ('XRP/ETH', '1d')],
-                                        cache=False)
+    res = await exchange.refresh_latest_ohlcv([
+        ('IOTA/ETH', '5m'), ('XRP/ETH', '5m'), ('XRP/ETH', '1d')], cache=False)
     assert len(res) == 3
     assert exchange._api_async.fetch_ohlcv.call_count == 3
 
     # Test the same again, should NOT return from cache!
     exchange._api_async.fetch_ohlcv.reset_mock()
-    res = exchange.refresh_latest_ohlcv([('IOTA/ETH', '5m'), ('XRP/ETH', '5m'), ('XRP/ETH', '1d')],
-                                        cache=False)
+    res = await exchange.refresh_latest_ohlcv([
+        ('IOTA/ETH', '5m'), ('XRP/ETH', '5m'), ('XRP/ETH', '1d')], cache=False)
     assert len(res) == 3
     assert exchange._api_async.fetch_ohlcv.call_count == 3
 
@@ -1882,7 +1882,7 @@ async def test_refresh_latest_ohlcv_inv_result(default_conf, mocker, caplog):
     exchange._api_async.fetch_ohlcv = MagicMock(side_effect=mock_get_candle_hist)
 
     pairs = [("ETH/BTC", "5m"), ("XRP/BTC", "5m")]
-    res = exchange.refresh_latest_ohlcv(pairs)
+    res = await exchange.refresh_latest_ohlcv(pairs)
     assert exchange._klines
     assert exchange._api_async.fetch_ohlcv.call_count == 2
 

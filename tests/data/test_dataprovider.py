@@ -9,7 +9,7 @@ from freqtrade.data.dataprovider import DataProvider
 from freqtrade.enums import RunMode
 from freqtrade.exceptions import ExchangeError, OperationalException
 from freqtrade.plugins.pairlistmanager import PairListManager
-from tests.conftest import get_patched_exchange
+from tests.conftest import get_mock_coro, get_patched_exchange
 
 
 pytestmark = pytest.mark.asyncio
@@ -127,7 +127,7 @@ async def test_available_pairs(mocker, default_conf, ohlcv_history):
 
 
 async def test_refresh(mocker, default_conf):
-    refresh_mock = MagicMock()
+    refresh_mock = get_mock_coro()
     mocker.patch("freqtrade.exchange.Exchange.refresh_latest_ohlcv", refresh_mock)
 
     exchange = await get_patched_exchange(mocker, default_conf, id="binance")
@@ -137,7 +137,7 @@ async def test_refresh(mocker, default_conf):
     pairs_non_trad = [("ETH/USDT", timeframe), ("BTC/TUSD", "1h")]
 
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
-    dp.refresh(pairs)
+    await dp.refresh(pairs)
 
     assert refresh_mock.call_count == 1
     assert len(refresh_mock.call_args[0]) == 1
@@ -145,7 +145,7 @@ async def test_refresh(mocker, default_conf):
     assert refresh_mock.call_args[0][0] == pairs
 
     refresh_mock.reset_mock()
-    dp.refresh(pairs, pairs_non_trad)
+    await dp.refresh(pairs, pairs_non_trad)
     assert refresh_mock.call_count == 1
     assert len(refresh_mock.call_args[0]) == 1
     assert len(refresh_mock.call_args[0][0]) == len(pairs) + len(pairs_non_trad)
@@ -271,13 +271,13 @@ async def test_get_analyzed_dataframe(mocker, default_conf, ohlcv_history):
     assert len(dataframe) == len(ohlcv_history)
 
 
-def test_no_exchange_mode(default_conf):
+async def test_no_exchange_mode(default_conf):
     dp = DataProvider(default_conf, None, asyncio.get_event_loop())
 
     message = "Exchange is not available to DataProvider."
 
     with pytest.raises(OperationalException, match=message):
-        dp.refresh([()])
+        await dp.refresh([()])
 
     with pytest.raises(OperationalException, match=message):
         dp.ohlcv('XRP/USDT', '5m')
