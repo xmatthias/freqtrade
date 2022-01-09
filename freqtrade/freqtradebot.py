@@ -120,7 +120,7 @@ class FreqtradeBot(LoggingMixin):
             'status': msg
         })
 
-    def cleanup(self) -> None:
+    async def cleanup(self) -> None:
         """
         Cleanup pending resources on an already stopped bot
         :return: None
@@ -128,7 +128,7 @@ class FreqtradeBot(LoggingMixin):
         logger.info('Cleaning up modules ...')
 
         if self.config['cancel_open_orders_on_exit']:
-            asyncio.get_event_loop().run_until_complete(self.cancel_all_open_orders())
+            await self.cancel_all_open_orders()
 
         self.check_for_open_trades()
 

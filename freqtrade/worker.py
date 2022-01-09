@@ -1,6 +1,7 @@
 """
 Main Freqtrade worker class.
 """
+import asyncio
 import logging
 import time
 import traceback
@@ -171,7 +172,7 @@ class Worker:
         self._notify("RELOADING=1")
 
         # Clean up current freqtrade modules
-        self.freqtrade.cleanup()
+        asyncio.get_event_loop().run_until_complete(self.freqtrade.cleanup())
 
         # Load and validate config and create new instance of the bot
         self._init(True)
@@ -187,4 +188,4 @@ class Worker:
 
         if self.freqtrade:
             self.freqtrade.notify_status('process died')
-            self.freqtrade.cleanup()
+            asyncio.get_event_loop().run_until_complete(self.freqtrade.cleanup())
