@@ -56,14 +56,14 @@ def test_historic_ohlcv(mocker, default_conf, ohlcv_history):
     assert historymock.call_args_list[0][1]["timeframe"] == "5m"
 
 
-def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
+async def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     hdf5loadmock = MagicMock(return_value=ohlcv_history)
     jsonloadmock = MagicMock(return_value=ohlcv_history)
     mocker.patch("freqtrade.data.history.hdf5datahandler.HDF5DataHandler._ohlcv_load", hdf5loadmock)
     mocker.patch("freqtrade.data.history.jsondatahandler.JsonDataHandler._ohlcv_load", jsonloadmock)
 
     default_conf["runmode"] = RunMode.BACKTEST
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     data = dp.historic_ohlcv("UNITTEST/BTC", "5m")
     assert isinstance(data, DataFrame)
@@ -226,12 +226,12 @@ async def test_current_whitelist(mocker, default_conf, tickers):
         dp.current_whitelist()
 
 
-def test_get_analyzed_dataframe(mocker, default_conf, ohlcv_history):
+async def test_get_analyzed_dataframe(mocker, default_conf, ohlcv_history):
 
     default_conf["runmode"] = RunMode.DRY_RUN
 
     timeframe = default_conf["timeframe"]
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
 
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     dp._set_cached_df("XRP/BTC", timeframe, ohlcv_history)

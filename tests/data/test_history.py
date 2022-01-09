@@ -29,8 +29,7 @@ from freqtrade.resolvers import StrategyResolver
 from tests.conftest import get_patched_exchange, log_has, log_has_re, patch_exchange
 
 
-# Change this if modifying UNITTEST/BTC testdatafile
-_BTC_UNITTEST_LENGTH = 13681
+pytestmark = pytest.mark.asyncio
 
 
 def _backup_file(file: Path, copy_file: bool = False) -> None:
@@ -109,14 +108,14 @@ def test_load_data_startup_candles(mocker, caplog, default_conf, testdatadir) ->
     assert ltfmock.call_args_list[0][1]['timerange'].startts == timerange.startts - 20 * 60
 
 
-def test_load_data_with_new_pair_1min(ohlcv_history_list, mocker, caplog,
+async def test_load_data_with_new_pair_1min(ohlcv_history_list, mocker, caplog,
                                       default_conf, tmpdir) -> None:
     """
     Test load_pair_history() with 1 min timeframe
     """
     tmpdir1 = Path(tmpdir)
     mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv', return_value=ohlcv_history_list)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     file = tmpdir1 / 'MEME_BTC-1m.json'
 
     # do not download a new pair if refresh_pairs isn't set
@@ -228,9 +227,9 @@ def test_load_cached_data_for_updating(mocker, testdatadir) -> None:
     assert start_ts is None
 
 
-def test_download_pair_history(ohlcv_history_list, mocker, default_conf, tmpdir) -> None:
+async def test_download_pair_history(ohlcv_history_list, mocker, default_conf, tmpdir) -> None:
     mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv', return_value=ohlcv_history_list)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     tmpdir1 = Path(tmpdir)
     file1_1 = tmpdir1 / 'MEME_BTC-1m.json'
     file1_5 = tmpdir1 / 'MEME_BTC-5m.json'
@@ -268,7 +267,7 @@ def test_download_pair_history(ohlcv_history_list, mocker, default_conf, tmpdir)
     assert file2_5.is_file()
 
 
-def test_download_pair_history2(mocker, default_conf, testdatadir) -> None:
+async def test_download_pair_history2(mocker, default_conf, testdatadir) -> None:
     tick = [
         [1509836520000, 0.00162008, 0.00162008, 0.00162008, 0.00162008, 108.14853839],
         [1509836580000, 0.00161, 0.00161, 0.00161, 0.00161, 82.390199]
@@ -277,7 +276,7 @@ def test_download_pair_history2(mocker, default_conf, testdatadir) -> None:
         'freqtrade.data.history.jsondatahandler.JsonDataHandler.ohlcv_store',
         return_value=None)
     mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv', return_value=tick)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
                            timeframe='1m')
     _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
@@ -442,7 +441,7 @@ def test_validate_backtest_data(default_conf, mocker, caplog, testdatadir) -> No
     assert len(caplog.record_tuples) == 0
 
 
-def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog, testdatadir):
+async def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog, testdatadir):
     dl_mock = mocker.patch('freqtrade.data.history.history_utils._download_pair_history',
                            MagicMock())
     mocker.patch(
@@ -451,7 +450,7 @@ def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog, test
     mocker.patch.object(Path, "exists", MagicMock(return_value=True))
     mocker.patch.object(Path, "unlink", MagicMock())
 
-    ex = get_patched_exchange(mocker, default_conf)
+    ex = await get_patched_exchange(mocker, default_conf)
     timerange = TimeRange.parse_timerange("20190101-20190102")
     refresh_backtest_ohlcv_data(exchange=ex, pairs=["ETH/BTC", "XRP/BTC"],
                                 timeframes=["1m", "5m"], datadir=testdatadir,
@@ -464,11 +463,11 @@ def test_refresh_backtest_ohlcv_data(mocker, default_conf, markets, caplog, test
     assert log_has("Downloading pair ETH/BTC, interval 1m.", caplog)
 
 
-def test_download_data_no_markets(mocker, default_conf, caplog, testdatadir):
+async def test_download_data_no_markets(mocker, default_conf, caplog, testdatadir):
     dl_mock = mocker.patch('freqtrade.data.history.history_utils._download_pair_history',
                            MagicMock())
 
-    ex = get_patched_exchange(mocker, default_conf)
+    ex = await get_patched_exchange(mocker, default_conf)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value={})
     )
@@ -485,7 +484,7 @@ def test_download_data_no_markets(mocker, default_conf, caplog, testdatadir):
     assert log_has("Skipping pair BTT/BTC...", caplog)
 
 
-def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplog, testdatadir):
+async def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplog, testdatadir):
     dl_mock = mocker.patch('freqtrade.data.history.history_utils._download_trades_history',
                            MagicMock())
     mocker.patch(
@@ -494,7 +493,7 @@ def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplog, tes
     mocker.patch.object(Path, "exists", MagicMock(return_value=True))
     mocker.patch.object(Path, "unlink", MagicMock())
 
-    ex = get_patched_exchange(mocker, default_conf)
+    ex = await get_patched_exchange(mocker, default_conf)
     timerange = TimeRange.parse_timerange("20190101-20190102")
     unavailable_pairs = refresh_backtest_trades_data(exchange=ex,
                                                      pairs=["ETH/BTC", "XRP/BTC", "XRP/ETH"],
@@ -510,13 +509,13 @@ def test_refresh_backtest_trades_data(mocker, default_conf, markets, caplog, tes
     assert log_has("Skipping pair XRP/ETH...", caplog)
 
 
-def test_download_trades_history(trades_history, mocker, default_conf, testdatadir, caplog,
+async def test_download_trades_history(trades_history, mocker, default_conf, testdatadir, caplog,
                                  tmpdir) -> None:
     tmpdir1 = Path(tmpdir)
     ght_mock = MagicMock(side_effect=lambda pair, *args, **kwargs: (pair, trades_history))
     mocker.patch('freqtrade.exchange.Exchange.get_historic_trades',
                  ght_mock)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
     file1 = tmpdir1 / 'ETH_BTC-trades.json.gz'
     data_handler = get_datahandler(tmpdir1, data_format='jsongz')
 
