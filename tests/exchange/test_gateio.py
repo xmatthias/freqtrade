@@ -6,7 +6,10 @@ from freqtrade.resolvers.exchange_resolver import ExchangeResolver
 from tests.conftest import get_mock_coro
 
 
-def test_validate_order_types_gateio(default_conf, mocker):
+pytestmark = pytest.mark.asyncio
+
+
+async def test_validate_order_types_gateio(default_conf, mocker):
     default_conf['exchange']['name'] = 'gateio'
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt')
     mocker.patch('freqtrade.exchange.Exchange.load_markets', get_mock_coro({}))
@@ -14,7 +17,7 @@ def test_validate_order_types_gateio(default_conf, mocker):
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     mocker.patch('freqtrade.exchange.Exchange.name', 'Gateio')
-    exch = ExchangeResolver.load_exchange('gateio', default_conf, True)
+    exch = await ExchangeResolver.load_exchange('gateio', default_conf, load_markets=True)
     assert isinstance(exch, Gateio)
 
     default_conf['order_types'] = {
@@ -26,4 +29,4 @@ def test_validate_order_types_gateio(default_conf, mocker):
 
     with pytest.raises(OperationalException,
                        match=r'Exchange .* does not support market orders.'):
-        ExchangeResolver.load_exchange('gateio', default_conf, True)
+        await ExchangeResolver.load_exchange('gateio', default_conf, load_markets=True)

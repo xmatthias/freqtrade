@@ -11,10 +11,11 @@ from tests.conftest import get_mock_coro, get_patched_exchange
 from .test_exchange import async_ccxt_exception
 
 
+pytestmark = pytest.mark.asyncio
+
 STOPLOSS_ORDERTYPE = 'stop'
 
 
-@pytest.mark.asyncio
 async def test_stoploss_order_ftx(default_conf, mocker):
     api_mock = MagicMock()
     order_id = 'test_prod_buy_{}'.format(randint(0, 10 ** 6))
@@ -30,7 +31,7 @@ async def test_stoploss_order_ftx(default_conf, mocker):
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
 
     # stoploss_on_exchange_limit_ratio is irrelevant for ftx market orders
     order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=190,
@@ -78,13 +79,13 @@ async def test_stoploss_order_ftx(default_conf, mocker):
     # test exception handling
     with pytest.raises(DependencyException):
         api_mock.create_order = MagicMock(side_effect=ccxt.InsufficientFunds("0 balance"))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
+        exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
         await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
     with pytest.raises(InvalidOrderException):
         api_mock.create_order = MagicMock(
             side_effect=ccxt.InvalidOrder("ftx Order would trigger immediately."))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
+        exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
         await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
     await async_ccxt_exception(mocker, default_conf, api_mock, 'ftx',
@@ -92,14 +93,13 @@ async def test_stoploss_order_ftx(default_conf, mocker):
                                pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
 
-@pytest.mark.asyncio
 async def test_stoploss_order_dry_run_ftx(default_conf, mocker):
     api_mock = MagicMock()
     default_conf['dry_run'] = True
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'ftx')
 
     api_mock.create_order.reset_mock()
 
@@ -114,8 +114,8 @@ async def test_stoploss_order_dry_run_ftx(default_conf, mocker):
     assert order['amount'] == 1
 
 
-def test_stoploss_adjust_ftx(mocker, default_conf):
-    exchange = get_patched_exchange(mocker, default_conf, id='ftx')
+async def test_stoploss_adjust_ftx(mocker, default_conf):
+    exchange = await get_patched_exchange(mocker, default_conf, id='ftx')
     order = {
         'type': STOPLOSS_ORDERTYPE,
         'price': 1500,
@@ -127,12 +127,11 @@ def test_stoploss_adjust_ftx(mocker, default_conf):
     assert not exchange.stoploss_adjust(1501, order)
 
 
-@pytest.mark.asyncio
 async def test_fetch_stoploss_order(default_conf, mocker, limit_sell_order):
     default_conf['dry_run'] = True
     order = MagicMock()
     order.myid = 123
-    exchange = get_patched_exchange(mocker, default_conf, id='ftx')
+    exchange = await get_patched_exchange(mocker, default_conf, id='ftx')
     exchange._dry_run_open_orders['X'] = order
     assert (await exchange.fetch_stoploss_order('X', 'TKN/BTC')).myid == 123
 
@@ -142,11 +141,11 @@ async def test_fetch_stoploss_order(default_conf, mocker, limit_sell_order):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
     api_mock.fetch_orders = get_mock_coro(return_value=[{'id': 'X', 'status': '456'}])
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id='ftx')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='ftx')
     assert (await exchange.fetch_stoploss_order('X', 'TKN/BTC'))['status'] == '456'
 
     api_mock.fetch_orders = get_mock_coro(return_value=[{'id': 'Y', 'status': '456'}])
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id='ftx')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='ftx')
     with pytest.raises(InvalidOrderException, match=r"Could not get stoploss order for id X"):
         await exchange.fetch_stoploss_order('X', 'TKN/BTC')
 
@@ -163,7 +162,7 @@ async def test_fetch_stoploss_order(default_conf, mocker, limit_sell_order):
 
     with pytest.raises(InvalidOrderException):
         api_mock.fetch_orders = MagicMock(side_effect=ccxt.InvalidOrder("Order not found"))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock, id='ftx')
+        exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='ftx')
         await exchange.fetch_stoploss_order(order_id='_', pair='TKN/BTC')
     assert api_mock.fetch_orders.call_count == 1
 
@@ -173,8 +172,8 @@ async def test_fetch_stoploss_order(default_conf, mocker, limit_sell_order):
                                order_id='_', pair='TKN/BTC')
 
 
-def test_get_order_id(mocker, default_conf):
-    exchange = get_patched_exchange(mocker, default_conf, id='ftx')
+async def test_get_order_id(mocker, default_conf):
+    exchange = await get_patched_exchange(mocker, default_conf, id='ftx')
     order = {
         'type': STOPLOSS_ORDERTYPE,
         'price': 1500,

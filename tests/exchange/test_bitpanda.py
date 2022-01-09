@@ -36,7 +36,7 @@ async def test_get_trades_for_order(default_conf, mocker):
         'amount': 0.2340606,
         'fee': {'cost': 0.06179, 'currency': 'BTC'}
     }])
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
     orders = await exchange.get_trades_for_order(order_id, 'LTC/BTC', since)
     assert len(orders) == 1

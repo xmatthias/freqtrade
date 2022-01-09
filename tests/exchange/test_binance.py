@@ -10,7 +10,9 @@ from tests.conftest import get_mock_coro, get_patched_exchange, log_has_re
 from tests.exchange.test_exchange import async_ccxt_exception
 
 
-@pytest.mark.asyncio
+pytestmark = pytest.mark.asyncio
+
+
 @pytest.mark.parametrize('limitratio,expected', [
     (None, 220 * 0.99),
     (0.99, 220 * 0.99),
@@ -31,7 +33,7 @@ async def test_stoploss_order_binance(default_conf, mocker, limitratio, expected
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, 'binance')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
     with pytest.raises(OperationalException):
         order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=190,
@@ -56,13 +58,13 @@ async def test_stoploss_order_binance(default_conf, mocker, limitratio, expected
     # test exception handling
     with pytest.raises(DependencyException):
         api_mock.create_order = MagicMock(side_effect=ccxt.InsufficientFunds("0 balance"))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock, 'binance')
+        exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
         await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
     with pytest.raises(InvalidOrderException):
         api_mock.create_order = MagicMock(
             side_effect=ccxt.InvalidOrder("binance Order would trigger immediately."))
-        exchange = get_patched_exchange(mocker, default_conf, api_mock, 'binance')
+        exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
         await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
     await async_ccxt_exception(mocker, default_conf, api_mock, "binance",
@@ -70,7 +72,6 @@ async def test_stoploss_order_binance(default_conf, mocker, limitratio, expected
                                pair='ETH/BTC', amount=1, stop_price=220, order_types={})
 
 
-@pytest.mark.asyncio
 async def test_stoploss_order_dry_run_binance(default_conf, mocker):
     api_mock = MagicMock()
     order_type = 'stop_loss_limit'
@@ -78,7 +79,7 @@ async def test_stoploss_order_dry_run_binance(default_conf, mocker):
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, 'binance')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
     with pytest.raises(OperationalException):
         order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=190,
@@ -97,8 +98,8 @@ async def test_stoploss_order_dry_run_binance(default_conf, mocker):
     assert order['amount'] == 1
 
 
-def test_stoploss_adjust_binance(mocker, default_conf):
-    exchange = get_patched_exchange(mocker, default_conf, id='binance')
+async def test_stoploss_adjust_binance(mocker, default_conf):
+    exchange = await get_patched_exchange(mocker, default_conf, id='binance')
     order = {
         'type': 'stop_loss_limit',
         'price': 1500,
@@ -111,7 +112,6 @@ def test_stoploss_adjust_binance(mocker, default_conf):
     assert not exchange.stoploss_adjust(1501, order)
 
 
-@pytest.mark.asyncio
 async def test__async_get_historic_ohlcv_binance(default_conf, mocker, caplog):
     ohlcv = [
         [
@@ -124,7 +124,7 @@ async def test__async_get_historic_ohlcv_binance(default_conf, mocker, caplog):
         ]
     ]
 
-    exchange = get_patched_exchange(mocker, default_conf, id='binance')
+    exchange = await get_patched_exchange(mocker, default_conf, id='binance')
     # Monkey-patch async function
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
 
