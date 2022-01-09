@@ -98,7 +98,7 @@ def test_remove_credentials(default_conf, caplog) -> None:
 
 
 async def test_init_ccxt_kwargs(default_conf, mocker, caplog):
-    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets', MagicMock(return_value={}))
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     caplog.set_level(logging.INFO)
     conf = copy.deepcopy(default_conf)
@@ -664,7 +664,7 @@ def test_validate_pairs(default_conf, mocker):  # test exchange.validate_pairs d
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     Exchange(default_conf)
 
@@ -787,7 +787,7 @@ def test_validate_timeframes(default_conf, mocker, timeframe):
     type(api_mock).timeframes = timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     Exchange(default_conf)
@@ -875,7 +875,7 @@ def test_validate_timeframes_not_in_config(default_conf, mocker):
     type(api_mock).timeframes = timeframes
 
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
     Exchange(default_conf)
@@ -929,7 +929,7 @@ async def test_validate_order_types(default_conf, mocker):
 def test_validate_order_types_not_in_config(default_conf, mocker):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange.load_markets_sync')
+    mocker.patch('freqtrade.exchange.Exchange.load_markets')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
@@ -2810,7 +2810,7 @@ async def test_stoploss_order_unsupported_exchange(default_conf, mocker):
 async def test_merge_ft_has_dict(default_conf, mocker):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           _init_ccxt=MagicMock(return_value=MagicMock()),
-                          load_markets_sync=MagicMock(),
+                          load_markets=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           validate_stakecurrency=MagicMock()
@@ -2844,7 +2844,7 @@ async def test_merge_ft_has_dict(default_conf, mocker):
 def test_get_valid_pair_combination(default_conf, mocker, markets):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           _init_ccxt=MagicMock(return_value=MagicMock()),
-                          load_markets_sync=MagicMock(),
+                          load_markets=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           markets=PropertyMock(return_value=markets))
@@ -2917,7 +2917,7 @@ def test_get_markets(default_conf, mocker, markets_static,
                      expected_keys):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
                           _init_ccxt=MagicMock(return_value=MagicMock()),
-                          load_markets_sync=MagicMock(),
+                          load_markets=MagicMock(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           markets=PropertyMock(return_value=markets_static))

@@ -338,14 +338,6 @@ class Exchange:
         except (asyncio.TimeoutError, ccxt.BaseError) as e:
             logger.exception('Unable to initialize markets. Reason: %s', e)
 
-    def load_markets_sync(self) -> None:
-        """
-        Called only when initializing the Exchange objects.
-        """
-        asyncio.get_event_loop().run_until_complete(
-            self.load_markets()
-        )
-
     async def reload_markets(self) -> None:
         """Reload markets both sync and async if refresh interval has passed """
         # Check whether markets have to be reloaded
