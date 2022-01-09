@@ -2,6 +2,7 @@
 This module loads custom exchanges
 """
 import logging
+from asyncio import AbstractEventLoop
 
 import freqtrade.exchange as exchanges
 from freqtrade.exchange import MAP_EXCHANGE_CHILDCLASS, Exchange
@@ -19,7 +20,7 @@ class ExchangeResolver(IResolver):
 
     @staticmethod
     def load_exchange(exchange_name: str, config: dict, load_markets: bool = True,
-                      validate: bool = True) -> Exchange:
+                      validate: bool = True, loop: AbstractEventLoop = None) -> Exchange:
         """
         Load the custom class from config parameter
         :param exchange_name: name of the Exchange to load
@@ -37,7 +38,9 @@ class ExchangeResolver(IResolver):
                 f"No {exchange_name} specific subclass found. Using the generic class instead.")
         if not exchange:
             exchange = Exchange(config)
-        exchange.init_exchange(load_markets=load_markets, validate=validate)
+        loop.run_until_complete(
+            exchange.init_exchange(load_markets=load_markets, validate=validate)
+        )
         return exchange
 
     @staticmethod

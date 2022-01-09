@@ -83,8 +83,6 @@ class Exchange:
         self._api: ccxt.Exchange = None
         self._api_async: ccxt_async.Exchange = None
         self._markets: Dict = {}
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
 
         self._config = config
 
@@ -131,7 +129,8 @@ class Exchange:
         self.markets_refresh_interval: int = exchange_config.get(
             "markets_refresh_interval", 60) * 60
 
-    def init_exchange(self, load_markets: bool = True, validate: bool = True) -> None:
+    async def init_exchange(self, load_markets: bool = True, validate: bool = True) -> None:
+        self.loop = asyncio.get_running_loop()
         exchange_config = self._config['exchange']
 
         # Initialize ccxt objects
@@ -139,20 +138,20 @@ class Exchange:
         ccxt_config = deep_merge_dicts(exchange_config.get('ccxt_config', {}), ccxt_config)
         ccxt_config = deep_merge_dicts(exchange_config.get('ccxt_sync_config', {}), ccxt_config)
 
-        self._api = self._init_ccxt(exchange_config, ccxt_kwargs=ccxt_config)
+        self._api = await self._init_ccxt(exchange_config, ccxt_kwargs=ccxt_config)
 
         ccxt_async_config = self._ccxt_config.copy()
         ccxt_async_config = deep_merge_dicts(exchange_config.get('ccxt_config', {}),
                                              ccxt_async_config)
         ccxt_async_config = deep_merge_dicts(exchange_config.get('ccxt_async_config', {}),
                                              ccxt_async_config)
-        self._api_async = self._init_ccxt(
+        self._api_async = await self._init_ccxt(
             exchange_config, ccxt_async, ccxt_kwargs=ccxt_async_config)
 
         logger.info('Using Exchange "%s"', self.name)
         if load_markets:
             # Initial markets load
-            self.load_markets_sync()
+            await self.load_markets()
 
         if validate:
             # Check if timeframe is available
@@ -180,8 +179,8 @@ class Exchange:
             logger.info("Closing async ccxt session.")
             self.loop.run_until_complete(self._api_async.close())
 
-    def _init_ccxt(self, exchange_config: Dict[str, Any], ccxt_module: CcxtModuleType = ccxt,
-                   ccxt_kwargs: Dict = {}) -> ccxt.Exchange:
+    async def _init_ccxt(self, exchange_config: Dict[str, Any], ccxt_module: CcxtModuleType = ccxt,
+                         ccxt_kwargs: Dict = {}) -> ccxt.Exchange:
         """
         Initialize ccxt with given config and return valid
         ccxt instance.

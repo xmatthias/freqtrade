@@ -51,6 +51,7 @@ class FreqtradeBot(LoggingMixin):
         self.active_pair_whitelist: List[str] = []
 
         logger.info('Starting freqtrade %s', __version__)
+        self.loop = asyncio.get_event_loop()
 
         # Init bot state
         self.state = State.STOPPED
@@ -63,7 +64,8 @@ class FreqtradeBot(LoggingMixin):
         # Check config consistency here since strategies can set certain options
         validate_config_consistency(config)
 
-        self.exchange = ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config)
+        self.exchange = ExchangeResolver.load_exchange(
+            self.config['exchange']['name'], self.config, loop=self.loop)
 
         init_db(self.config.get('db_url', None), clean_open_orders=self.config['dry_run'])
 

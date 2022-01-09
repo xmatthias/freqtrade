@@ -91,10 +91,11 @@ def exchange_conf():
 
 
 @pytest.fixture(params=EXCHANGES, scope="class")
-def exchange(request, exchange_conf):
+def exchange(request, exchange_conf, event_loop):
     exchange_conf['exchange']['name'] = request.param
     exchange_conf['stake_currency'] = EXCHANGES[request.param]['stake_currency']
-    exchange = ExchangeResolver.load_exchange(request.param, exchange_conf, validate=True)
+    exchange = ExchangeResolver.load_exchange(request.param, exchange_conf, validate=True,
+                                              loop=event_loop)
 
     yield exchange, request.param
 
@@ -124,11 +125,11 @@ class TestCCXTExchange():
         if EXCHANGES[exchangename].get('hasQuoteVolume'):
             assert tickers[pair]['quoteVolume'] is not None
 
-    async def test_ccxt_fetch_ticker_sync(self, exchange):
+    def test_ccxt_fetch_ticker_sync(self, exchange):
         exchange, exchangename = exchange
         pair = EXCHANGES[exchangename]['pair']
 
-        ticker = exchange.fetch_ticker(pair)
+        ticker = exchange.fetch_ticker_sync(pair)
         assert 'ask' in ticker
         assert ticker['ask'] is not None
         assert 'bid' in ticker
