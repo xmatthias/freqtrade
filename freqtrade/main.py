@@ -3,6 +3,7 @@
 Main Freqtrade bot script.
 Read the documentation to know what cli arguments you need.
 """
+import asyncio
 import logging
 import sys
 from typing import Any, List
@@ -34,7 +35,11 @@ def main(sysargv: List[str] = None) -> None:
 
         # Call subcommand.
         if 'func' in args:
-            return_code = args['func'](args)
+            func = args['func']
+            if asyncio.iscoroutinefunction(func):
+                asyncio.run(func(args))
+            else:
+                return_code = func(args)
         else:
             # No subcommand was issued.
             raise OperationalException(

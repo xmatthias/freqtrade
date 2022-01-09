@@ -92,7 +92,7 @@ def start_list_strategies(args: Dict[str, Any]) -> None:
         _print_objs_tabular(strategy_objs, config.get('print_colorized', False))
 
 
-def start_list_timeframes(args: Dict[str, Any]) -> None:
+async def start_list_timeframes(args: Dict[str, Any]) -> None:
     """
     Print timeframes available on Exchange
     """
@@ -101,8 +101,8 @@ def start_list_timeframes(args: Dict[str, Any]) -> None:
     config['timeframe'] = None
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config,
-                                              load_markets=False, validate=False)
+    exchange = await ExchangeResolver.load_exchange(
+        config['exchange']['name'], config, load_markets=False, validate=False)
 
     if args['print_one_column']:
         print('\n'.join(exchange.timeframes))
@@ -111,7 +111,7 @@ def start_list_timeframes(args: Dict[str, Any]) -> None:
               f"{', '.join(exchange.timeframes)}")
 
 
-def start_list_markets(args: Dict[str, Any], pairs_only: bool = False) -> None:
+async def start_list_markets(args: Dict[str, Any], pairs_only: bool = False) -> None:
     """
     Print pairs/markets on the exchange
     :param args: Cli args from Arguments()
@@ -121,8 +121,8 @@ def start_list_markets(args: Dict[str, Any], pairs_only: bool = False) -> None:
     config = setup_utils_configuration(args, RunMode.UTIL_EXCHANGE)
 
     # Init exchange
-    exchange = ExchangeResolver.load_exchange(config['exchange']['name'], config,
-                                              load_markets=True, validate=False)
+    exchange = await ExchangeResolver.load_exchange(config['exchange']['name'], config,
+                                                    load_markets=True, validate=False)
 
     # By default only active pairs/markets are to be shown
     active_only = not args.get('list_pairs_all', False)
