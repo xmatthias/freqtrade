@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from html import escape
 from itertools import chain
 from math import isnan
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 
 import arrow
 from tabulate import tabulate
@@ -214,6 +214,22 @@ class Telegram(RPCHandler):
         # This can take up to `timeout` from the call to `start_polling`.
         self._updater.stop()
 
+    def _run_async(self, coro: Coroutine):
+        """
+        Async helper
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            if loop:
+                # Oh oh ...
+                pass
+        except RuntimeError:
+            # TODO: asyncio: this can cause quite some delay
+            resp = asyncio.run_coroutine_threadsafe(
+                coro, self._rpc._freqtrade.loop).result()
+
+            return resp
+
     def _format_buy_msg(self, msg: Dict[str, Any]) -> str:
         if self._rpc._fiat_converter:
             msg['stake_amount_fiat'] = self._rpc._fiat_converter.convert_amount(
@@ -389,9 +405,7 @@ class Telegram(RPCHandler):
             if context.args and len(context.args) > 0:
                 trade_ids = [int(i) for i in context.args if i.isnumeric()]
 
-            results = asyncio.new_event_loop().run_until_complete(
-                self._rpc._rpc_trade_status(trade_ids=trade_ids)
-            )
+            results = self._run_async(self._rpc._rpc_trade_status(trade_ids=trade_ids))
 
             messages = []
             for r in results:
@@ -444,7 +458,7 @@ class Telegram(RPCHandler):
         """
         try:
             fiat_currency = self._config.get('fiat_display_currency', '')
-            statlist, head, fiat_profit_sum = asyncio.new_event_loop().run_until_complete(
+            statlist, head, fiat_profit_sum = self._run_async(
                 self._rpc._rpc_status_table(self._config['stake_currency'], fiat_currency)
             )
 
@@ -616,10 +630,9 @@ class Telegram(RPCHandler):
         except (TypeError, ValueError, IndexError):
             pass
 
-        stats = asyncio.new_event_loop().run_until_complete(
-            self._rpc._rpc_trade_statistics(stake_cur,
-                                            fiat_disp_cur, start_date)
-        )
+        stats = self._run_async(self._rpc._rpc_trade_statistics(
+            stake_cur, fiat_disp_cur, start_date))
+
         profit_closed_coin = stats['profit_closed_coin']
         profit_closed_ratio_mean = stats['profit_closed_ratio_mean']
         profit_closed_percent = stats['profit_closed_percent']
@@ -718,9 +731,9 @@ class Telegram(RPCHandler):
     def _balance(self, update: Update, context: CallbackContext) -> None:
         """ Handler for /balance """
         try:
-            result = asyncio.new_event_loop().run_until_complete(
-                self._rpc._rpc_balance(self._config['stake_currency'],
-                                       self._config.get('fiat_display_currency', '')))
+            result = self._run_async(self._rpc._rpc_balance(
+                self._config['stake_currency'],
+                self._config.get('fiat_display_currency', '')))
 
             balance_dust_level = self._config['telegram'].get('balance_dust_level', 0.0)
             if not balance_dust_level:
@@ -842,7 +855,7 @@ class Telegram(RPCHandler):
             self._send_msg("You must specify a trade-id or 'all'.")
             return
         try:
-            msg = asyncio.new_event_loop().run_until_complete(self._rpc._rpc_forcesell(trade_id))
+            msg = self._run_async(self._rpc._rpc_forcesell(trade_id))
             self._send_msg('Forcesell Result: `{result}`'.format(**msg))
 
         except RPCException as e:
@@ -850,7 +863,7 @@ class Telegram(RPCHandler):
 
     def _forcebuy_action(self, pair, price=None):
         try:
-            asyncio.new_event_loop().run_until_complete(self._rpc._rpc_forcebuy(pair, price))
+            self._run_async(self._rpc._rpc_forcebuy(pair, price))
         except RPCException as e:
             self._send_msg(str(e))
 
@@ -935,7 +948,7 @@ class Telegram(RPCHandler):
             if not context.args or len(context.args) == 0:
                 raise RPCException("Trade-id not set.")
             trade_id = int(context.args[0])
-            msg = asyncio.new_event_loop().run_until_complete(self._rpc._rpc_delete(trade_id))
+            msg = self._run_async(self._rpc._rpc_delete(trade_id))
             self._send_msg((
                 '`{result_msg}`\n'
                 'Please make sure to take care of this asset on the exchange manually.'
