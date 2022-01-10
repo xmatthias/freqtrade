@@ -639,7 +639,7 @@ def test_get_ui_download_url_direct(mocker):
 
 async def test_download_data_keyboardInterrupt(mocker, caplog, markets):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
-                           get_mock_coro(side_effect=KeyboardInterrupt))
+                           MagicMock(side_effect=KeyboardInterrupt()))
     patch_exchange(mocker)
     mocker.patch(
         'freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets)
@@ -799,7 +799,7 @@ async def test_download_data_all_pairs(mocker, markets):
 
 async def test_download_data_trades(mocker, caplog):
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_trades_data',
-                           MagicMock(return_value=[]))
+                           get_mock_coro(return_value=[]))
     convert_mock = mocker.patch('freqtrade.commands.data_commands.convert_trades_to_ohlcv',
                                 MagicMock(return_value=[]))
     patch_exchange(mocker)

@@ -77,15 +77,17 @@ def get_args(args):
 def get_mock_coro(return_value=None, side_effect=None):
     async def mock_coro(*args, **kwargs):
         if side_effect:
-            effect = side_effect.pop(0)
+            if isinstance(side_effect, list):
+                effect = side_effect.pop(0)
+            else:
+                effect = side_effect
             if isinstance(effect, Exception):
                 raise effect
+            if callable(effect):
+                return effect(*args, **kwargs)
             return effect
         else:
             return return_value
-
-    if side_effect and not isinstance(side_effect, list):
-        side_effect = [side_effect]
 
     return Mock(wraps=mock_coro)
 

@@ -85,11 +85,11 @@ async def test_telegram__init__(default_conf, mocker) -> None:
     assert telegram._config == default_conf
 
 
-def test_telegram_init(default_conf, mocker, caplog) -> None:
+async def test_telegram_init(default_conf, mocker, caplog) -> None:
     start_polling = MagicMock()
     mocker.patch('freqtrade.rpc.telegram.Updater', MagicMock(return_value=start_polling))
 
-    get_telegram_testobject(mocker, default_conf, mock=False)
+    await get_telegram_testobject(mocker, default_conf, mock=False)
     assert start_polling.call_count == 0
 
     # number of handles registered
@@ -119,11 +119,12 @@ async def test_cleanup(default_conf, mocker, ) -> None:
     assert telegram._updater.stop.call_count == 1
 
 
-def test_authorized_only(default_conf, mocker, caplog, update) -> None:
+async def test_authorized_only(default_conf, mocker, caplog, update) -> None:
     patch_exchange(mocker)
     caplog.set_level(logging.DEBUG)
     default_conf['telegram']['enabled'] = False
     bot = FreqtradeBot(default_conf)
+    await bot.init_bot()
     rpc = RPC(bot)
     dummy = DummyCls(rpc, default_conf)
 
@@ -135,7 +136,7 @@ def test_authorized_only(default_conf, mocker, caplog, update) -> None:
     assert not log_has('Exception occurred within Telegram module', caplog)
 
 
-def test_authorized_only_unauthorized(default_conf, mocker, caplog) -> None:
+async def test_authorized_only_unauthorized(default_conf, mocker, caplog) -> None:
     patch_exchange(mocker)
     caplog.set_level(logging.DEBUG)
     chat = Chat(0xdeadbeef, 0)
@@ -144,6 +145,7 @@ def test_authorized_only_unauthorized(default_conf, mocker, caplog) -> None:
 
     default_conf['telegram']['enabled'] = False
     bot = FreqtradeBot(default_conf)
+    await bot.init_bot()
     rpc = RPC(bot)
     dummy = DummyCls(rpc, default_conf)
 
@@ -155,12 +157,13 @@ def test_authorized_only_unauthorized(default_conf, mocker, caplog) -> None:
     assert not log_has('Exception occurred within Telegram module', caplog)
 
 
-def test_authorized_only_exception(default_conf, mocker, caplog, update) -> None:
+async def test_authorized_only_exception(default_conf, mocker, caplog, update) -> None:
     patch_exchange(mocker)
 
     default_conf['telegram']['enabled'] = False
 
     bot = FreqtradeBot(default_conf)
+    await bot.init_bot()
     rpc = RPC(bot)
     dummy = DummyCls(rpc, default_conf)
     patch_get_signal(bot)
