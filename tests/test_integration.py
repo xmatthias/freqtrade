@@ -210,10 +210,11 @@ async def test_forcebuy_last_unlimited(default_conf, ticker, fee, mocker, balanc
     assert 'LTC' not in bals2
 
 
-def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
+@pytest.mark.asyncio
+async def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     default_conf_usdt['position_adjustment_enable'] = True
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf_usdt)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_usdt,
@@ -223,7 +224,7 @@ def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     )
 
     patch_get_signal(freqtrade)
-    freqtrade.enter_positions()
+    await freqtrade.enter_positions()
 
     assert len(Trade.get_trades().all()) == 1
     trade = Trade.get_trades().first()
@@ -231,18 +232,18 @@ def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     assert trade.stake_amount == 60
     assert trade.open_rate == 2.0
     # No adjustment
-    freqtrade.process()
+    await freqtrade.process()
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 1
     assert trade.stake_amount == 60
 
     # Reduce bid amount
-    ticker_usdt_modif = ticker_usdt.return_value
+    ticker_usdt_modif = (await ticker_usdt())
     ticker_usdt_modif['bid'] = ticker_usdt_modif['bid'] * 0.995
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', return_value=ticker_usdt_modif)
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(ticker_usdt_modif))
 
     # additional buy order
-    freqtrade.process()
+    await freqtrade.process()
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 2
     assert trade.stake_amount == 120
@@ -252,7 +253,7 @@ def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     assert trade.open_rate > 2.0 * 0.995
 
     # No action - profit raised above 1% (the bar set in the strategy).
-    freqtrade.process()
+    await freqtrade.process()
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 2
     assert trade.stake_amount == 120
@@ -265,7 +266,7 @@ def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
 
     # Sell
     patch_get_signal(freqtrade, value=(False, True, None, None))
-    freqtrade.process()
+    await freqtrade.process()
     trade = Trade.get_trades().first()
     assert trade.is_open is False
     assert trade.orders[0].amount == 30

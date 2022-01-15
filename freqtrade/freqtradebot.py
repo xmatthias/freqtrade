@@ -192,7 +192,7 @@ class FreqtradeBot(LoggingMixin):
         # Check if we need to adjust our current positions before attempting to buy new trades.
         if self.strategy.position_adjustment_enable:
             with self._exit_lock:
-                self.process_open_trade_positions()
+                await self.process_open_trade_positions()
 
         # Then looking for buy opportunities
         if self.get_free_open_trades():
@@ -465,7 +465,7 @@ class FreqtradeBot(LoggingMixin):
 #
 # BUY / increase positions / DCA logic and methods
 #
-    def process_open_trade_positions(self):
+    async def process_open_trade_positions(self):
         """
         Tries to execute additional buy or sell orders for open trades (positions)
         """
@@ -474,7 +474,7 @@ class FreqtradeBot(LoggingMixin):
             # If there is any open orders, wait for them to finish.
             if trade.open_order_id is None:
                 try:
-                    self.check_and_call_adjust_trade_position(trade)
+                    await self.check_and_call_adjust_trade_position(trade)
                 except DependencyException as exception:
                     logger.warning('Unable to adjust position of trade for %s: %s',
                                    trade.pair, exception)
@@ -502,7 +502,7 @@ class FreqtradeBot(LoggingMixin):
 
         if stake_amount is not None and stake_amount > 0.0:
             # We should increase our position
-            self.execute_entry(trade.pair, stake_amount, trade=trade)
+            await self.execute_entry(trade.pair, stake_amount, trade=trade)
 
         if stake_amount is not None and stake_amount < 0.0:
             # We should decrease our position
@@ -1428,7 +1428,7 @@ class FreqtradeBot(LoggingMixin):
             if order.get('side', None) == 'buy':
                 trade = await self.cancel_stoploss_on_exchange(trade)
             # Updating wallets when order is closed
-            self.wallets.update()
+            await self.wallets.update()
 
         if not trade.is_open:
             if send_msg and not stoploss_order and not trade.open_order_id:

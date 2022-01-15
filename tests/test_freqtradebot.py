@@ -4398,7 +4398,7 @@ def test_get_valid_price(mocker, default_conf_usdt) -> None:
     assert valid_price_at_min_alwd < proposed_price
 
 
-def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
+async def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     patch_wallet(mocker, free=10000)
@@ -4409,19 +4409,21 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         "dry_run_wallet": 1000.0,
     })
     freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
     freqtrade.strategy.confirm_trade_entry = MagicMock(return_value=True)
     bid = 11
     stake_amount = 10
-    buy_rate_mock = MagicMock(return_value=bid)
+    buy_rate_mock = get_mock_coro(return_value=bid)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         get_rate=buy_rate_mock,
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 10,
             'ask': 12,
             'last': 11
         }),
         get_min_pair_stake_amount=MagicMock(return_value=1),
+        get_balances=get_mock_coro([]),
         get_fee=fee,
     )
     pair = 'ETH/USDT'
@@ -4444,10 +4446,10 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         'order_id': '650'
     }
     mocker.patch('freqtrade.exchange.Exchange.create_order',
-                 MagicMock(return_value=closed_successful_buy_order))
+                 get_mock_coro(return_value=closed_successful_buy_order))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order',
-                 MagicMock(return_value=closed_successful_buy_order))
-    assert freqtrade.execute_entry(pair, stake_amount)
+                 get_mock_coro(return_value=closed_successful_buy_order))
+    assert await freqtrade.execute_entry(pair, stake_amount)
     # Should create an closed trade with an no open order id
     # Order is filled and trade is open
     orders = Order.query.all()
@@ -4461,7 +4463,7 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
     assert trade.stake_amount == 110
 
     # Assume it does nothing since order is closed and trade is open
-    freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_closed_trades_without_assigned_fees()
 
     trade = Trade.query.first()
     assert trade
@@ -4471,7 +4473,7 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
     assert trade.stake_amount == 110
     assert not trade.fee_updated('buy')
 
-    freqtrade.check_handle_timedout()
+    await freqtrade.check_handle_timedout()
 
     trade = Trade.query.first()
     assert trade
@@ -4496,10 +4498,10 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         'order_id': '651'
     }
     mocker.patch('freqtrade.exchange.Exchange.create_order',
-                 MagicMock(return_value=open_dca_order_1))
+                 get_mock_coro(return_value=open_dca_order_1))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order',
-                 MagicMock(return_value=open_dca_order_1))
-    assert freqtrade.execute_entry(pair, stake_amount, trade=trade)
+                 get_mock_coro(return_value=open_dca_order_1))
+    assert await freqtrade.execute_entry(pair, stake_amount, trade=trade)
 
     orders = Order.query.all()
     assert orders
@@ -4528,11 +4530,11 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         return None
 
     # Assume it does nothing since order is still open
-    fetch_order_mm = MagicMock(side_effect=make_sure_its_651)
+    fetch_order_mm = get_mock_coro(side_effect=make_sure_its_651)
     mocker.patch('freqtrade.exchange.Exchange.create_order', fetch_order_mm)
     mocker.patch('freqtrade.exchange.Exchange.fetch_order', fetch_order_mm)
     mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order', fetch_order_mm)
-    freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_closed_trades_without_assigned_fees()
 
     orders = Order.query.all()
     assert orders
@@ -4571,12 +4573,12 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
     }
 
     mocker.patch('freqtrade.exchange.Exchange.create_order',
-                 MagicMock(return_value=closed_dca_order_1))
+                 get_mock_coro(return_value=closed_dca_order_1))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order',
-                 MagicMock(return_value=closed_dca_order_1))
+                 get_mock_coro(return_value=closed_dca_order_1))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order',
-                 MagicMock(return_value=closed_dca_order_1))
-    freqtrade.check_handle_timedout()
+                 get_mock_coro(return_value=closed_dca_order_1))
+    await freqtrade.check_handle_timedout()
 
     # Assert trade is as expected (averaged dca)
     trade = Trade.query.first()
@@ -4615,12 +4617,12 @@ def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         'order_id': '652'
     }
     mocker.patch('freqtrade.exchange.Exchange.create_order',
-                 MagicMock(return_value=closed_dca_order_2))
+                 get_mock_coro(return_value=closed_dca_order_2))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order',
-                 MagicMock(return_value=closed_dca_order_2))
+                 get_mock_coro(return_value=closed_dca_order_2))
     mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order',
-                 MagicMock(return_value=closed_dca_order_2))
-    assert freqtrade.execute_entry(pair, stake_amount, trade=trade)
+                 get_mock_coro(return_value=closed_dca_order_2))
+    assert await freqtrade.execute_entry(pair, stake_amount, trade=trade)
 
     # Assert trade is as expected (averaged dca)
     trade = Trade.query.first()
