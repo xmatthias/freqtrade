@@ -832,7 +832,7 @@ class Exchange:
             rate = self.price_to_precision(pair, rate)
 
         if self._config['dry_run']:
-            dry_order = self.create_dry_run_order(
+            dry_order = await self.create_dry_run_order(
                 pair, ordertype, "sell", amount, stop_price_norm, stop_loss=True)
             return dry_order
 
