@@ -5,6 +5,7 @@ import logging
 import time
 from unittest.mock import MagicMock, PropertyMock
 
+import pandas as pd
 import pytest
 import time_machine
 
@@ -15,7 +16,7 @@ from freqtrade.persistence import Trade
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
 from freqtrade.plugins.pairlistmanager import PairListManager
 from freqtrade.resolvers import PairListResolver
-from tests.conftest import (create_mock_trades, get_mock_coro, get_patched_exchange,
+from tests.conftest import (create_mock_trades_usdt, get_mock_coro, get_patched_exchange,
                             get_patched_freqtradebot, log_has, log_has_re, num_log_has)
 
 
@@ -493,7 +494,7 @@ async def test_VolumePairList_whitelist_gen(mocker, whitelist_conf, shitcoinmark
     ohlcv_data = {
         ('ETH/BTC', '1d'): ohlcv_history,
         ('TKN/BTC', '1d'): ohlcv_history,
-        ('LTC/BTC', '1d'): ohlcv_history.append(ohlcv_history),
+        ('LTC/BTC', '1d'): pd.concat([ohlcv_history, ohlcv_history]),
         ('XRP/BTC', '1d'): ohlcv_history,
         ('HOT/BTC', '1d'): ohlcv_history_high_vola,
     }
@@ -716,29 +717,60 @@ async def test_ShuffleFilter_init(mocker, whitelist_conf, caplog) -> None:
 
 
 @pytest.mark.usefixtures("init_persistence")
-async def test_PerformanceFilter_lookback(mocker, whitelist_conf, fee, caplog) -> None:
-    whitelist_conf['exchange']['pair_whitelist'].append('XRP/BTC')
-    whitelist_conf['pairlists'] = [
+async def test_PerformanceFilter_lookback(mocker, default_conf_usdt, fee, caplog) -> None:
+    default_conf_usdt['exchange']['pair_whitelist'].extend(['ADA/USDT', 'XRP/USDT', 'ETC/USDT'])
+    default_conf_usdt['pairlists'] = [
         {"method": "StaticPairList"},
         {"method": "PerformanceFilter", "minutes": 60, "min_profit": 0.01}
     ]
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
-    exchange = await get_patched_exchange(mocker, whitelist_conf)
-    pm = PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
+    exchange = await get_patched_exchange(mocker, default_conf_usdt)
+    pm = PairListManager(exchange, default_conf_usdt, asyncio.get_event_loop())
     await pm.refresh_pairlist()
 
-    assert pm.whitelist == ['ETH/BTC', 'TKN/BTC', 'XRP/BTC']
+    assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
 
     with time_machine.travel("2021-09-01 05:00:00 +00:00") as t:
-        create_mock_trades(fee)
+        create_mock_trades_usdt(fee)
         await pm.refresh_pairlist()
-        assert pm.whitelist == ['XRP/BTC']
+        assert pm.whitelist == ['XRP/USDT']
         assert log_has_re(r'Removing pair .* since .* is below .*', caplog)
 
         # Move to "outside" of lookback window, so original sorting is restored.
         t.move_to("2021-09-01 07:00:00 +00:00")
         await pm.refresh_pairlist()
         assert pm.whitelist == ['ETH/BTC', 'TKN/BTC', 'XRP/BTC']
+        await pm.refresh_pairlist()
+        assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
+
+
+@pytest.mark.usefixtures("init_persistence")
+async def test_PerformanceFilter_keep_mid_order(mocker, default_conf_usdt, fee, caplog) -> None:
+    default_conf_usdt['exchange']['pair_whitelist'].extend(['ADA/USDT', 'ETC/USDT'])
+    default_conf_usdt['pairlists'] = [
+        {"method": "StaticPairList", "allow_inactive": True},
+        {"method": "PerformanceFilter", "minutes": 60, }
+    ]
+    mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
+    exchange = await get_patched_exchange(mocker, default_conf_usdt)
+    pm = PairListManager(exchange, default_conf_usdt, asyncio.get_event_loop())
+    await pm.refresh_pairlist()
+
+    assert pm.whitelist == ['ETH/USDT', 'LTC/USDT', 'XRP/USDT',
+                            'NEO/USDT', 'TKN/USDT', 'ADA/USDT', 'ETC/USDT']
+
+    with time_machine.travel("2021-09-01 05:00:00 +00:00") as t:
+        create_mock_trades_usdt(fee)
+        await pm.refresh_pairlist()
+        assert pm.whitelist == ['XRP/USDT', 'ETC/USDT', 'ETH/USDT',
+                                'NEO/USDT', 'TKN/USDT', 'ADA/USDT', 'LTC/USDT']
+        # assert log_has_re(r'Removing pair .* since .* is below .*', caplog)
+
+        # Move to "outside" of lookback window, so original sorting is restored.
+        t.move_to("2021-09-01 07:00:00 +00:00")
+        await pm.refresh_pairlist()
+        assert pm.whitelist == ['ETH/USDT', 'LTC/USDT', 'XRP/USDT',
+                                'NEO/USDT', 'TKN/USDT', 'ADA/USDT', 'ETC/USDT']
 
 
 async def test_gen_pair_whitelist_not_supported(mocker, default_conf, tickers) -> None:
@@ -752,6 +784,19 @@ async def test_gen_pair_whitelist_not_supported(mocker, default_conf, tickers) -
     with pytest.raises(OperationalException,
                        match=r'Exchange does not support dynamic whitelist.*'):
         await get_patched_freqtradebot(mocker, default_conf)
+
+
+def test_pair_whitelist_not_supported_Spread(mocker, default_conf, tickers) -> None:
+    default_conf['pairlists'] = [{'method': 'StaticPairList'}, {'method': 'SpreadFilter'}]
+
+    mocker.patch.multiple('freqtrade.exchange.Exchange',
+                          get_tickers=tickers,
+                          exchange_has=MagicMock(return_value=False),
+                          )
+
+    with pytest.raises(OperationalException,
+                       match=r'Exchange does not support fetchTickers, .*'):
+        get_patched_freqtradebot(mocker, default_conf)
 
 
 @pytest.mark.parametrize("pairlist", AVAILABLE_PAIRLISTS)
@@ -1170,13 +1215,13 @@ async def test_pairlistmanager_no_pairlist(mocker, whitelist_conf):
       {'pair': 'TKN/BTC', 'profit_ratio': -0.0501, 'count': 2},
       {'pair': 'ETH/BTC', 'profit_ratio': -0.0501, 'count': 100}],
      ['TKN/BTC', 'ETH/BTC', 'LTC/BTC']),
-    # Tie in performance and count, broken by alphabetical sort
+    # Tie in performance and count, broken by prior sorting sort
     ([{"method": "StaticPairList"}, {"method": "PerformanceFilter"}],
      ['ETH/BTC', 'TKN/BTC', 'LTC/BTC'],
      [{'pair': 'LTC/BTC', 'profit_ratio': -0.0501, 'count': 1},
       {'pair': 'TKN/BTC', 'profit_ratio': -0.0501, 'count': 1},
       {'pair': 'ETH/BTC', 'profit_ratio': -0.0501, 'count': 1}],
-     ['ETH/BTC', 'LTC/BTC', 'TKN/BTC']),
+     ['ETH/BTC', 'TKN/BTC', 'LTC/BTC']),
 ])
 async def test_performance_filter(
         mocker, whitelist_conf, pairlists, pair_allowlist, overall_performance,

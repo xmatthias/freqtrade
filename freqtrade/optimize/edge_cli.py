@@ -37,7 +37,7 @@ class EdgeCli:
         self.exchange = asyncio.get_event_loop().run_until_complete(
             ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config))
         self.strategy = StrategyResolver.load_strategy(self.config)
-        self.strategy.dp = DataProvider(config, None, asyncio.get_event_loop())
+        self.strategy.dp = DataProvider(config, self.exchange, asyncio.get_event_loop())
 
         validate_config_consistency(self.config)
 

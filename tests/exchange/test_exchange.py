@@ -175,7 +175,7 @@ async def test_exchange_resolver(default_conf, mocker, caplog):
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
     mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
 
-    exchange = await ExchangeResolver.load_exchange('huobi', default_conf)
+    exchange = await ExchangeResolver.load_exchange('zaif', default_conf)
     assert isinstance(exchange, Exchange)
     assert log_has_re(r"No .* specific subclass found. Using the generic class instead.", caplog)
     caplog.clear()
@@ -1114,7 +1114,7 @@ async def test_create_order(default_conf, mocker, side, ordertype, rate, marketp
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
     order = await exchange.create_order(
-        pair='ETH/BTC', ordertype=ordertype, side=side, amount=1, rate=200)
+        pair='ETH/BTC', ordertype=ordertype, side=side, amount=1, rate=rate)
 
     assert 'id' in order
     assert 'info' in order
@@ -1761,6 +1761,13 @@ async def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
         ('IOTA/ETH', '5m'), ('XRP/ETH', '5m'), ('XRP/ETH', '1d')], cache=False)
     assert len(res) == 3
     assert exchange._api_async.fetch_ohlcv.call_count == 3
+    exchange._api_async.fetch_ohlcv.reset_mock()
+    caplog.clear()
+    # Call with invalid timeframe
+    res = exchange.refresh_latest_ohlcv([('IOTA/ETH', '3m')], cache=False)
+    assert not res
+    assert len(res) == 0
+    assert log_has_re(r'Cannot download \(IOTA\/ETH, 3m\).*', caplog)
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)

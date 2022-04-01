@@ -22,7 +22,7 @@ from freqtrade.configuration.load_config import load_config_file, load_file, log
 from freqtrade.constants import DEFAULT_DB_DRYRUN_URL, DEFAULT_DB_PROD_URL, ENV_VAR_PREFIX
 from freqtrade.enums import RunMode
 from freqtrade.exceptions import OperationalException
-from freqtrade.loggers import _set_loggers, setup_logging, setup_logging_pre
+from freqtrade.loggers import FTBufferingHandler, _set_loggers, setup_logging, setup_logging_pre
 from tests.conftest import log_has, log_has_re, patched_configuration_load_config_file
 
 
@@ -443,7 +443,7 @@ def test_setup_configuration_with_arguments(mocker, default_conf, caplog) -> Non
         '--strategy', 'StrategyTestV2',
         '--datadir', '/foo/bar',
         '--userdir', "/tmp/freqtrade",
-        '--ticker-interval', '1m',
+        '--timeframe', '1m',
         '--enable-position-stacking',
         '--disable-max-market-positions',
         '--timerange', ':100',
@@ -494,7 +494,7 @@ def test_setup_configuration_with_stratlist(mocker, default_conf, caplog) -> Non
     arglist = [
         'backtesting',
         '--config', 'config.json',
-        '--ticker-interval', '1m',
+        '--timeframe', '1m',
         '--export', 'trades',
         '--strategy-list',
         'StrategyTestV2',
@@ -686,7 +686,7 @@ def test_set_loggers_syslog():
     assert len(logger.handlers) == 3
     assert [x for x in logger.handlers if type(x) == logging.handlers.SysLogHandler]
     assert [x for x in logger.handlers if type(x) == logging.StreamHandler]
-    assert [x for x in logger.handlers if type(x) == logging.handlers.BufferingHandler]
+    assert [x for x in logger.handlers if type(x) == FTBufferingHandler]
     # setting up logging again should NOT cause the loggers to be added a second time.
     setup_logging(config)
     assert len(logger.handlers) == 3
@@ -709,7 +709,7 @@ def test_set_loggers_Filehandler(tmpdir):
     assert len(logger.handlers) == 3
     assert [x for x in logger.handlers if type(x) == logging.handlers.RotatingFileHandler]
     assert [x for x in logger.handlers if type(x) == logging.StreamHandler]
-    assert [x for x in logger.handlers if type(x) == logging.handlers.BufferingHandler]
+    assert [x for x in logger.handlers if type(x) == FTBufferingHandler]
     # setting up logging again should NOT cause the loggers to be added a second time.
     setup_logging(config)
     assert len(logger.handlers) == 3
@@ -1320,22 +1320,14 @@ def test_process_removed_setting(mocker, default_conf, caplog):
 def test_process_deprecated_ticker_interval(default_conf, caplog):
     message = "DEPRECATED: Please use 'timeframe' instead of 'ticker_interval."
     config = deepcopy(default_conf)
+
     process_temporary_deprecated_settings(config)
     assert not log_has(message, caplog)
 
     del config['timeframe']
     config['ticker_interval'] = '15m'
-    process_temporary_deprecated_settings(config)
-    assert log_has(message, caplog)
-    assert config['ticker_interval'] == '15m'
-
-    config = deepcopy(default_conf)
-    # Have both timeframe and ticker interval in config
-    # Can also happen when using ticker_interval in configuration, and --timeframe as cli argument
-    config['timeframe'] = '5m'
-    config['ticker_interval'] = '4h'
     with pytest.raises(OperationalException,
-                       match=r"Both 'timeframe' and 'ticker_interval' detected."):
+                       match=r"DEPRECATED: 'ticker_interval' detected. Please use.*"):
         process_temporary_deprecated_settings(config)
 
 

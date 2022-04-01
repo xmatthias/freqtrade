@@ -11,6 +11,7 @@ from freqtrade.edge import PairInfo
 from freqtrade.enums import State
 from freqtrade.exceptions import ExchangeError, InvalidOrderException, TemporaryError
 from freqtrade.persistence import Trade
+from freqtrade.persistence.models import Order
 from freqtrade.persistence.pairlock_middleware import PairLocks
 from freqtrade.rpc import RPC, RPCException
 from freqtrade.rpc.fiat_convert import CryptoToFiatConverter
@@ -82,7 +83,7 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
         'close_rate': None,
         'current_rate': 1.099e-05,
         'amount': 91.07468123,
-        'amount_requested': 91.07468123,
+        'amount_requested': 91.07468124,
         'stake_amount': 0.001,
         'trade_duration': None,
         'trade_duration_s': None,
@@ -112,6 +113,13 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
         'stoploss_entry_dist_ratio': -0.10448878,
         'open_order': None,
         'exchange': 'binance',
+        'orders': [{
+            'amount': 91.07468123, 'average': 1.098e-05, 'safe_price': 1.098e-05,
+            'cost': 0.0009999999999054, 'filled': 91.07468123, 'ft_order_side': 'buy',
+            'order_date': ANY, 'order_timestamp': ANY, 'order_filled_date': ANY,
+            'order_filled_timestamp': ANY, 'order_type': 'limit', 'price': 1.098e-05,
+            'is_open': False, 'pair': 'ETH/BTC', 'order_id': ANY,
+            'remaining': ANY, 'status': ANY}],
     }
 
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
@@ -149,7 +157,7 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
         'close_rate': None,
         'current_rate': ANY,
         'amount': 91.07468123,
-        'amount_requested': 91.07468123,
+        'amount_requested': 91.07468124,
         'trade_duration': ANY,
         'trade_duration_s': ANY,
         'stake_amount': 0.001,
@@ -179,6 +187,13 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
         'stoploss_entry_dist_ratio': -0.10448878,
         'open_order': None,
         'exchange': 'binance',
+        'orders': [{
+            'amount': 91.07468123, 'average': 1.098e-05, 'safe_price': 1.098e-05,
+            'cost': 0.0009999999999054, 'filled': 91.07468123, 'ft_order_side': 'buy',
+            'order_date': ANY, 'order_timestamp': ANY, 'order_filled_date': ANY,
+            'order_filled_timestamp': ANY, 'order_type': 'limit', 'price': 1.098e-05,
+            'is_open': False, 'pair': 'ETH/BTC', 'order_id': ANY,
+            'remaining': ANY, 'status': ANY}],
     }
 
 
@@ -220,10 +235,20 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
         default_conf['stake_currency'], 'USD')
     assert "Since" in headers
     assert "Pair" in headers
+    assert len(result[0]) == 4
     assert 'instantly' == result[0][2]
     assert 'ETH/BTC' in result[0][1]
     assert '-0.41% (-0.06)' == result[0][3]
     assert '-0.06' == f'{fiat_profit_sum:.2f}'
+
+    rpc._config['position_adjustment_enable'] = True
+    rpc._config['max_entry_position_adjustment'] = 3
+    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+    assert "# Entries" in headers
+    assert len(result[0]) == 5
+    # 4th column should be 1/4 - as 1 order filled (a total of 4 is possible)
+    # 3 on top of the initial one.
+    assert result[0][4] == '1/4'
 
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
@@ -258,8 +283,10 @@ async def test_rpc_daily_profit(default_conf, update, ticker, fee,
     assert trade
 
     # Simulate buy & sell
-    trade.update(limit_buy_order)
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
     trade.close_date = datetime.utcnow()
     trade.is_open = False
 
@@ -397,28 +424,32 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     await freqtradebot.enter_positions()
     trade = Trade.query.first()
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'sell')
+    trade.update_trade(oobj)
 
     # Update the ticker with a market going up
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_sell_up
     )
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
     trade.close_date = datetime.utcnow()
     trade.is_open = False
 
     await freqtradebot.enter_positions()
     trade = Trade.query.first()
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
 
     # Update the ticker with a market going up
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_sell_up
     )
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
     trade.close_date = datetime.utcnow()
     trade.is_open = False
 
@@ -477,14 +508,16 @@ async def test_rpc_trade_statistics_closed(mocker, default_conf, ticker, fee,
     await freqtradebot.enter_positions()
     trade = Trade.query.first()
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
     # Update the ticker with a market going up
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_sell_up,
         get_fee=fee
     )
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
     trade.close_date = datetime.utcnow()
     trade.is_open = False
 
@@ -584,8 +617,8 @@ async def test_rpc_balance_handle(default_conf, mocker, tickers):
 
     result = await rpc._rpc_balance(default_conf['stake_currency'],
                                     default_conf['fiat_display_currency'])
-    assert prec_satoshi(result['total'], 12.309096315)
-    assert prec_satoshi(result['value'], 184636.44472997)
+    assert prec_satoshi(result['total'], 12.30909624)
+    assert prec_satoshi(result['value'], 184636.443606915)
     assert tickers.call_count == 1
     assert tickers.call_args_list[0][1]['cached'] is True
     assert 'USD' == result['symbol']
@@ -603,17 +636,16 @@ async def test_rpc_balance_handle(default_conf, mocker, tickers):
          'est_stake': 0.30794,
          'used': 4.0,
          'stake': 'BTC',
-
          },
         {'free': 5.0,
          'balance': 10.0,
          'currency': 'USDT',
-         'est_stake': 0.0011563153318162476,
+         'est_stake': 0.0011562404610161968,
          'used': 5.0,
          'stake': 'BTC',
          }
     ]
-    assert result['total'] == 12.309096315331816
+    assert result['total'] == 12.309096240461017
 
 
 async def test_rpc_start(mocker, default_conf) -> None:
@@ -741,13 +773,13 @@ async def test_rpc_forcesell(default_conf, ticker, fee, mocker) -> None:
     mocker.patch(
         'freqtrade.exchange.Exchange.fetch_order',
         get_mock_coro(side_effect=[{
-            'id': '1234',
+            'id': trade.orders[0].order_id,
             'status': 'open',
             'type': 'limit',
             'side': 'buy',
             'filled': filled_amount
         }, {
-            'id': '1234',
+            'id': trade.orders[0].order_id,
             'status': 'closed',
             'type': 'limit',
             'side': 'buy',
@@ -828,10 +860,12 @@ async def test_performance_handle(default_conf, ticker, limit_buy_order, fee,
     assert trade
 
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
 
     # Simulate fulfilled LIMIT_SELL order for trade
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
 
     trade.close_date = datetime.utcnow()
     trade.is_open = False
@@ -862,10 +896,12 @@ async def test_buy_tag_performance_handle(default_conf, ticker, limit_buy_order,
     assert trade
 
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
 
     # Simulate fulfilled LIMIT_SELL order for trade
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
 
     trade.close_date = datetime.utcnow()
     trade.is_open = False
@@ -934,10 +970,12 @@ async def test_sell_reason_performance_handle(default_conf, ticker, limit_buy_or
     assert trade
 
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
 
     # Simulate fulfilled LIMIT_SELL order for trade
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
 
     trade.close_date = datetime.utcnow()
     trade.is_open = False
@@ -1006,10 +1044,12 @@ async def test_mix_tag_performance_handle(default_conf, ticker, limit_buy_order,
     assert trade
 
     # Simulate fulfilled LIMIT_BUY order for trade
-    trade.update(limit_buy_order)
+    oobj = Order.parse_from_ccxt_object(limit_buy_order, limit_buy_order['symbol'], 'buy')
+    trade.update_trade(oobj)
 
     # Simulate fulfilled LIMIT_SELL order for trade
-    trade.update(limit_sell_order)
+    oobj = Order.parse_from_ccxt_object(limit_sell_order, limit_sell_order['symbol'], 'sell')
+    trade.update_trade(oobj)
 
     trade.close_date = datetime.utcnow()
     trade.is_open = False
@@ -1116,9 +1156,15 @@ async def test_rpcforcebuy(mocker, default_conf, ticker, fee, limit_buy_order_op
     with pytest.raises(RPCException,
                        match=r'Wrong pair selected. Only pairs with stake-currency.*'):
         await rpc._rpc_forcebuy('LTC/ETH', 0.0001)
-    pair = 'XRP/BTC'
+
+    # Test with defined stake_amount
+    pair = 'LTC/BTC'
+    trade = await rpc._rpc_forcebuy(pair, 0.0001, order_type='limit', stake_amount=0.05)
+    assert trade.stake_amount == 0.05
+    assert trade.buy_tag == 'forceentry'
 
     # Test not buying
+    pair = 'XRP/BTC'
     freqtradebot = await get_patched_freqtradebot(mocker, default_conf)
     freqtradebot.config['stake_amount'] = 0
     patch_get_signal(freqtradebot)
@@ -1275,3 +1321,13 @@ async def test_rpc_edge_enabled(mocker, edge_conf) -> None:
     assert ret[0]['Winrate'] == 0.66
     assert ret[0]['Expectancy'] == 1.71
     assert ret[0]['Stoploss'] == -0.02
+
+
+def test_rpc_health(mocker, default_conf) -> None:
+    mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
+
+    freqtradebot = get_patched_freqtradebot(mocker, default_conf)
+    rpc = RPC(freqtradebot)
+    result = rpc._health()
+    assert result['last_process'] == '1970-01-01 00:00:00+00:00'
+    assert result['last_process_ts'] == 0

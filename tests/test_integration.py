@@ -4,6 +4,7 @@ import pytest
 
 from freqtrade.enums import SellType
 from freqtrade.persistence import Trade
+from freqtrade.persistence.models import Order
 from freqtrade.rpc.rpc import RPC
 from freqtrade.strategy.interface import SellCheckTuple
 from tests.conftest import get_mock_coro, get_patched_freqtradebot, patch_get_signal
@@ -95,7 +96,11 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     trades = Trade.query.all()
     # Make sure stoploss-order is open and trade is bought (since we mock update_trade_state)
     for trade in trades:
-        trade.stoploss_order_id = 3
+        stoploss_order_closed['id'] = '3'
+        oobj = Order.parse_from_ccxt_object(stoploss_order_closed, trade.pair, 'stoploss')
+
+        trade.orders.append(oobj)
+        trade.stoploss_order_id = '3'
         trade.open_order_id = None
 
     n = await freqtrade.exit_positions(trades)
@@ -129,7 +134,8 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
                         (0.99, 198),
 ])
 @pytest.mark.asyncio
-async def test_forcebuy_last_unlimited(default_conf, ticker, fee, mocker, balance_ratio, result1) -> None:
+async def test_forcebuy_last_unlimited(
+        default_conf, ticker, fee, mocker, balance_ratio, result1) -> None:
     """
     Tests workflow unlimited stake-amount
     Buy 4 trades, forcebuy a 5th trade
@@ -246,6 +252,8 @@ async def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     await freqtrade.process()
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 2
+    for o in trade.orders:
+        assert o.status == "closed"
     assert trade.stake_amount == 120
 
     # Open-rate averaged between 2.0 and 2.0 * 0.995
@@ -261,7 +269,6 @@ async def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     assert trade.orders[1].amount == 60 / ticker_usdt_modif['bid']
 
     assert trade.amount == trade.orders[0].amount + trade.orders[1].amount
-
     assert trade.nr_of_successful_buys == 2
 
     # Sell
