@@ -1764,7 +1764,7 @@ async def test_refresh_latest_ohlcv(mocker, default_conf, caplog) -> None:
     exchange._api_async.fetch_ohlcv.reset_mock()
     caplog.clear()
     # Call with invalid timeframe
-    res = exchange.refresh_latest_ohlcv([('IOTA/ETH', '3m')], cache=False)
+    res = await exchange.refresh_latest_ohlcv([('IOTA/ETH', '3m')], cache=False)
     assert not res
     assert len(res) == 0
     assert log_has_re(r'Cannot download \(IOTA\/ETH, 3m\).*', caplog)

@@ -155,7 +155,7 @@ class Backtesting:
         self.prepare_backtest(False)
 
         self.wallets = Wallets(self.config, self.exchange, log=False)
-        asyncio.get_event_loop().run_until_complete(self.wallets.update())
+        self.wallets_update()
 
         self.progress = BTProgress()
         self.abort = False
@@ -252,6 +252,10 @@ class Backtesting:
         if self.abort:
             self.abort = False
             raise DependencyException("Stop requested")
+
+    def wallets_update(self):
+        # TODO: asyncio: improve this !!!
+        asyncio.get_event_loop().run_until_complete(self.wallets.update())
 
     def _get_ohlcv_as_lists(self, processed: Dict[str, DataFrame]) -> Dict[str, Tuple]:
         """
@@ -400,7 +404,7 @@ class Backtesting:
         if stake_amount is not None and stake_amount > 0.0:
             pos_trade = self._enter_trade(trade.pair, row, stake_amount, trade)
             if pos_trade is not None:
-                self.wallets.update()
+                self.wallets_update()
                 return pos_trade
 
         return trade
@@ -732,7 +736,7 @@ class Backtesting:
         trades: List[LocalTrade] = []
         self.prepare_backtest(enable_protections)
         # Ensure wallets are uptodate (important for --strategy-list)
-        self.wallets.update()
+        self.wallets_update()
         # Use dict of lists with data for performance
         # (looping lists is a lot faster than pandas DataFrames)
         data: Dict = self._get_ohlcv_as_lists(processed)
@@ -790,7 +794,7 @@ class Backtesting:
                         order.close_bt_order(current_time)
                         trade.open_order_id = None
                         LocalTrade.add_bt_trade(trade)
-                        self.wallets.update()
+                        self.wallets_update()
 
                     # 3. Create sell orders (if any)
                     if not trade.open_order_id:
@@ -808,7 +812,7 @@ class Backtesting:
                         open_trades[pair].remove(trade)
                         LocalTrade.close_bt_trade(trade)
                         trades.append(trade)
-                        self.wallets.update()
+                        self.wallets_update()
                         self.run_protections(enable_protections, pair, current_time)
 
                     # 5. Cancel expired buy/sell orders.
@@ -816,7 +820,7 @@ class Backtesting:
                         # Close trade due to buy timeout expiration.
                         open_trade_count -= 1
                         open_trades[pair].remove(trade)
-                        self.wallets.update()
+                        self.wallets_update()
 
             # Move time one configured time_interval ahead.
             self.progress.increment()
@@ -824,7 +828,7 @@ class Backtesting:
 
         trades += self.handle_left_open(open_trades, data=data)
         # TODO: asyncio - investigate better approach for below call
-        asyncio.get_event_loop().run_until_complete(self.wallets.update())
+        asyncio.get_event_loop().run_until_complete(self.wallets_update())
 
         results = trade_list_to_dataframe(trades)
         return {

@@ -243,7 +243,8 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     rpc._config['position_adjustment_enable'] = True
     rpc._config['max_entry_position_adjustment'] = 3
-    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
+        default_conf['stake_currency'], 'USD')
     assert "# Entries" in headers
     assert len(result[0]) == 5
     # 4th column should be 1/4 - as 1 order filled (a total of 4 is possible)
@@ -1323,10 +1324,10 @@ async def test_rpc_edge_enabled(mocker, edge_conf) -> None:
     assert ret[0]['Stoploss'] == -0.02
 
 
-def test_rpc_health(mocker, default_conf) -> None:
+async def test_rpc_health(mocker, default_conf) -> None:
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
 
-    freqtradebot = get_patched_freqtradebot(mocker, default_conf)
+    freqtradebot = await get_patched_freqtradebot(mocker, default_conf)
     rpc = RPC(freqtradebot)
     result = rpc._health()
     assert result['last_process'] == '1970-01-01 00:00:00+00:00'

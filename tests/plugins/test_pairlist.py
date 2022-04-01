@@ -739,8 +739,6 @@ async def test_PerformanceFilter_lookback(mocker, default_conf_usdt, fee, caplog
         # Move to "outside" of lookback window, so original sorting is restored.
         t.move_to("2021-09-01 07:00:00 +00:00")
         await pm.refresh_pairlist()
-        assert pm.whitelist == ['ETH/BTC', 'TKN/BTC', 'XRP/BTC']
-        await pm.refresh_pairlist()
         assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
 
 
@@ -786,7 +784,7 @@ async def test_gen_pair_whitelist_not_supported(mocker, default_conf, tickers) -
         await get_patched_freqtradebot(mocker, default_conf)
 
 
-def test_pair_whitelist_not_supported_Spread(mocker, default_conf, tickers) -> None:
+async def test_pair_whitelist_not_supported_Spread(mocker, default_conf, tickers) -> None:
     default_conf['pairlists'] = [{'method': 'StaticPairList'}, {'method': 'SpreadFilter'}]
 
     mocker.patch.multiple('freqtrade.exchange.Exchange',
@@ -796,7 +794,7 @@ def test_pair_whitelist_not_supported_Spread(mocker, default_conf, tickers) -> N
 
     with pytest.raises(OperationalException,
                        match=r'Exchange does not support fetchTickers, .*'):
-        get_patched_freqtradebot(mocker, default_conf)
+        await get_patched_freqtradebot(mocker, default_conf)
 
 
 @pytest.mark.parametrize("pairlist", AVAILABLE_PAIRLISTS)
