@@ -166,7 +166,7 @@ async def test_stoploss_adjust_binance(mocker, default_conf, sl1, sl2, sl3, side
     assert not exchange.stoploss_adjust(sl3, order, side=side)
 
 
-def test_fill_leverage_tiers_binance(default_conf, mocker):
+async def test_fill_leverage_tiers_binance(default_conf, mocker):
     api_mock = MagicMock()
     api_mock.fetch_leverage_tiers = MagicMock(return_value={
         'ADA/BUSD': [
@@ -372,7 +372,7 @@ def test_fill_leverage_tiers_binance(default_conf, mocker):
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="binance")
     exchange.fill_leverage_tiers()
 
     assert exchange._leverage_tiers == {
@@ -487,11 +487,11 @@ def test_fill_leverage_tiers_binance(default_conf, mocker):
     )
 
 
-def test_fill_leverage_tiers_binance_dryrun(default_conf, mocker, leverage_tiers):
+async def test_fill_leverage_tiers_binance_dryrun(default_conf, mocker, leverage_tiers):
     api_mock = MagicMock()
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="binance")
     exchange.fill_leverage_tiers()
 
     leverage_tiers = leverage_tiers
@@ -500,13 +500,13 @@ def test_fill_leverage_tiers_binance_dryrun(default_conf, mocker, leverage_tiers
         assert exchange._leverage_tiers[key] == value
 
 
-def test__set_leverage_binance(mocker, default_conf):
+async def test__set_leverage_binance(mocker, default_conf):
 
     api_mock = MagicMock()
     api_mock.set_leverage = MagicMock()
     type(api_mock).has = PropertyMock(return_value={'setLeverage': True})
     default_conf['dry_run'] = False
-    exchange = get_patched_exchange(mocker, default_conf, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, id="binance")
     exchange._set_leverage(3.0, trading_mode=TradingMode.MARGIN)
 
     ccxt_exceptionhandlers(
@@ -563,10 +563,10 @@ async def test__async_get_historic_ohlcv_binance(default_conf, mocker, caplog, c
     ("margin", "cross", {"options": {"defaultType": "margin"}}),
     ("futures", "isolated", {"options": {"defaultType": "future"}}),
 ])
-def test__ccxt_config(default_conf, mocker, trading_mode, margin_mode, config):
+async def test__ccxt_config(default_conf, mocker, trading_mode, margin_mode, config):
     default_conf['trading_mode'] = trading_mode
     default_conf['margin_mode'] = margin_mode
-    exchange = get_patched_exchange(mocker, default_conf, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, id="binance")
     assert exchange._ccxt_config == config
 
 
@@ -578,7 +578,7 @@ def test__ccxt_config(default_conf, mocker, trading_mode, margin_mode, config):
     ("BNB/USDT", 5000000.0, 0.15, 233035.0),
     ("BTC/USDT", 600000000, 0.5, 1.997038E8),
 ])
-def test_get_maintenance_ratio_and_amt_binance(
+async def test_get_maintenance_ratio_and_amt_binance(
     default_conf,
     mocker,
     leverage_tiers,
@@ -588,7 +588,7 @@ def test_get_maintenance_ratio_and_amt_binance(
     amt,
 ):
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
-    exchange = get_patched_exchange(mocker, default_conf, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, id="binance")
     exchange._leverage_tiers = leverage_tiers
     (result_ratio, result_amt) = exchange.get_maintenance_ratio_and_amt(pair, nominal_value)
     assert (round(result_ratio, 8), round(result_amt, 8)) == (mm_ratio, amt)

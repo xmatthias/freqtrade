@@ -47,9 +47,9 @@ class Gateio(Exchange):
                 raise OperationalException(
                     f'Exchange {self.name} does not support market orders.')
 
-    def get_trades_for_order(self, order_id: str, pair: str, since: datetime,
+    async def get_trades_for_order(self, order_id: str, pair: str, since: datetime,
                              params: Optional[Dict] = None) -> List:
-        trades = super().get_trades_for_order(order_id, pair, since, params)
+        trades = await super().get_trades_for_order(order_id, pair, since, params)
 
         if self.trading_mode == TradingMode.FUTURES:
             # Futures usually don't contain fees in the response.

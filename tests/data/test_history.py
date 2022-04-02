@@ -323,8 +323,8 @@ async def test_download_pair_history2(mocker, default_conf, testdatadir) -> None
     json_dump_mock = mocker.patch(
         'freqtrade.data.history.jsondatahandler.JsonDataHandler.ohlcv_store',
         return_value=None)
-    mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv', return_value=tick)
-    exchange = get_patched_exchange(mocker, default_conf)
+    mocker.patch('freqtrade.exchange.Exchange.get_historic_ohlcv', get_mock_coro(tick))
+    exchange = await get_patched_exchange(mocker, default_conf)
     await _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",
                                  timeframe='1m', candle_type='spot')
     await _download_pair_history(datadir=testdatadir, exchange=exchange, pair="UNITTEST/BTC",

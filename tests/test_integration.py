@@ -314,7 +314,7 @@ async def test_dca_short(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     assert pytest.approx(trade.stake_amount) == 60
 
     # Reduce bid amount
-    ticker_usdt_modif = ticker_usdt.return_value
+    ticker_usdt_modif = await ticker_usdt()
     ticker_usdt_modif['ask'] = ticker_usdt_modif['ask'] * 1.004
     mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', get_mock_coro(ticker_usdt_modif))
 

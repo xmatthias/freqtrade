@@ -1,10 +1,15 @@
 from unittest.mock import MagicMock, PropertyMock
 
+import pytest
+
 from freqtrade.enums import MarginMode, TradingMode
 from tests.conftest import get_patched_exchange
 
 
-def test_get_maintenance_ratio_and_amt_okx(
+pytestmark = pytest.mark.asyncio
+
+
+async def test_get_maintenance_ratio_and_amt_okx(
     default_conf,
     mocker,
 ):
@@ -142,7 +147,7 @@ def test_get_maintenance_ratio_and_amt_okx(
             ]
         })
     )
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="okx")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="okx")
     assert exchange.get_maintenance_ratio_and_amt('ETH/USDT:USDT', 2000) == (0.01, None)
     assert exchange.get_maintenance_ratio_and_amt('ETH/USDT:USDT', 2001) == (0.015, None)
     assert exchange.get_maintenance_ratio_and_amt('ETH/USDT:USDT', 4001) == (0.02, None)
@@ -152,14 +157,14 @@ def test_get_maintenance_ratio_and_amt_okx(
     assert exchange.get_maintenance_ratio_and_amt('ADA/USDT:USDT', 2000) == (0.03, None)
 
 
-def test_get_max_pair_stake_amount_okx(default_conf, mocker, leverage_tiers):
+async def test_get_max_pair_stake_amount_okx(default_conf, mocker, leverage_tiers):
 
-    exchange = get_patched_exchange(mocker, default_conf, id="okx")
+    exchange = await get_patched_exchange(mocker, default_conf, id="okx")
     assert exchange.get_max_pair_stake_amount('BNB/BUSD', 1.0) == float('inf')
 
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
-    exchange = get_patched_exchange(mocker, default_conf, id="okx")
+    exchange = await get_patched_exchange(mocker, default_conf, id="okx")
     exchange._leverage_tiers = leverage_tiers
 
     assert exchange.get_max_pair_stake_amount('BNB/BUSD', 1.0) == 30000000
@@ -170,7 +175,7 @@ def test_get_max_pair_stake_amount_okx(default_conf, mocker, leverage_tiers):
     assert exchange.get_max_pair_stake_amount('TTT/USDT', 1.0) == float('inf')  # Not in tiers
 
 
-def test_load_leverage_tiers_okx(default_conf, mocker, markets):
+async def test_load_leverage_tiers_okx(default_conf, mocker, markets):
     api_mock = MagicMock()
     type(api_mock).has = PropertyMock(return_value={
         'fetchLeverageTiers': False,
@@ -305,7 +310,7 @@ def test_load_leverage_tiers_okx(default_conf, mocker, markets):
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
     default_conf['stake_currency'] = 'USDT'
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="okx")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="okx")
     exchange.trading_mode = TradingMode.FUTURES
     exchange.margin_mode = MarginMode.ISOLATED
     exchange.markets = markets
