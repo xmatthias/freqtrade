@@ -1042,7 +1042,7 @@ async def test_execute_entry_min_leverage(
         get_rate=get_mock_coro(return_value=0.11),
         # Minimum stake-amount is ~5$
         get_maintenance_ratio_and_amt=MagicMock(return_value=(0.0, 0.0)),
-        _fetch_and_calculate_funding_fees=MagicMock(return_value=0),
+        _fetch_and_calculate_funding_fees=get_mock_coro(return_value=0),
         get_fee=fee,
         get_max_leverage=MagicMock(return_value=5.0),
     )
@@ -5105,8 +5105,8 @@ async def test_update_funding_fees(
     open_order = limit_order_open[enter_side(is_short)]
     open_exit_order = limit_order_open[exit_side(is_short)]
     bid = 0.11
-    enter_rate_mock = MagicMock(return_value=bid)
-    enter_mm = MagicMock(return_value=open_order)
+    enter_rate_mock = get_mock_coro(return_value=bid)
+    enter_mm = get_mock_coro(return_value=open_order)
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     default_conf['trading_mode'] = 'futures'

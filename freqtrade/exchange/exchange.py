@@ -1687,10 +1687,9 @@ class Exchange:
         :param candle_type: '', mark, index, premiumIndex, or funding_rate
         :return: List with candle (OHLCV) data
         """
-        pair, _, _, data = self.loop.run_until_complete(
-            await self._async_get_historic_ohlcv(pair=pair, timeframe=timeframe,
-                                                 since_ms=since_ms, is_new_pair=is_new_pair,
-                                                 candle_type=candle_type))
+        pair, _, _, data = await self._async_get_historic_ohlcv(
+            pair=pair, timeframe=timeframe, since_ms=since_ms, is_new_pair=is_new_pair,
+            candle_type=candle_type)
         logger.info(f"Downloaded data for {pair} with length {len(data)}.")
         return data
 
@@ -2345,7 +2344,7 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    def _fetch_and_calculate_funding_fees(
+    async def _fetch_and_calculate_funding_fees(
         self,
         pair: str,
         amount: float,
@@ -2379,7 +2378,7 @@ class Exchange:
             pair, timeframe, CandleType.from_string(self._ft_has["mark_ohlcv_price"]))
 
         funding_comb: PairWithTimeframe = (pair, timeframe_ff, CandleType.FUNDING_RATE)
-        candle_histories = self.refresh_latest_ohlcv(
+        candle_histories = await self.refresh_latest_ohlcv(
             [mark_comb, funding_comb],
             since_ms=open_timestamp,
             cache=False,
@@ -2436,7 +2435,7 @@ class Exchange:
         # Negate fees for longs as funding_fees expects it this way based on live endpoints.
         return fees if is_short else -fees
 
-    def get_funding_fees(
+    async def get_funding_fees(
             self, pair: str, amount: float, is_short: bool, open_date: datetime) -> float:
         """
         Fetch funding fees, either from the exchange (live) or calculates them
@@ -2448,7 +2447,7 @@ class Exchange:
         """
         if self.trading_mode == TradingMode.FUTURES:
             if self._config['dry_run']:
-                funding_fees = self._fetch_and_calculate_funding_fees(
+                funding_fees = await self._fetch_and_calculate_funding_fees(
                     pair, amount, is_short, open_date)
             else:
                 funding_fees = self._get_funding_fees_from_exchange(pair, open_date)

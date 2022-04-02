@@ -607,7 +607,7 @@ async def test__load_markets(default_conf, mocker, caplog):
     ex = Exchange(default_conf)
     await ex.init_exchange()
 
-    assert log_has('Unable to initialize markets.', caplog)
+    assert log_has_re(r'Unable to initialize markets.*', caplog)
 
     expected_return = {'ETH/BTC': 'available'}
     api_mock = MagicMock()
@@ -967,8 +967,8 @@ async def test_validate_pricing(default_conf, mocker):
         'fetchTicker': True,
     }
     type(api_mock).has = PropertyMock(return_value=has)
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch('freqtrade.exchange.Exchange._load_markets', MagicMock(return_value={}))
+    mocker.patch('freqtrade.exchange.Exchange._init_ccxt', get_mock_coro(return_value=api_mock))
+    mocker.patch('freqtrade.exchange.Exchange.load_markets', get_mock_coro(return_value={}))
     mocker.patch('freqtrade.exchange.exchange.Exchange.validate_trading_mode_and_margin_mode')
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
@@ -1088,7 +1088,7 @@ async def test_validate_required_startup_candles(default_conf, mocker, caplog):
     # Ensure the same also happens on init
     default_conf['startup_candle_count'] = 6000
     with pytest.raises(OperationalException, match=r'This strategy requires 6000.*'):
-        Exchange(default_conf)
+        ex = Exchange(default_conf)
         await ex.init_exchange()
 
 
@@ -3669,7 +3669,7 @@ def test_calculate_backoff(retrycount, max_retries, expected):
 
 
 @pytest.mark.parametrize("exchange_name", ['binance', 'ftx'])
-def test__get_funding_fees_from_exchange(default_conf, mocker, exchange_name):
+async def test__get_funding_fees_from_exchange(default_conf, mocker, exchange_name):
     api_mock = MagicMock()
     api_mock.fetch_funding_history = MagicMock(return_value=[
         {
@@ -3708,7 +3708,7 @@ def test__get_funding_fees_from_exchange(default_conf, mocker, exchange_name):
     type(api_mock).has = PropertyMock(return_value={'fetchFundingHistory': True})
 
     # mocker.patch('freqtrade.exchange.Exchange.get_funding_fees', lambda pair, since: y)
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     date_time = datetime.strptime("2021-09-01T00:00:01.000Z", '%Y-%m-%dT%H:%M:%S.%fZ')
     unix_time = int(date_time.timestamp())
     expected_fees = -0.001  # 0.14542341 + -0.14642341
@@ -3742,7 +3742,7 @@ def test__get_funding_fees_from_exchange(default_conf, mocker, exchange_name):
     (20.0, 5.0, 4.0),
     (100.0, 100.0, 1.0)
 ])
-def test_get_stake_amount_considering_leverage(
+async def test_get_stake_amount_considering_leverage(
     exchange,
     stake_amount,
     leverage,
@@ -3750,7 +3750,7 @@ def test_get_stake_amount_considering_leverage(
     mocker,
     default_conf
 ):
-    exchange = get_patched_exchange(mocker, default_conf, id=exchange)
+    exchange = await get_patched_exchange(mocker, default_conf, id=exchange)
     assert exchange._get_stake_amount_considering_leverage(
         stake_amount, leverage) == min_stake_with_lev
 
@@ -3847,7 +3847,7 @@ def test_set_margin_mode(mocker, default_conf, margin_mode):
     # ("gateio", TradingMode.MARGIN, MarginMode.CROSS, False),
     # ("gateio", TradingMode.FUTURES, MarginMode.CROSS, False),
 ])
-def test_validate_trading_mode_and_margin_mode(
+async def test_validate_trading_mode_and_margin_mode(
     default_conf,
     mocker,
     exchange_name,
@@ -3855,7 +3855,7 @@ def test_validate_trading_mode_and_margin_mode(
     margin_mode,
     exception_thrown
 ):
-    exchange = get_patched_exchange(
+    exchange = await get_patched_exchange(
         mocker, default_conf, id=exchange_name, mock_supported_modes=False)
     if (exception_thrown):
         with pytest.raises(OperationalException):
@@ -3879,7 +3879,7 @@ def test_validate_trading_mode_and_margin_mode(
     ("kucoin", "futures", {"options": {"defaultType": "swap"}}),
     ("okx", "futures", {"options": {"defaultType": "swap"}}),
 ])
-def test__ccxt_config(
+async def test__ccxt_config(
     default_conf,
     mocker,
     exchange_name,
@@ -3888,7 +3888,7 @@ def test__ccxt_config(
 ):
     default_conf['trading_mode'] = trading_mode
     default_conf['margin_mode'] = 'isolated'
-    exchange = get_patched_exchange(mocker, default_conf, id=exchange_name)
+    exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
     assert exchange._ccxt_config == ccxt_config
 
 
@@ -3969,7 +3969,7 @@ async def test_calculate_funding_fees(
         ) == kraken_fee
 
 
-def test_get_or_calculate_liquidation_price(mocker, default_conf):
+async def test_get_or_calculate_liquidation_price(mocker, default_conf):
 
     api_mock = MagicMock()
     positions = [
@@ -4007,7 +4007,7 @@ def test_get_or_calculate_liquidation_price(mocker, default_conf):
     default_conf['margin_mode'] = 'isolated'
     default_conf['liquidation_buffer'] = 0.0
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock)
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock)
     liq_price = exchange.get_or_calculate_liquidation_price(
         pair='NEAR/USDT:USDT',
         open_rate=18.884,
@@ -4018,7 +4018,7 @@ def test_get_or_calculate_liquidation_price(mocker, default_conf):
     assert liq_price == 17.47
 
     default_conf['liquidation_buffer'] = 0.05
-    exchange = get_patched_exchange(mocker, default_conf, api_mock)
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock)
     liq_price = exchange.get_or_calculate_liquidation_price(
         pair='NEAR/USDT:USDT',
         open_rate=18.884,
@@ -4137,11 +4137,11 @@ async def test__fetch_and_calculate_funding_fees(
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange)
     mocker.patch('freqtrade.exchange.Exchange.timeframes', PropertyMock(
         return_value=['1h', '4h', '8h']))
-    funding_fees = exchange._fetch_and_calculate_funding_fees(
+    funding_fees = await exchange._fetch_and_calculate_funding_fees(
         pair='ADA/USDT', amount=amount, is_short=True, open_date=d1, close_date=d2)
     assert pytest.approx(funding_fees) == expected_fees
     # Fees for Longs are inverted
-    funding_fees = exchange._fetch_and_calculate_funding_fees(
+    funding_fees = await exchange._fetch_and_calculate_funding_fees(
         pair='ADA/USDT', amount=amount, is_short=False, open_date=d1, close_date=d2)
     assert pytest.approx(funding_fees) == -expected_fees
 
@@ -4170,9 +4170,9 @@ async def test__fetch_and_calculate_funding_fees_datetime_called(
     d1 = datetime.strptime("2021-09-01 00:00:00 +0000", '%Y-%m-%d %H:%M:%S %z')
 
     time_machine.move_to("2021-09-01 08:00:00 +00:00")
-    funding_fees = exchange._fetch_and_calculate_funding_fees('ADA/USDT', 30.0, True, d1)
+    funding_fees = await exchange._fetch_and_calculate_funding_fees('ADA/USDT', 30.0, True, d1)
     assert funding_fees == expected_fees
-    funding_fees = exchange._fetch_and_calculate_funding_fees('ADA/USDT', 30.0, False, d1)
+    funding_fees = await exchange._fetch_and_calculate_funding_fees('ADA/USDT', 30.0, False, d1)
     assert funding_fees == 0 - expected_fees
 
 

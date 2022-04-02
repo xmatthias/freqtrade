@@ -117,17 +117,20 @@ class FreqtradeBot(LoggingMixin):
 
         if self.trading_mode == TradingMode.FUTURES:
 
-            def update():
-                self.update_funding_fees()
-                # TODO: asyncio - mmmmmmmh
-                self.wallets.update()
+            async def update():
+                await self.update_funding_fees()
+                await self.wallets.update()
+
+            def executor():
+                # TODO: asyncio - this does not actually work.
+                self.loop.call_soon_threadsafe(update)
 
             # TODO: This would be more efficient if scheduled in utc time, and performed at each
             # TODO: funding interval, specified by funding_fee_times on the exchange classes
             for time_slot in range(0, 24):
                 for minutes in [0, 15, 30, 45]:
                     t = str(time(time_slot, minutes, 2))
-                    self._schedule.every().day.at(t).do(update)
+                    self._schedule.every().day.at(t).do(executor)
         self.last_process = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     def notify_status(self, msg: str) -> None:
@@ -276,11 +279,11 @@ class FreqtradeBot(LoggingMixin):
         open_trades = len(Trade.get_open_trades())
         return max(0, self.config['max_open_trades'] - open_trades)
 
-    def update_funding_fees(self):
+    async def update_funding_fees(self):
         if self.trading_mode == TradingMode.FUTURES:
             trades = Trade.get_open_trades()
             for trade in trades:
-                funding_fees = self.exchange.get_funding_fees(
+                funding_fees = await self.exchange.get_funding_fees(
                     pair=trade.pair,
                     amount=trade.amount,
                     is_short=trade.is_short,
@@ -688,7 +691,7 @@ class FreqtradeBot(LoggingMixin):
         # Fee is applied twice because we make a LIMIT_BUY and LIMIT_SELL
         fee = self.exchange.get_fee(symbol=pair, taker_or_maker='maker')
         open_date = datetime.now(timezone.utc)
-        funding_fees = self.exchange.get_funding_fees(
+        funding_fees = await self.exchange.get_funding_fees(
             pair=pair, amount=amount, is_short=is_short, open_date=open_date)
         # This is a new trade
         if trade is None:
@@ -1378,7 +1381,7 @@ class FreqtradeBot(LoggingMixin):
         :param exit_check: CheckTuple with signal and reason
         :return: True if it succeeds (supported) False (not supported)
         """
-        trade.funding_fees = self.exchange.get_funding_fees(
+        trade.funding_fees = await self.exchange.get_funding_fees(
             pair=trade.pair,
             amount=trade.amount,
             is_short=trade.is_short,
