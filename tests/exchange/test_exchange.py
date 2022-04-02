@@ -1623,21 +1623,21 @@ async def test_get_balances_prod(default_conf, mocker, exchange_name):
 async def test_fetch_positions(default_conf, mocker, exchange_name):
     mocker.patch('freqtrade.exchange.Exchange.validate_trading_mode_and_margin_mode')
     api_mock = MagicMock()
-    api_mock.fetch_positions = MagicMock(return_value=[
+    api_mock.fetch_positions = get_mock_coro(return_value=[
         {'symbol': 'ETH/USDT:USDT', 'leverage': 5},
         {'symbol': 'XRP/USDT:USDT', 'leverage': 5},
     ])
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.fetch_positions() == []
+    assert await exchange.fetch_positions() == []
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = 'futures'
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    res = exchange.fetch_positions()
+    res = await exchange.fetch_positions()
     assert len(res) == 2
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "fetch_positions", "fetch_positions")
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "fetch_positions", "fetch_positions")
 
 
 async def test_fetch_trading_fees(default_conf, mocker):

@@ -1270,12 +1270,12 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier
-    def fetch_positions(self) -> List[Dict]:
+    @retrier_async
+    async def fetch_positions(self) -> List[Dict]:
         if self._config['dry_run'] or self.trading_mode != TradingMode.FUTURES:
             return []
         try:
-            positions: List[Dict] = self._api.fetch_positions()
+            positions: List[Dict] = await self._api_async.fetch_positions()
             self._log_exchange_response('fetch_positions', positions)
             return positions
         except ccxt.DDoSProtection as e:
