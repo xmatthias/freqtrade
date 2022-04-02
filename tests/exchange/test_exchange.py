@@ -1676,7 +1676,7 @@ async def test_fetch_trading_fees(default_conf, mocker):
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
-    api_mock.fetch_trading_fees = MagicMock(return_value=tick)
+    api_mock.fetch_trading_fees = get_mock_coro(return_value=tick)
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
@@ -1686,14 +1686,14 @@ async def test_fetch_trading_fees(default_conf, mocker):
 
     api_mock.fetch_trading_fees.reset_mock()
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "fetch_trading_fees", "fetch_trading_fees")
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "fetch_trading_fees", "fetch_trading_fees")
 
     api_mock.fetch_trading_fees = MagicMock(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    exchange.fetch_trading_fees()
+    await exchange.fetch_trading_fees()
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
-    assert exchange.fetch_trading_fees() == {}
+    assert await exchange.fetch_trading_fees() == {}
 
 
 async def test_fetch_bids_asks(default_conf, mocker):

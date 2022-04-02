@@ -448,7 +448,7 @@ class Exchange:
 
             self._last_markets_refresh = arrow.utcnow().int_timestamp
             if self._ft_has['needs_trading_fees']:
-                self._trading_fees = self.fetch_trading_fees()
+                self._trading_fees = await self.fetch_trading_fees()
 
         except (asyncio.TimeoutError, ccxt.BaseError) as e:
             logger.exception('Unable to initialize markets. Reason: %s', e)
@@ -1286,8 +1286,8 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier
-    def fetch_trading_fees(self) -> Dict[str, Any]:
+    @retrier_async
+    async def fetch_trading_fees(self) -> Dict[str, Any]:
         """
         Fetch user account trading fees
         Can be cached, should not update often.
@@ -1296,7 +1296,7 @@ class Exchange:
                 or not self.exchange_has('fetchTradingFees')):
             return {}
         try:
-            trading_fees: Dict[str, Any] = self._api.fetch_trading_fees()
+            trading_fees: Dict[str, Any] = await self._api_async.fetch_trading_fees()
             self._log_exchange_response('fetch_trading_fees', trading_fees)
             return trading_fees
         except ccxt.DDoSProtection as e:
