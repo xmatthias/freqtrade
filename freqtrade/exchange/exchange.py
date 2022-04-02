@@ -1307,8 +1307,8 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier
-    def fetch_bids_asks(self, symbols: List[str] = None, cached: bool = False) -> Dict:
+    @retrier_async
+    async def fetch_bids_asks(self, symbols: List[str] = None, cached: bool = False) -> Dict:
         """
         :param cached: Allow cached result
         :return: fetch_tickers result
@@ -1320,7 +1320,7 @@ class Exchange:
             if tickers:
                 return tickers
         try:
-            tickers = self._api.fetch_bids_asks(symbols)
+            tickers = await self._api_async.fetch_bids_asks(symbols)
             self._fetch_tickers_cache['fetch_bids_asks'] = tickers
             return tickers
         except ccxt.NotSupported as e:

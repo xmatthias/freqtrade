@@ -57,12 +57,12 @@ class Binance(Exchange):
             (side == "buy" and stop_loss < float(order['info']['stopPrice']))
         )
 
-    def get_tickers(self, symbols: List[str] = None, cached: bool = False) -> Dict:
-        tickers = super().get_tickers(symbols=symbols, cached=cached)
+    async def get_tickers(self, symbols: List[str] = None, cached: bool = False) -> Dict:
+        tickers = await super().get_tickers(symbols=symbols, cached=cached)
         if self.trading_mode == TradingMode.FUTURES:
             # Binance's future result has no bid/ask values.
             # Therefore we must fetch that from fetch_bids_asks and combine the two results.
-            bidsasks = self.fetch_bids_asks(symbols, cached)
+            bidsasks = await self.fetch_bids_asks(symbols, cached)
             tickers = deep_merge_dicts(bidsasks, tickers, allow_null_overrides=False)
         return tickers
 

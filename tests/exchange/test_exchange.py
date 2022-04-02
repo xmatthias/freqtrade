@@ -1711,11 +1711,11 @@ async def test_fetch_bids_asks(default_conf, mocker):
     }
     }
     exchange_name = 'binance'
-    api_mock.fetch_bids_asks = MagicMock(return_value=tick)
+    api_mock.fetch_bids_asks = get_mock_coro(return_value=tick)
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     # retrieve original ticker
-    bidsasks = exchange.fetch_bids_asks()
+    bidsasks = await exchange.fetch_bids_asks()
 
     assert 'ETH/BTC' in bidsasks
     assert 'BCH/BTC' in bidsasks
@@ -1728,25 +1728,25 @@ async def test_fetch_bids_asks(default_conf, mocker):
     api_mock.fetch_bids_asks.reset_mock()
 
     # Cached ticker should not call api again
-    tickers2 = exchange.fetch_bids_asks(cached=True)
+    tickers2 = await exchange.fetch_bids_asks(cached=True)
     assert tickers2 == bidsasks
     assert api_mock.fetch_bids_asks.call_count == 0
-    tickers2 = exchange.fetch_bids_asks(cached=False)
+    tickers2 = await exchange.fetch_bids_asks(cached=False)
     assert api_mock.fetch_bids_asks.call_count == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "fetch_bids_asks", "fetch_bids_asks")
+    await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
+                               "fetch_bids_asks", "fetch_bids_asks")
 
     with pytest.raises(OperationalException):
-        api_mock.fetch_bids_asks = MagicMock(side_effect=ccxt.NotSupported("DeadBeef"))
+        api_mock.fetch_bids_asks = get_mock_coro(side_effect=ccxt.NotSupported("DeadBeef"))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        exchange.fetch_bids_asks()
+        await exchange.fetch_bids_asks()
 
-    api_mock.fetch_bids_asks = MagicMock(return_value={})
+    api_mock.fetch_bids_asks = get_mock_coro(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    exchange.fetch_bids_asks()
+    await exchange.fetch_bids_asks()
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
-    assert exchange.fetch_bids_asks() == {}
+    assert await exchange.fetch_bids_asks() == {}
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
