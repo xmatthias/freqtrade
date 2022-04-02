@@ -12,12 +12,12 @@ from tests.exchange.test_exchange import async_ccxt_exception
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.parametrize('limitratio,expected', [
-    (None, 220 * 0.99),
-    (0.99, 220 * 0.99),
-    (0.98, 220 * 0.98),
+@pytest.mark.parametrize('limitratio,expected,side', [
+    (None, 220 * 0.99, "sell"),
+    (0.99, 220 * 0.99, "sell"),
+    (0.98, 220 * 0.98, "sell"),
 ])
-async def test_stoploss_order_huobi(default_conf, mocker, limitratio, expected):
+async def test_stoploss_order_huobi(default_conf, mocker, limitratio, expected, side):
     api_mock = MagicMock()
     order_id = 'test_prod_buy_{}'.format(randint(0, 10 ** 6))
     order_type = 'stop-limit'
@@ -36,12 +36,14 @@ async def test_stoploss_order_huobi(default_conf, mocker, limitratio, expected):
 
     with pytest.raises(OperationalException):
         order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=190,
-                                        order_types={'stoploss_on_exchange_limit_ratio': 1.05})
+                                        order_types={'stoploss_on_exchange_limit_ratio': 1.05},
+                                        side=side,
+                                        leverage=1.0)
 
     api_mock.create_order.reset_mock()
     order_types = {} if limitratio is None else {'stoploss_on_exchange_limit_ratio': limitratio}
     order = await exchange.stoploss(
-        pair='ETH/BTC', amount=1, stop_price=220, order_types=order_types)
+        pair='ETH/BTC', amount=1, stop_price=220, order_types=order_types, side=side, leverage=1.0)
 
     assert 'id' in order
     assert 'info' in order
@@ -60,17 +62,20 @@ async def test_stoploss_order_huobi(default_conf, mocker, limitratio, expected):
     with pytest.raises(DependencyException):
         api_mock.create_order = get_mock_coro(side_effect=ccxt.InsufficientFunds("0 balance"))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
-        await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
+        await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220,
+                                order_types={},  side=side, leverage=1.0)
 
     with pytest.raises(InvalidOrderException):
         api_mock.create_order = get_mock_coro(
             side_effect=ccxt.InvalidOrder("binance Order would trigger immediately."))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
-        await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
+        await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220,
+                                order_types={},  side=side, leverage=1.0)
 
     await async_ccxt_exception(mocker, default_conf, api_mock, "huobi",
                                "stoploss", "create_order", retries=1,
-                               pair='ETH/BTC', amount=1, stop_price=220, order_types={})
+                               pair='ETH/BTC', amount=1, stop_price=220, order_types={},
+                               side=side, leverage=1.0)
 
 
 async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
@@ -84,11 +89,13 @@ async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
 
     with pytest.raises(OperationalException):
         order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=190,
-                                        order_types={'stoploss_on_exchange_limit_ratio': 1.05})
+                                        order_types={'stoploss_on_exchange_limit_ratio': 1.05},
+                                        side='sell', leverage=1.0)
 
     api_mock.create_order.reset_mock()
 
-    order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220, order_types={})
+    order = await exchange.stoploss(pair='ETH/BTC', amount=1, stop_price=220,
+                                    order_types={},  side='sell', leverage=1.0)
 
     assert 'id' in order
     assert 'info' in order
@@ -106,8 +113,8 @@ async def test_stoploss_adjust_huobi(mocker, default_conf):
         'price': 1500,
         'stopPrice': '1500',
     }
-    assert exchange.stoploss_adjust(1501, order)
-    assert not exchange.stoploss_adjust(1499, order)
+    assert exchange.stoploss_adjust(1501, order, 'sell')
+    assert not exchange.stoploss_adjust(1499, order, 'sell')
     # Test with invalid order case
     order['type'] = 'stop_loss'
-    assert not exchange.stoploss_adjust(1501, order)
+    assert not exchange.stoploss_adjust(1501, order, 'sell')

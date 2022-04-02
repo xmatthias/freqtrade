@@ -2,11 +2,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from freqtrade.enums import SellType
+from freqtrade.enums import ExitCheckTuple, ExitType
 from freqtrade.persistence import Trade
 from freqtrade.persistence.models import Order
 from freqtrade.rpc.rpc import RPC
-from freqtrade.strategy.interface import SellCheckTuple
 from tests.conftest import get_mock_coro, get_patched_freqtradebot, patch_get_signal
 
 
@@ -54,8 +53,8 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
         side_effect=[stoploss_order_closed, stoploss_order_open, stoploss_order_open])
     # Sell 3rd trade (not called for the first trade)
     should_sell_mock = MagicMock(side_effect=[
-        SellCheckTuple(sell_type=SellType.NONE),
-        SellCheckTuple(sell_type=SellType.SELL_SIGNAL)]
+        ExitCheckTuple(exit_type=ExitType.NONE),
+        ExitCheckTuple(exit_type=ExitType.SELL_SIGNAL)]
     )
     cancel_order_mock = get_mock_coro()
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss)
@@ -74,14 +73,14 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
         create_stoploss_order=get_mock_coro(return_value=True),
         _notify_exit=get_mock_coro(),
     )
-    mocker.patch("freqtrade.strategy.interface.IStrategy.should_sell", should_sell_mock)
+    mocker.patch("freqtrade.strategy.interface.IStrategy.should_exit", should_sell_mock)
     wallets_mock = mocker.patch("freqtrade.wallets.Wallets.update", get_mock_coro())
     mocker.patch("freqtrade.wallets.Wallets.get_free", MagicMock(return_value=1000))
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True
     # Switch ordertype to market to close trade immediately
-    freqtrade.strategy.order_types['sell'] = 'market'
+    freqtrade.strategy.order_types['exit'] = 'market'
     freqtrade.strategy.confirm_trade_entry = MagicMock(return_value=True)
     freqtrade.strategy.confirm_trade_exit = MagicMock(return_value=True)
     patch_get_signal(freqtrade)
@@ -117,7 +116,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     assert wallets_mock.call_count == 4
 
     trade = [t for t in trades if t.id == 1][0]
-    assert trade.sell_reason == SellType.STOPLOSS_ON_EXCHANGE.value
+    assert trade.sell_reason == ExitType.STOPLOSS_ON_EXCHANGE.value
     assert not trade.is_open
 
     trade = [t for t in trades if t.id == 2][0]
@@ -125,7 +124,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     assert trade.is_open
 
     trade = [t for t in trades if t.id == 3][0]
-    assert trade.sell_reason == SellType.SELL_SIGNAL.value
+    assert trade.sell_reason == ExitType.SELL_SIGNAL.value
     assert not trade.is_open
 
 
@@ -164,19 +163,19 @@ async def test_forcebuy_last_unlimited(
         _notify_exit=get_mock_coro(),
     )
     should_sell_mock = MagicMock(side_effect=[
-        SellCheckTuple(sell_type=SellType.NONE),
-        SellCheckTuple(sell_type=SellType.SELL_SIGNAL),
-        SellCheckTuple(sell_type=SellType.NONE),
-        SellCheckTuple(sell_type=SellType.NONE),
-        SellCheckTuple(sell_type=SellType.NONE)]
+        ExitCheckTuple(exit_type=ExitType.NONE),
+        ExitCheckTuple(exit_type=ExitType.SELL_SIGNAL),
+        ExitCheckTuple(exit_type=ExitType.NONE),
+        ExitCheckTuple(exit_type=ExitType.NONE),
+        ExitCheckTuple(exit_type=ExitType.NONE)]
     )
-    mocker.patch("freqtrade.strategy.interface.IStrategy.should_sell", should_sell_mock)
+    mocker.patch("freqtrade.strategy.interface.IStrategy.should_exit", should_sell_mock)
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     rpc = RPC(freqtrade)
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True
     # Switch ordertype to market to close trade immediately
-    freqtrade.strategy.order_types['sell'] = 'market'
+    freqtrade.strategy.order_types['exit'] = 'market'
     patch_get_signal(freqtrade)
 
     # Create 4 trades
@@ -187,7 +186,7 @@ async def test_forcebuy_last_unlimited(
     assert len(trades) == 4
     assert await freqtrade.wallets.get_trade_stake_amount('XRP/BTC') == result1
 
-    await rpc._rpc_forcebuy('TKN/BTC', None)
+    await rpc._rpc_force_entry('TKN/BTC', None)
 
     trades = Trade.query.all()
     assert len(trades) == 5
@@ -235,13 +234,13 @@ async def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     assert len(Trade.get_trades().all()) == 1
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 1
-    assert trade.stake_amount == 60
+    assert pytest.approx(trade.stake_amount) == 60
     assert trade.open_rate == 2.0
     # No adjustment
     await freqtrade.process()
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 1
-    assert trade.stake_amount == 60
+    assert pytest.approx(trade.stake_amount) == 60
 
     # Reduce bid amount
     ticker_usdt_modif = (await ticker_usdt())
@@ -270,9 +269,10 @@ async def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
 
     assert trade.amount == trade.orders[0].amount + trade.orders[1].amount
     assert trade.nr_of_successful_buys == 2
+    assert trade.nr_of_successful_entries == 2
 
     # Sell
-    patch_get_signal(freqtrade, value=(False, True, None, None))
+    patch_get_signal(freqtrade, enter_long=False, exit_long=True)
     await freqtrade.process()
     trade = Trade.get_trades().first()
     assert trade.is_open is False
@@ -284,3 +284,74 @@ async def test_dca_buying(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
     assert trade.orders[2].amount == trade.amount
 
     assert trade.nr_of_successful_buys == 2
+    assert trade.nr_of_successful_entries == 2
+
+
+def test_dca_short(default_conf_usdt, ticker_usdt, fee, mocker) -> None:
+    default_conf_usdt['position_adjustment_enable'] = True
+
+    freqtrade = get_patched_freqtradebot(mocker, default_conf_usdt)
+    mocker.patch.multiple(
+        'freqtrade.exchange.Exchange',
+        fetch_ticker=ticker_usdt,
+        get_fee=fee,
+        amount_to_precision=lambda s, x, y: y,
+        price_to_precision=lambda s, x, y: y,
+    )
+
+    patch_get_signal(freqtrade, enter_long=False, enter_short=True)
+    freqtrade.enter_positions()
+
+    assert len(Trade.get_trades().all()) == 1
+    trade = Trade.get_trades().first()
+    assert len(trade.orders) == 1
+    assert pytest.approx(trade.stake_amount) == 60
+    assert trade.open_rate == 2.02
+    # No adjustment
+    freqtrade.process()
+    trade = Trade.get_trades().first()
+    assert len(trade.orders) == 1
+    assert pytest.approx(trade.stake_amount) == 60
+
+    # Reduce bid amount
+    ticker_usdt_modif = ticker_usdt.return_value
+    ticker_usdt_modif['ask'] = ticker_usdt_modif['ask'] * 1.004
+    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', return_value=ticker_usdt_modif)
+
+    # additional buy order
+    freqtrade.process()
+    trade = Trade.get_trades().first()
+    assert len(trade.orders) == 2
+    for o in trade.orders:
+        assert o.status == "closed"
+    assert pytest.approx(trade.stake_amount) == 120
+
+    # Open-rate averaged between 2.0 and 2.0 * 1.015
+    assert trade.open_rate >= 2.02
+    assert trade.open_rate < 2.02 * 1.015
+
+    # No action - profit raised above 1% (the bar set in the strategy).
+    freqtrade.process()
+    trade = Trade.get_trades().first()
+    assert len(trade.orders) == 2
+    assert pytest.approx(trade.stake_amount) == 120
+    # assert trade.orders[0].amount == 30
+    assert trade.orders[1].amount == 60 / ticker_usdt_modif['ask']
+
+    assert trade.amount == trade.orders[0].amount + trade.orders[1].amount
+    assert trade.nr_of_successful_entries == 2
+
+    # Buy
+    patch_get_signal(freqtrade, enter_long=False, exit_short=True)
+    freqtrade.process()
+    trade = Trade.get_trades().first()
+    assert trade.is_open is False
+    # assert trade.orders[0].amount == 30
+    assert trade.orders[0].side == 'sell'
+    assert trade.orders[1].amount == 60 / ticker_usdt_modif['ask']
+    # Sold everything
+    assert trade.orders[-1].side == 'buy'
+    assert trade.orders[2].amount == trade.amount
+
+    assert trade.nr_of_successful_entries == 2
+    assert trade.nr_of_successful_exits == 1
