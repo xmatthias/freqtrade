@@ -577,8 +577,8 @@ async def test_process_trade_creation(default_conf_usdt, ticker_usdt, limit_orde
     assert trade.is_open
     assert trade.open_date is not None
     assert trade.exchange == 'binance'
-    assert trade.open_rate == ticker_usdt.return_value[ticker_side]
-    assert isclose(trade.amount, 60 / ticker_usdt.return_value[ticker_side])
+    assert trade.open_rate == (await ticker_usdt())[ticker_side]
+    assert isclose(trade.amount, 60 / (await ticker_usdt())[ticker_side])
 
     assert log_has(
         f'{"Short" if is_short else "Long"} signal found: about create a new trade for ETH/USDT '
@@ -984,7 +984,7 @@ async def test_execute_entry(mocker, default_conf_usdt, fee, limit_order,
     )
     freqtrade.exchange.get_max_pair_stake_amount = MagicMock(return_value=500)
 
-    assert freqtrade.execute_entry(pair, 2000, is_short=is_short)
+    assert await freqtrade.execute_entry(pair, 2000, is_short=is_short)
     trade = Trade.query.all()[9]
     trade.is_short = is_short
     assert pytest.approx(trade.stake_amount) == 500
@@ -1050,7 +1050,7 @@ async def test_execute_entry_min_leverage(
     pair = 'SOL/BUSD:BUSD'
     freqtrade.strategy.leverage = MagicMock(return_value=5.0)
 
-    assert freqtrade.execute_entry(pair, stake_amount, is_short=is_short)
+    assert await freqtrade.execute_entry(pair, stake_amount, is_short=is_short)
     trade = Trade.query.first()
     assert trade.leverage == 5.0
     # assert trade.stake_amount == 2
@@ -1907,7 +1907,7 @@ async def test_exit_positions(mocker, default_conf_usdt, limit_order, is_short, 
     trade.open_order_id = '123'
     trade.open_fee = 0.001
     trades = [trade]
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 0
     # Test amount not modified by fee-logic
     assert not log_has(
@@ -1916,7 +1916,7 @@ async def test_exit_positions(mocker, default_conf_usdt, limit_order, is_short, 
 
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.get_real_amount', return_value=90.81)
     # test amount modified by fee-logic
-    n = freqtrade.exit_positions(trades)
+    n = await freqtrade.exit_positions(trades)
     assert n == 0
 
 
@@ -2054,7 +2054,7 @@ async def test_update_trade_state_withorderdict(
     # await freqtrade.update_trade_state(trade, order_id, limit_buy_order_usdt)
     # assert trade.amount != amount
     log_text = r'Applying fee on amount for .*'
-    freqtrade.update_trade_state(trade, order_id, order)
+    await freqtrade.update_trade_state(trade, order_id, order)
     assert trade.amount != amount
     if has_rounding_fee:
         assert pytest.approx(trade.amount) == 29.992
@@ -3130,10 +3130,11 @@ async def test_execute_trade_exit_up(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_usdt_sell_down if is_short else ticker_usdt_sell_up
     )
+    price = (await ticker_usdt_sell_down())['ask'] if is_short else (await ticker_usdt_sell_up())['bid']
     # Prevented sell ...
     await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=(ticker_usdt_sell_down()['ask'] if is_short else ticker_usdt_sell_up()['bid']),
+        limit=price,
         exit_check=ExitCheckTuple(exit_type=ExitType.ROI)
     )
     assert rpc_mock.call_count == 0
@@ -3145,7 +3146,7 @@ async def test_execute_trade_exit_up(
     freqtrade.strategy.confirm_trade_exit = MagicMock(return_value=True)
     await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=(ticker_usdt_sell_down()['ask'] if is_short else ticker_usdt_sell_up()['bid']),
+        limit=price,
         exit_check=ExitCheckTuple(exit_type=ExitType.ROI)
     )
     assert freqtrade.strategy.confirm_trade_exit.call_count == 1
@@ -3207,7 +3208,7 @@ async def test_execute_trade_exit_down(default_conf_usdt, ticker_usdt, fee, tick
         fetch_ticker=ticker_usdt_sell_up if is_short else ticker_usdt_sell_down
     )
     await freqtrade.execute_trade_exit(
-        trade=trade, limit=(ticker_usdt_sell_up if is_short else ticker_usdt_sell_down)()['bid'],
+        trade=trade, limit=(await (ticker_usdt_sell_up if is_short else ticker_usdt_sell_down)())['bid'],
         exit_check=ExitCheckTuple(exit_type=ExitType.STOP_LOSS))
 
     assert rpc_mock.call_count == 2
@@ -3283,7 +3284,7 @@ async def test_execute_trade_exit_custom_exit_price(
     freqtrade.strategy.custom_exit_price = lambda **kwargs: 2.25
     await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=ticker_usdt_sell_up()['ask' if is_short else 'bid'],
+        limit=(await ticker_usdt_sell_up())['ask' if is_short else 'bid'],
         exit_check=ExitCheckTuple(exit_type=ExitType.SELL_SIGNAL)
     )
 
@@ -3354,8 +3355,9 @@ async def test_execute_trade_exit_down_stoploss_on_exchange_dry_run(
     # Setting trade stoploss to 0.01
 
     trade.stop_loss = 2.0 * 1.01 if is_short else 2.0 * 0.99
+    limit = (await(ticker_usdt_sell_up if is_short else ticker_usdt_sell_down)())['bid']
     await freqtrade.execute_trade_exit(
-        trade=trade, limit=(ticker_usdt_sell_up if is_short else ticker_usdt_sell_down())['bid'],
+        trade=trade, limit=limit,
         exit_check=ExitCheckTuple(exit_type=ExitType.STOP_LOSS))
 
     assert rpc_mock.call_count == 2
@@ -3471,7 +3473,7 @@ async def test_execute_trade_exit_with_stoploss_on_exchange(
 
     await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=ticker_usdt_sell_up()['ask' if is_short else 'bid'],
+        limit=(await ticker_usdt_sell_up())['ask' if is_short else 'bid'],
         exit_check=ExitCheckTuple(exit_type=ExitType.STOP_LOSS)
     )
 
@@ -3588,7 +3590,7 @@ async def test_execute_trade_exit_market_order(
         long: (65.835/60.15) - 1 = 0.0945137157107232
         short: 1 - (68.48762376237624/59.85) = -0.1443211990371971
     """
-    open_rate = ticker_usdt.return_value['ask' if is_short else 'bid']
+    open_rate = (await ticker_usdt())['ask' if is_short else 'bid']
     rpc_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -3618,7 +3620,7 @@ async def test_execute_trade_exit_market_order(
 
     await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=ticker_usdt_sell_up()['ask' if is_short else 'bid'],
+        limit=(await ticker_usdt_sell_up())['ask' if is_short else 'bid'],
         exit_check=ExitCheckTuple(exit_type=ExitType.ROI)
     )
 
@@ -3657,7 +3659,7 @@ async def test_execute_trade_exit_market_order(
 @pytest.mark.parametrize("is_short", [False, True])
 async def test_execute_trade_exit_insufficient_funds_error(
         default_conf_usdt, ticker_usdt, fee, is_short, ticker_usdt_sell_up, mocker) -> None:
-    freqtrade = get_patched_freqtradebot(mocker, default_conf_usdt)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     mock_insuf = mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_insufficient_funds')
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -3686,7 +3688,7 @@ async def test_execute_trade_exit_insufficient_funds_error(
     sell_reason = ExitCheckTuple(exit_type=ExitType.ROI)
     assert not await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=ticker_usdt_sell_up()['ask' if is_short else 'bid'],
+        limit=(await ticker_usdt_sell_up())['ask' if is_short else 'bid'],
         exit_check=sell_reason
     )
     assert mock_insuf.call_count == 1
@@ -3859,10 +3861,10 @@ async def test_locked_pairs(default_conf_usdt, ticker_usdt, fee,
 
     await freqtrade.execute_trade_exit(
         trade=trade,
-        limit=ticker_usdt_sell_down()['ask' if is_short else 'bid'],
+        limit=(await ticker_usdt_sell_down())['ask' if is_short else 'bid'],
         exit_check=ExitCheckTuple(exit_type=ExitType.STOP_LOSS)
     )
-    trade.close(ticker_usdt_sell_down()['bid'])
+    trade.close((await ticker_usdt_sell_down())['bid'])
     assert freqtrade.strategy.is_pair_locked(trade.pair)
 
     # reinit - should buy other pair.
@@ -4535,7 +4537,7 @@ async def test_order_book_depth_of_market(
             limit_order_open[enter_side(is_short)], 'ADA/USDT', enter_side(is_short))
         trade.update_trade(oobj)
 
-        assert trade.open_rate == ticker_usdt.return_value[ticker_side]
+        assert trade.open_rate == (await ticker_usdt())[ticker_side]
         assert whitelist == default_conf_usdt['exchange']['pair_whitelist']
 
 
@@ -4644,7 +4646,7 @@ async def test_order_book_exit_pricing(
     else:
         patch_get_signal(freqtrade, enter_long=False, exit_long=True)
     assert await freqtrade.handle_trade(trade) is True
-    assert trade.close_rate_requested == order_book_l2.return_value['asks'][0][0]
+    assert trade.close_rate_requested == (await order_book_l2())['asks'][0][0]
 
     mocker.patch('freqtrade.exchange.Exchange.fetch_l2_order_book',
                  get_mock_coro(return_value={'bids': [[]], 'asks': [[]]}))
@@ -5203,7 +5205,7 @@ async def test_update_funding_fees(
             await freqtrade.execute_trade_exit(
                 trade=trade,
                 # The values of the next 2 params are irrelevant for this test
-                limit=ticker_usdt_sell_up()['bid'],
+                limit=(await ticker_usdt_sell_up())['bid'],
                 exit_check=ExitCheckTuple(exit_type=ExitType.ROI)
             )
             assert trade.funding_fees == pytest.approx(sum(

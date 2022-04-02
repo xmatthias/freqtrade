@@ -241,7 +241,7 @@ async def test_get_starting_balance(mocker, default_conf, available_capital, clo
     assert freqtrade.wallets.get_starting_balance() == expected
 
 
-def test_sync_wallet_futures_live(mocker, default_conf):
+async def test_sync_wallet_futures_live(mocker, default_conf):
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
@@ -326,7 +326,7 @@ def test_sync_wallet_futures_live(mocker, default_conf):
         fetch_positions=MagicMock(return_value=mock_result)
     )
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 
     assert len(freqtrade.wallets._wallets) == 1
     assert len(freqtrade.wallets._positions) == 2
@@ -337,22 +337,22 @@ def test_sync_wallet_futures_live(mocker, default_conf):
 
     # Remove ETH/USDT:USDT position
     del mock_result[0]
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     assert len(freqtrade.wallets._positions) == 1
     assert 'ETH/USDT:USDT' not in freqtrade.wallets._positions
 
 
-def test_sync_wallet_futures_dry(mocker, default_conf, fee):
+async def test_sync_wallet_futures_dry(mocker, default_conf, fee):
     default_conf['dry_run'] = True
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     assert len(freqtrade.wallets._wallets) == 1
     assert len(freqtrade.wallets._positions) == 0
 
     create_mock_trades(fee, is_short=None)
 
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
 
     assert len(freqtrade.wallets._wallets) == 1
     assert len(freqtrade.wallets._positions) == 4

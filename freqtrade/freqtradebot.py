@@ -119,6 +119,7 @@ class FreqtradeBot(LoggingMixin):
 
             def update():
                 self.update_funding_fees()
+                # TODO: asyncio - mmmmmmmh
                 self.wallets.update()
 
             # TODO: This would be more efficient if scheduled in utc time, and performed at each
@@ -474,7 +475,7 @@ class FreqtradeBot(LoggingMixin):
             bid_check_dom = self.config.get('entry_pricing', {}).get('check_depth_of_market', {})
             if ((bid_check_dom.get('enabled', False)) and
                     (bid_check_dom.get('bids_to_ask_delta', 0) > 0)):
-                if self._check_depth_of_market(pair, bid_check_dom, side=signal):
+                if await self._check_depth_of_market(pair, bid_check_dom, side=signal):
                     return await self.execute_entry(
                         pair,
                         stake_amount,
