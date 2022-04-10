@@ -184,8 +184,8 @@ class Binance(Exchange):
             raise OperationalException(
                 "Freqtrade only supports isolated futures for leverage trading")
 
-    @retrier
-    def load_leverage_tiers(self) -> Dict[str, List[Dict]]:
+    @retrier_async
+    async def load_leverage_tiers(self) -> Dict[str, List[Dict]]:
         if self.trading_mode == TradingMode.FUTURES:
             if self._config['dry_run']:
                 leverage_tiers_path = (
@@ -195,7 +195,7 @@ class Binance(Exchange):
                     return json.load(json_file)
             else:
                 try:
-                    return self._api.fetch_leverage_tiers()
+                    return await self._api_async.fetch_leverage_tiers()
                 except ccxt.DDoSProtection as e:
                     raise DDosProtection(e) from e
                 except (ccxt.NetworkError, ccxt.ExchangeError) as e:

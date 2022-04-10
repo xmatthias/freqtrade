@@ -196,7 +196,7 @@ class Exchange:
             self.validate_pricing(self._config['entry_pricing'])
 
         if self.trading_mode != TradingMode.SPOT:
-            self.fill_leverage_tiers()
+            await self.fill_leverage_tiers()
 
     def __del__(self):
         """
@@ -463,7 +463,7 @@ class Exchange:
         logger.debug("Performing scheduled market reload..")
         await self.load_markets(reload=True)
         self._last_markets_refresh = arrow.utcnow().int_timestamp
-        self.fill_leverage_tiers()
+        await self.fill_leverage_tiers()
 
     def validate_stakecurrency(self, stake_currency: str) -> None:
         """
@@ -2099,10 +2099,10 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier
-    def get_leverage_tiers(self) -> Dict[str, List[Dict]]:
+    @retrier_async
+    async def get_leverage_tiers(self) -> Dict[str, List[Dict]]:
         try:
-            return self._api.fetch_leverage_tiers()
+            return await self._api_async.fetch_leverage_tiers()
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
@@ -2112,10 +2112,10 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    @retrier
-    def get_market_leverage_tiers(self, symbol) -> List[Dict]:
+    @retrier_async
+    async def get_market_leverage_tiers(self, symbol) -> List[Dict]:
         try:
-            return self._api.fetch_market_leverage_tiers(symbol)
+            return await self._api_async.fetch_market_leverage_tiers(symbol)
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
@@ -2126,11 +2126,11 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    def load_leverage_tiers(self) -> Dict[str, List[Dict]]:
+    async def load_leverage_tiers(self) -> Dict[str, List[Dict]]:
         if self.trading_mode == TradingMode.FUTURES:
             if self.exchange_has('fetchLeverageTiers'):
                 # Fetch all leverage tiers at once
-                return self.get_leverage_tiers()
+                return await self.get_leverage_tiers()
             elif self.exchange_has('fetchMarketLeverageTiers'):
                 # Must fetch the leverage tiers for each market separately
                 # * This is slow(~45s) on Okx, makes ~90 api calls to load all linear swap markets
@@ -2150,7 +2150,7 @@ class Exchange:
                     "This will take about a minute.")
 
                 for symbol in sorted(symbols):
-                    tiers[symbol] = self.get_market_leverage_tiers(symbol)
+                    tiers[symbol] = await self.get_market_leverage_tiers(symbol)
 
                 logger.info(f"Done initializing {len(symbols)} markets.")
 
@@ -2160,12 +2160,12 @@ class Exchange:
         else:
             return {}
 
-    def fill_leverage_tiers(self) -> None:
+    async def fill_leverage_tiers(self) -> None:
         """
         Assigns property _leverage_tiers to a dictionary of information about the leverage
         allowed on each pair
         """
-        leverage_tiers = self.load_leverage_tiers()
+        leverage_tiers = await self.load_leverage_tiers()
         for pair, tiers in leverage_tiers.items():
             pair_tiers = []
             for tier in tiers:

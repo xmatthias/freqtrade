@@ -4593,12 +4593,11 @@ async def test_get_max_pair_stake_amount(
 @pytest.mark.parametrize('exchange_name', EXCHANGES)
 async def test_load_leverage_tiers(mocker, default_conf, leverage_tiers, exchange_name):
     api_mock = MagicMock()
-    api_mock.fetch_leverage_tiers = MagicMock()
     type(api_mock).has = PropertyMock(return_value={'fetchLeverageTiers': True})
     default_conf['dry_run'] = False
     mocker.patch('freqtrade.exchange.exchange.Exchange.validate_trading_mode_and_margin_mode')
 
-    api_mock.fetch_leverage_tiers = MagicMock(return_value={
+    api_mock.fetch_leverage_tiers = get_mock_coro(return_value={
         'ADA/USDT:USDT': [
             {
                 'tier': 1,
@@ -4625,7 +4624,7 @@ async def test_load_leverage_tiers(mocker, default_conf, leverage_tiers, exchang
 
     # SPOT
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.load_leverage_tiers() == {}
+    assert await exchange.load_leverage_tiers() == {}
 
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
@@ -4634,12 +4633,12 @@ async def test_load_leverage_tiers(mocker, default_conf, leverage_tiers, exchang
         # FUTURES has.fetchLeverageTiers == False
         type(api_mock).has = PropertyMock(return_value={'fetchLeverageTiers': False})
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-        assert exchange.load_leverage_tiers() == {}
+        assert await exchange.load_leverage_tiers() == {}
 
     # FUTURES regular
     type(api_mock).has = PropertyMock(return_value={'fetchLeverageTiers': True})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    assert exchange.load_leverage_tiers() == {
+    assert await exchange.load_leverage_tiers() == {
         'ADA/USDT:USDT': [
             {
                 'tier': 1,
@@ -4664,7 +4663,7 @@ async def test_load_leverage_tiers(mocker, default_conf, leverage_tiers, exchang
         ]
     }
 
-    ccxt_exceptionhandlers(
+    await async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,
@@ -4812,6 +4811,7 @@ async def test_get_max_leverage_futures(default_conf, mocker, leverage_tiers):
 async def test__get_params(mocker, default_conf, exchange_name):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
+    mocker.patch('freqtrade.exchange.Exchange.get_leverage_tiers', get_mock_coro({}))
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     exchange._params = {'test': True}
 

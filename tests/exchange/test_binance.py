@@ -8,7 +8,7 @@ import pytest
 from freqtrade.enums import MarginMode, TradingMode
 from freqtrade.exceptions import DependencyException, InvalidOrderException, OperationalException
 from tests.conftest import get_mock_coro, get_patched_exchange, log_has_re
-from tests.exchange.test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
+from tests.exchange.test_exchange import async_ccxt_exception
 
 
 pytestmark = pytest.mark.asyncio
@@ -39,6 +39,7 @@ async def test_stoploss_order_binance(default_conf, mocker, limitratio, expected
     default_conf['trading_mode'] = trademode
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
+    mocker.patch('freqtrade.exchange.Binance._set_leverage', get_mock_coro())
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
@@ -168,7 +169,7 @@ async def test_stoploss_adjust_binance(mocker, default_conf, sl1, sl2, sl3, side
 
 async def test_fill_leverage_tiers_binance(default_conf, mocker):
     api_mock = MagicMock()
-    api_mock.fetch_leverage_tiers = MagicMock(return_value={
+    api_mock.fetch_leverage_tiers = get_mock_coro(return_value={
         'ADA/BUSD': [
             {
                 "tier": 1,
@@ -373,7 +374,7 @@ async def test_fill_leverage_tiers_binance(default_conf, mocker):
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="binance")
-    exchange.fill_leverage_tiers()
+    await exchange.fill_leverage_tiers()
 
     assert exchange._leverage_tiers == {
         'ADA/BUSD': [
@@ -474,10 +475,10 @@ async def test_fill_leverage_tiers_binance(default_conf, mocker):
     }
 
     api_mock = MagicMock()
-    api_mock.load_leverage_tiers = MagicMock()
+    api_mock.load_leverage_tiers = get_mock_coro()
     type(api_mock).has = PropertyMock(return_value={'fetchLeverageTiers': True})
 
-    ccxt_exceptionhandlers(
+    await async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,
@@ -492,7 +493,7 @@ async def test_fill_leverage_tiers_binance_dryrun(default_conf, mocker, leverage
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="binance")
-    exchange.fill_leverage_tiers()
+    await exchange.fill_leverage_tiers()
 
     leverage_tiers = leverage_tiers
 
@@ -507,9 +508,9 @@ async def test__set_leverage_binance(mocker, default_conf):
     type(api_mock).has = PropertyMock(return_value={'setLeverage': True})
     default_conf['dry_run'] = False
     exchange = await get_patched_exchange(mocker, default_conf, id="binance")
-    exchange._set_leverage(3.0, trading_mode=TradingMode.MARGIN)
+    await exchange._set_leverage(3.0, trading_mode=TradingMode.MARGIN)
 
-    ccxt_exceptionhandlers(
+    await async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,

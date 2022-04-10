@@ -407,10 +407,11 @@ class TestCCXTExchange():
             assert (isinstance(contract_size, float) or isinstance(contract_size, int))
             assert contract_size >= 0.0
 
-    def test_ccxt_load_leverage_tiers(self, exchange_futures):
+    @pytest.mark.asyncio
+    async def test_ccxt_load_leverage_tiers(self, exchange_futures):
         futures, futures_name = exchange_futures
         if futures and EXCHANGES[futures_name].get('leverage_tiers_public'):
-            leverage_tiers = futures.load_leverage_tiers()
+            leverage_tiers = await futures.load_leverage_tiers()
             futures_pair = EXCHANGES[futures_name].get(
                 'futures_pair',
                 EXCHANGES[futures_name]['pair']

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 from freqtrade.enums import MarginMode, TradingMode
-from tests.conftest import get_patched_exchange
+from tests.conftest import get_mock_coro, get_patched_exchange
 
 
 pytestmark = pytest.mark.asyncio
@@ -20,7 +20,7 @@ async def test_get_maintenance_ratio_and_amt_okx(
     mocker.patch.multiple(
         'freqtrade.exchange.Okx',
         exchange_has=MagicMock(return_value=True),
-        load_leverage_tiers=MagicMock(return_value={
+        load_leverage_tiers=get_mock_coro(return_value={
             'ETH/USDT:USDT': [
                 {
                     'tier': 1,
@@ -181,7 +181,7 @@ async def test_load_leverage_tiers_okx(default_conf, mocker, markets):
         'fetchLeverageTiers': False,
         'fetchMarketLeverageTiers': True,
     })
-    api_mock.fetch_market_leverage_tiers = MagicMock(side_effect=[
+    api_mock.fetch_market_leverage_tiers = get_mock_coro(side_effect=[
         [
             {
                 'tier': 1,
