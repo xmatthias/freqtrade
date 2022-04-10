@@ -2067,8 +2067,9 @@ class Exchange:
         return await self._async_get_trade_history(pair=pair, since=since,
                                                    until=until, from_id=from_id)
 
-    @retrier
-    def _get_funding_fees_from_exchange(self, pair: str, since: Union[datetime, int]) -> float:
+    @retrier_async
+    async def _get_funding_fees_from_exchange(
+            self, pair: str, since: Union[datetime, int]) -> float:
         """
         Returns the sum of all funding fees that were exchanged for a pair within a timeframe
         Dry-run handling happens as part of _calculate_funding_fees.
@@ -2085,7 +2086,7 @@ class Exchange:
             since = int(since.timestamp()) * 1000   # * 1000 for ms
 
         try:
-            funding_history = self._api.fetch_funding_history(
+            funding_history = await self._api_async.fetch_funding_history(
                 symbol=pair,
                 since=since
             )
@@ -2451,7 +2452,7 @@ class Exchange:
                 funding_fees = await self._fetch_and_calculate_funding_fees(
                     pair, amount, is_short, open_date)
             else:
-                funding_fees = self._get_funding_fees_from_exchange(pair, open_date)
+                funding_fees = await self._get_funding_fees_from_exchange(pair, open_date)
             return funding_fees
         else:
             return 0.0
