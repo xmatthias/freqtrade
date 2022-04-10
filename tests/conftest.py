@@ -120,7 +120,6 @@ def patch_exchange(
     mocker.patch('freqtrade.exchange.Exchange.id', PropertyMock(return_value=id))
     mocker.patch('freqtrade.exchange.Exchange.name', PropertyMock(return_value=id.title()))
     mocker.patch('freqtrade.exchange.Exchange.precisionMode', PropertyMock(return_value=2))
-    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
 
     if mock_markets:
         if isinstance(mock_markets, bool):

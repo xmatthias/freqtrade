@@ -83,6 +83,7 @@ async def test_stoploss_adjust_gateio(mocker, default_conf, sl1, sl2, sl3, side)
 ])
 async def test_fetch_my_trades_gateio(mocker, default_conf, takerormaker, rate, cost):
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
     tick = {'ETH/USDT:USDT': {
         'info': {'user_id': '',
                  'taker_fee': '0.0018',

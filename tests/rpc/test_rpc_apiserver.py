@@ -2,6 +2,7 @@
 Unit test file for rpc/api_server.py
 """
 
+import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -442,7 +443,7 @@ def test_api_balance(botclient, mocker, rpc_balance, tickers):
     mocker.patch('freqtrade.exchange.Exchange.get_valid_pair_combination',
                  side_effect=lambda a, b: f"{a}/{b}")
     # TODO: asyncio: fix this test - the below should be awaited.
-    ftbot.wallets.update()
+    asyncio.get_event_loop().run_until_complete(ftbot.wallets.update())
 
     rc = client_get(client, f"{BASE_URI}/balance")
     assert_response(rc)

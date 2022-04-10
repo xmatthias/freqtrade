@@ -1622,6 +1622,7 @@ async def test_get_balances_prod(default_conf, mocker, exchange_name):
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test_fetch_positions(default_conf, mocker, exchange_name):
     mocker.patch('freqtrade.exchange.Exchange.validate_trading_mode_and_margin_mode')
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
     api_mock = MagicMock()
     api_mock.fetch_positions = get_mock_coro(return_value=[
         {'symbol': 'ETH/USDT:USDT', 'leverage': 5},
@@ -1678,6 +1679,7 @@ async def test_fetch_trading_fees(default_conf, mocker):
     default_conf['margin_mode'] = MarginMode.ISOLATED
     api_mock.fetch_trading_fees = get_mock_coro(return_value=tick)
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
 
     assert '1INCH/USDT:USDT' in exchange._trading_fees
@@ -1764,6 +1766,7 @@ async def test_get_tickers(default_conf, mocker, exchange_name):
         'last': 41,
     }
     }
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
     api_mock.fetch_tickers = get_mock_coro(return_value=tick)
     api_mock.fetch_bids_asks = get_mock_coro(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
@@ -3170,6 +3173,7 @@ async def test_get_trades_for_order(default_conf, mocker, exchange_name, trading
     default_conf["trading_mode"] = trading_mode
     default_conf["margin_mode"] = 'isolated'
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
     api_mock = MagicMock()
 
     api_mock.fetch_my_trades = get_mock_coro(return_value=[{
@@ -3971,6 +3975,7 @@ async def test_calculate_funding_fees(
 
 async def test_get_or_calculate_liquidation_price(mocker, default_conf):
 
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
     api_mock = MagicMock()
     positions = [
         {

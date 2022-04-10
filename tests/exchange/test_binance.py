@@ -40,6 +40,7 @@ async def test_stoploss_order_binance(default_conf, mocker, limitratio, expected
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Binance._set_leverage', get_mock_coro())
+    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
