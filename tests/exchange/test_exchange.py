@@ -1765,7 +1765,7 @@ async def test_get_tickers(default_conf, mocker, exchange_name):
     }
     }
     api_mock.fetch_tickers = get_mock_coro(return_value=tick)
-    api_mock.fetch_bids_asks = MagicMock(return_value={})
+    api_mock.fetch_bids_asks = get_mock_coro(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     # retrieve original ticker
     tickers = await exchange.get_tickers()

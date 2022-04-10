@@ -91,6 +91,7 @@ async def test_bot_cleanup(mocker, default_conf_usdt, caplog) -> None:
 async def test_order_dict(default_conf_usdt, mocker, runmode, caplog) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
+    mocker.patch('freqtrade.exchange.Exchange.get_balances', get_mock_coro([]))
     conf = default_conf_usdt.copy()
     conf['runmode'] = runmode
     conf['order_types'] = {
@@ -805,7 +806,7 @@ async def test_execute_entry(mocker, default_conf_usdt, fee, limit_order,
         get_min_pair_stake_amount=MagicMock(return_value=1),
         get_max_pair_stake_amount=MagicMock(return_value=500000),
         get_fee=fee,
-        get_funding_fees=MagicMock(return_value=0),
+        get_funding_fees=get_mock_coro(return_value=0),
         name=exchange_name,
         get_maintenance_ratio_and_amt=MagicMock(return_value=(0.01, 0.01)),
         get_max_leverage=MagicMock(return_value=10),
@@ -5198,7 +5199,8 @@ async def test_update_funding_fees(
     assert len(trades) == 3
     for trade in trades:
         assert pytest.approx(trade.funding_fees) == 0
-    mocker.patch('freqtrade.exchange.Exchange.create_order', return_value=open_exit_order)
+    mocker.patch('freqtrade.exchange.Exchange.create_order',
+                 get_mock_coro(open_exit_order))
     time_machine.move_to("2021-09-01 08:00:00 +00:00")
     if schedule_off:
         for trade in trades:
@@ -5237,9 +5239,6 @@ async def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         "stake_amount": 10.0,
         "dry_run_wallet": 1000.0,
     })
-    freqtrade = FreqtradeBot(default_conf_usdt)
-    await freqtrade.init_bot()
-    freqtrade.strategy.confirm_trade_entry = MagicMock(return_value=True)
     bid = 11
     stake_amount = 10
     buy_rate_mock = get_mock_coro(return_value=bid)
@@ -5255,6 +5254,11 @@ async def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
         get_balances=get_mock_coro([]),
         get_fee=fee,
     )
+
+    freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
+    freqtrade.strategy.confirm_trade_entry = MagicMock(return_value=True)
+
     pair = 'ETH/USDT'
 
     # Initial buy

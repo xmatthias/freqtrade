@@ -73,8 +73,7 @@ class FreqtradeBot(LoggingMixin):
         init_db(self.config.get('db_url', None), clean_open_orders=self.config['dry_run'])
 
         self.wallets = Wallets(self.config, self.exchange)
-        # TODO: asyncio - is updating the wallets "right away" really necessary?
-        # asyncio.get_event_loop().run_until_complete(self.wallets.update())
+        await self.wallets.update()
 
         PairLocks.timeframe = self.config['timeframe']
 

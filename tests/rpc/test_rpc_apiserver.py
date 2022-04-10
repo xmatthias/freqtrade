@@ -765,7 +765,7 @@ def test_api_profit(botclient, mocker, ticker, fee, markets, is_short, expected)
     mocker.patch("freqtrade.wallets.Wallets.get_starting_balance", return_value=1000.003260873)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        get_balances=MagicMock(return_value=ticker),
+        get_balances=get_mock_coro(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
         markets=PropertyMock(return_value=markets)
