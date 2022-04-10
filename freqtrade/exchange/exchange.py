@@ -921,10 +921,10 @@ class Exchange:
 
     # Order handling
 
-    def _lev_prep(self, pair: str, leverage: float, side: str):
+    async def _lev_prep(self, pair: str, leverage: float, side: str):
         if self.trading_mode != TradingMode.SPOT:
-            self.set_margin_mode(pair, self.margin_mode)
-            self._set_leverage(leverage, pair)
+            await self.set_margin_mode(pair, self.margin_mode)
+            await self._set_leverage(leverage, pair)
 
     def _get_params(
         self,
@@ -963,12 +963,13 @@ class Exchange:
         try:
             # Set the precision for amount and price(rate) as accepted by the exchange
             amount = self.amount_to_precision(pair, self._amount_to_contracts(pair, amount))
-            needs_price = (ordertype != 'market'
-                           or self._api.options.get("createMarketBuyOrderRequiresPrice", False))
+            needs_price = (
+                ordertype != 'market'
+                or self._api_async.options.get("createMarketBuyOrderRequiresPrice", False))
             rate_for_order = self.price_to_precision(pair, rate) if needs_price else None
 
             if not reduceOnly:
-                self._lev_prep(pair, leverage, side)
+                await self._lev_prep(pair, leverage, side)
 
             order = await self._api_async.create_order(
                 pair,
@@ -1090,7 +1091,7 @@ class Exchange:
 
             amount = self.amount_to_precision(pair, self._amount_to_contracts(pair, amount))
 
-            self._lev_prep(pair, leverage, side)
+            await self._lev_prep(pair, leverage, side)
             order = await self._api_async.create_order(
                 symbol=pair, type=ordertype, side=side,
                 amount=amount, price=limit_rate, params=params)
@@ -1325,7 +1326,7 @@ class Exchange:
             return tickers
         except ccxt.NotSupported as e:
             raise OperationalException(
-                f'Exchange {self._api.name} does not support fetching bids/asks in batch. '
+                f'Exchange {self._api_async.name} does not support fetching bids/asks in batch. '
                 f'Message: {e}') from e
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -2255,8 +2256,8 @@ class Exchange:
         else:
             return 1.0
 
-    @retrier
-    def _set_leverage(
+    @retrier_async
+    async def _set_leverage(
         self,
         leverage: float,
         pair: Optional[str] = None,
@@ -2271,7 +2272,7 @@ class Exchange:
             return
 
         try:
-            self._api.set_leverage(symbol=pair, leverage=leverage)
+            await self._api_async.set_leverage(symbol=pair, leverage=leverage)
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
@@ -2324,8 +2325,8 @@ class Exchange:
         """
         return open_date.minute > 0 or open_date.second > 0
 
-    @retrier
-    def set_margin_mode(self, pair: str, margin_mode: MarginMode, params: dict = {}):
+    @retrier_async
+    async def set_margin_mode(self, pair: str, margin_mode: MarginMode, params: dict = {}):
         """
         Set's the margin mode on the exchange to cross or isolated for a specific pair
         :param pair: base/quote currency pair (e.g. "ADA/USDT")
@@ -2335,7 +2336,7 @@ class Exchange:
             return
 
         try:
-            self._api.set_margin_mode(margin_mode.value, pair, params)
+            await self._api_async.set_margin_mode(margin_mode.value, pair, params)
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:

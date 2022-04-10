@@ -1254,8 +1254,8 @@ async def test_create_order(default_conf, mocker, side, ordertype, rate, marketp
     mocker.patch('freqtrade.exchange.Exchange.amount_to_precision', lambda s, x, y: y)
     mocker.patch('freqtrade.exchange.Exchange.price_to_precision', lambda s, x, y: y)
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    exchange._set_leverage = MagicMock()
-    exchange.set_margin_mode = MagicMock()
+    exchange._set_leverage = get_mock_coro()
+    exchange.set_margin_mode = get_mock_coro()
 
     order = await exchange.create_order(
         pair='XLTCUSDT',
@@ -1288,8 +1288,8 @@ async def test_create_order(default_conf, mocker, side, ordertype, rate, marketp
     })
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     exchange.trading_mode = TradingMode.FUTURES
-    exchange._set_leverage = MagicMock()
-    exchange.set_margin_mode = MagicMock()
+    exchange._set_leverage = get_mock_coro()
+    exchange.set_margin_mode = get_mock_coro()
     order = await exchange.create_order(
         pair='ADA/USDT:USDT',
         ordertype=ordertype,
@@ -3760,14 +3760,14 @@ async def test_get_stake_amount_considering_leverage(
     ("ftx", TradingMode.MARGIN),
     ("ftx", TradingMode.FUTURES)
 ])
-def test__set_leverage(mocker, default_conf, exchange_name, trading_mode):
+async def test__set_leverage(mocker, default_conf, exchange_name, trading_mode):
 
     api_mock = MagicMock()
     api_mock.set_leverage = MagicMock()
     type(api_mock).has = PropertyMock(return_value={'setLeverage': True})
     default_conf['dry_run'] = False
 
-    ccxt_exceptionhandlers(
+    await async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,

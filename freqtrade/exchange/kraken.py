@@ -151,7 +151,7 @@ class Kraken(Exchange):
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    def _set_leverage(
+    async def _set_leverage(
         self,
         leverage: float,
         pair: Optional[str] = None,

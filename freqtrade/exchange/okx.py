@@ -6,7 +6,7 @@ import ccxt
 from freqtrade.enums import MarginMode, TradingMode
 from freqtrade.exceptions import DDosProtection, OperationalException, TemporaryError
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import retrier
+from freqtrade.exchange.common import retrier_async
 
 
 logger = logging.getLogger(__name__)
@@ -51,12 +51,12 @@ class Okx(Exchange):
             params['tdMode'] = self.margin_mode.value
         return params
 
-    @retrier
-    def _lev_prep(self, pair: str, leverage: float, side: str):
+    @retrier_async
+    async def _lev_prep(self, pair: str, leverage: float, side: str):
         if self.trading_mode != TradingMode.SPOT and self.margin_mode is not None:
             try:
                 # TODO-lev: Test me properly (check mgnMode passed)
-                self._api.set_leverage(
+                await self._api_async.set_leverage(
                     leverage=leverage,
                     symbol=pair,
                     params={

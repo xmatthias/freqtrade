@@ -11,7 +11,7 @@ import ccxt
 from freqtrade.enums import CandleType, MarginMode, TradingMode
 from freqtrade.exceptions import DDosProtection, OperationalException, TemporaryError
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import retrier
+from freqtrade.exchange.common import retrier, retrier_async
 from freqtrade.misc import deep_merge_dicts
 
 
@@ -66,8 +66,8 @@ class Binance(Exchange):
             tickers = deep_merge_dicts(bidsasks, tickers, allow_null_overrides=False)
         return tickers
 
-    @retrier
-    def _set_leverage(
+    @retrier_async
+    async def _set_leverage(
         self,
         leverage: float,
         pair: Optional[str] = None,
@@ -83,7 +83,7 @@ class Binance(Exchange):
             return
 
         try:
-            self._api.set_leverage(symbol=pair, leverage=round(leverage))
+            await self._api_async.set_leverage(symbol=pair, leverage=round(leverage))
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
