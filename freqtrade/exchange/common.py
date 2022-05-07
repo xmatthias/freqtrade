@@ -104,7 +104,7 @@ def retrier_async(_func=None, retries=API_RETRY_COUNT):
         @wraps(f)
         async def wrapper(*args, **kwargs):
             count = kwargs.pop('count', retries)
-            kucoin = args[0].name == "Kucoin"  # Check if the exchange is KuCoin.
+            kucoin = args[0].name == "KuCoin"  # Check if the exchange is KuCoin.
             try:
                 return await f(*args, **kwargs)
             except (TemporaryError, RetryableOrderError) as ex:

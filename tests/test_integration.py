@@ -54,7 +54,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     # Sell 3rd trade (not called for the first trade)
     should_sell_mock = MagicMock(side_effect=[
         ExitCheckTuple(exit_type=ExitType.NONE),
-        ExitCheckTuple(exit_type=ExitType.SELL_SIGNAL)]
+        ExitCheckTuple(exit_type=ExitType.EXIT_SIGNAL)]
     )
     cancel_order_mock = get_mock_coro()
     mocker.patch('freqtrade.exchange.Binance.stoploss', stoploss)
@@ -116,15 +116,15 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
     assert wallets_mock.call_count == 4
 
     trade = [t for t in trades if t.id == 1][0]
-    assert trade.sell_reason == ExitType.STOPLOSS_ON_EXCHANGE.value
+    assert trade.exit_reason == ExitType.STOPLOSS_ON_EXCHANGE.value
     assert not trade.is_open
 
     trade = [t for t in trades if t.id == 2][0]
-    assert not trade.sell_reason
+    assert not trade.exit_reason
     assert trade.is_open
 
     trade = [t for t in trades if t.id == 3][0]
-    assert trade.sell_reason == ExitType.SELL_SIGNAL.value
+    assert trade.exit_reason == ExitType.EXIT_SIGNAL.value
     assert not trade.is_open
 
 
@@ -142,7 +142,7 @@ async def test_forcebuy_last_unlimited(
     one trade was sold at a loss.
     """
     default_conf['max_open_trades'] = 5
-    default_conf['forcebuy_enable'] = True
+    default_conf['force_entry_enable'] = True
     default_conf['stake_amount'] = 'unlimited'
     default_conf['tradable_balance_ratio'] = balance_ratio
     default_conf['dry_run_wallet'] = 1000
@@ -164,7 +164,7 @@ async def test_forcebuy_last_unlimited(
     )
     should_sell_mock = MagicMock(side_effect=[
         ExitCheckTuple(exit_type=ExitType.NONE),
-        ExitCheckTuple(exit_type=ExitType.SELL_SIGNAL),
+        ExitCheckTuple(exit_type=ExitType.EXIT_SIGNAL),
         ExitCheckTuple(exit_type=ExitType.NONE),
         ExitCheckTuple(exit_type=ExitType.NONE),
         ExitCheckTuple(exit_type=ExitType.NONE)]

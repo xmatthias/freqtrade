@@ -1,6 +1,5 @@
 # pragma pylint: disable=missing-docstring
 from copy import deepcopy
-from unittest.mock import MagicMock
 
 import pytest
 

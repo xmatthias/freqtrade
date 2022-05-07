@@ -114,7 +114,8 @@ async def test_fetch_my_trades_gateio(mocker, default_conf, takerormaker, rate, 
     }])
     exchange = await get_patched_exchange(mocker, default_conf, api_mock=api_mock, id='gateio')
     exchange._trading_fees = tick
-    trades = await exchange.get_trades_for_order('22255', 'ETH/USDT:USDT', datetime.now(timezone.utc))
+    trades = await exchange.get_trades_for_order(
+        '22255', 'ETH/USDT:USDT', datetime.now(timezone.utc))
     trade = trades[0]
     assert trade['fee']
     assert trade['fee']['rate'] == rate

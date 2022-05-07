@@ -86,6 +86,7 @@ async def start_download_data(args: Dict[str, Any]) -> None:
                 new_pairs_days=config['new_pairs_days'],
                 erase=bool(config.get('erase')), data_format=config['dataformat_ohlcv'],
                 trading_mode=config.get('trading_mode', 'spot'),
+                prepend=config.get('prepend_data', False)
             )
 
     except KeyboardInterrupt:
