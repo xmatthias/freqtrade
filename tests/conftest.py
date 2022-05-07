@@ -111,7 +111,6 @@ def patch_exchange(
     mock_markets=True,
     mock_supported_modes=True
 ) -> None:
-    mocker.patch('freqtrade.exchange.Exchange.load_markets', get_mock_coro())
     mocker.patch('freqtrade.exchange.Exchange.validate_pairs', MagicMock())
     mocker.patch('freqtrade.exchange.Exchange.validate_timeframes', MagicMock())
     mocker.patch('freqtrade.exchange.Exchange.validate_ordertypes', MagicMock())
@@ -122,6 +121,7 @@ def patch_exchange(
     mocker.patch('freqtrade.exchange.Exchange.precisionMode', PropertyMock(return_value=2))
 
     if mock_markets:
+        mocker.patch('freqtrade.exchange.Exchange.load_markets', get_mock_coro())
         if isinstance(mock_markets, bool):
             mock_markets = get_markets()
         mocker.patch('freqtrade.exchange.Exchange.markets',

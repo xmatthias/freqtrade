@@ -1646,7 +1646,6 @@ async def test_fetch_positions(default_conf, mocker, exchange_name):
 
 
 async def test_fetch_trading_fees(default_conf, mocker):
-    api_mock = MagicMock()
     tick = {
         '1INCH/USDT:USDT': {
             'info': {'user_id': '',
@@ -1677,15 +1676,17 @@ async def test_fetch_trading_fees(default_conf, mocker):
             'maker': 0.0,
             'taker': 0.0005}
     }
+    api_mock = MagicMock()
     exchange_name = 'gateio'
+    api_mock.load_markets = get_mock_coro()
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
     api_mock.fetch_trading_fees = get_mock_coro(return_value=tick)
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
     mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name,
+                                          mock_markets=False)
     assert '1INCH/USDT:USDT' in exchange._trading_fees
     assert 'ETH/USDT:USDT' in exchange._trading_fees
     assert api_mock.fetch_trading_fees.call_count == 1
@@ -1695,7 +1696,7 @@ async def test_fetch_trading_fees(default_conf, mocker):
     await async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
                                "fetch_trading_fees", "fetch_trading_fees")
 
-    api_mock.fetch_trading_fees = MagicMock(return_value={})
+    api_mock.fetch_trading_fees = get_mock_coro(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
     await exchange.fetch_trading_fees()
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
@@ -3405,19 +3406,20 @@ def test_get_valid_pair_combination(default_conf, mocker, markets):
          [],
          'all markets, base=LTC, quote=NONEXISTENT'),
     ])
-def test_get_markets(default_conf, mocker, markets_static,
-                     base_currencies, quote_currencies, tradable_only, active_only,
-                     spot_only, futures_only, expected_keys,
-                     test_comment  # Here for debugging purposes (Not used within method)
-                     ):
+async def test_get_markets(default_conf, mocker, markets_static,
+                           base_currencies, quote_currencies, tradable_only, active_only,
+                           spot_only, futures_only, expected_keys,
+                           test_comment  # Here for debugging purposes (Not used within method)
+                           ):
     mocker.patch.multiple('freqtrade.exchange.Exchange',
-                          _init_ccxt=MagicMock(return_value=MagicMock()),
-                          load_markets=MagicMock(),
+                          _init_ccxt=get_mock_coro(return_value=MagicMock()),
+                          load_markets=get_mock_coro(),
                           validate_pairs=MagicMock(),
                           validate_timeframes=MagicMock(),
                           validate_pricing=MagicMock(),
                           markets=PropertyMock(return_value=markets_static))
     ex = Exchange(default_conf)
+    await ex.init_exchange(validate=False)
     pairs = ex.get_markets(base_currencies,
                            quote_currencies,
                            tradable_only=tradable_only,
