@@ -471,12 +471,16 @@ async def test_VolumePairList_refresh_empty(mocker, markets_empty, whitelist_con
      "BTC", ['ETH/BTC', 'TKN/BTC']),
     # VolumePairList with no offset = unchanged pairlist
     ([{"method": "VolumePairList", "number_assets": 20, "sort_key": "quoteVolume"},
-      {"method": "OffsetFilter", "offset": 0}],
+      {"method": "OffsetFilter", "offset": 0, "number_assets": 0}],
      "USDT", ['ETH/USDT', 'NANO/USDT', 'ADAHALF/USDT', 'ADADOUBLE/USDT']),
     # VolumePairList with offset = 2
     ([{"method": "VolumePairList", "number_assets": 20, "sort_key": "quoteVolume"},
       {"method": "OffsetFilter", "offset": 2}],
      "USDT", ['ADAHALF/USDT', 'ADADOUBLE/USDT']),
+    # VolumePairList with offset and limit
+    ([{"method": "VolumePairList", "number_assets": 20, "sort_key": "quoteVolume"},
+      {"method": "OffsetFilter", "offset": 1, "number_assets": 2}],
+     "USDT", ['NANO/USDT', 'ADAHALF/USDT']),
     # VolumePairList with higher offset, than total pairlist
     ([{"method": "VolumePairList", "number_assets": 20, "sort_key": "quoteVolume"},
       {"method": "OffsetFilter", "offset": 100}],
@@ -1154,6 +1158,10 @@ async def test_spreadfilter_invalid_data(mocker, default_conf, markets, tickers_
      "[{'RangeStabilityFilter': 'RangeStabilityFilter - Filtering pairs with rate of change below "
      "0.01 and above 0.99 over the last days.'}]",
         None
+     ),
+    ({"method": "OffsetFilter", "offset": 5, "number_assets": 10},
+     "[{'OffsetFilter': 'OffsetFilter - Taking 10 Pairs, starting from 5.'}]",
+     None
      ),
 ])
 async def test_pricefilter_desc(mocker, whitelist_conf, markets, pairlistconfig,

@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 import ccxt
 
+from freqtrade.constants import BuySell
 from freqtrade.enums import MarginMode, TradingMode
 from freqtrade.exceptions import (DDosProtection, InsufficientFundsError, InvalidOrderException,
                                   OperationalException, TemporaryError)
@@ -44,7 +45,7 @@ class Ftx(Exchange):
 
     @retrier_async(retries=0)
     async def stoploss(self, pair: str, amount: float, stop_price: float,
-                       order_types: Dict, side: str, leverage: float) -> Dict:
+                       order_types: Dict, side: BuySell, leverage: float) -> Dict:
         """
         Creates a stoploss order.
         depending on order_types.stoploss configuration, uses 'market' or limit order.
@@ -103,7 +104,7 @@ class Ftx(Exchange):
             raise OperationalException(e) from e
 
     @retrier_async(retries=API_FETCH_ORDER_RETRY_COUNT)
-    async def fetch_stoploss_order(self, order_id: str, pair: str) -> Dict:
+    async def fetch_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
         if self._config['dry_run']:
             return await self.fetch_dry_run_order(order_id)
 
@@ -144,7 +145,7 @@ class Ftx(Exchange):
             raise OperationalException(e) from e
 
     @retrier_async
-    async def cancel_stoploss_order(self, order_id: str, pair: str) -> Dict:
+    async def cancel_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
         if self._config['dry_run']:
             return {}
         try:
