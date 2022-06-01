@@ -5,6 +5,7 @@ on:
     branches:
       - stable
       - develop
+      - ci/*
       - async_tests
     tags:
   release:
