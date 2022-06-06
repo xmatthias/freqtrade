@@ -3,7 +3,6 @@
 """
 This module manage Telegram communication
 """
-import asyncio
 import json
 import logging
 import re
@@ -12,7 +11,7 @@ from functools import partial
 from html import escape
 from itertools import chain
 from math import isnan
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import arrow
 from tabulate import tabulate
@@ -222,22 +221,6 @@ class Telegram(RPCHandler):
         """
         # This can take up to `timeout` from the call to `start_polling`.
         self._updater.stop()
-
-    def _run_async(self, coro: Coroutine):
-        """
-        Async helper
-        """
-        try:
-            loop = asyncio.get_running_loop()
-            if loop:
-                # Oh oh ...
-                pass
-        except RuntimeError:
-            # TODO: asyncio: this can cause quite some delay
-            resp = asyncio.run_coroutine_threadsafe(
-                coro, self._rpc._freqtrade.loop).result()
-
-            return resp
 
     def _format_entry_msg(self, msg: Dict[str, Any]) -> str:
         if self._rpc._fiat_converter:
@@ -472,7 +455,7 @@ class Telegram(RPCHandler):
             if context.args and len(context.args) > 0:
                 trade_ids = [int(i) for i in context.args if i.isnumeric()]
 
-            results = self._run_async(self._rpc._rpc_trade_status(trade_ids=trade_ids))
+            results = self._rpc._rpc_trade_status(trade_ids=trade_ids)
             position_adjust = self._config.get('position_adjustment_enable', False)
             max_entries = self._config.get('max_entry_position_adjustment', -1)
             messages = []
@@ -547,9 +530,8 @@ class Telegram(RPCHandler):
         """
         try:
             fiat_currency = self._config.get('fiat_display_currency', '')
-            statlist, head, fiat_profit_sum = self._run_async(
-                self._rpc._rpc_status_table(self._config['stake_currency'], fiat_currency)
-            )
+            statlist, head, fiat_profit_sum = self._rpc._rpc_status_table(
+                self._config['stake_currency'], fiat_currency)
 
             show_total = not isnan(fiat_profit_sum) and len(statlist) > 1
             max_trades_per_msg = 50
@@ -719,8 +701,7 @@ class Telegram(RPCHandler):
         except (TypeError, ValueError, IndexError):
             pass
 
-        stats = self._run_async(self._rpc._rpc_trade_statistics(
-            stake_cur, fiat_disp_cur, start_date))
+        stats = self._rpc._rpc_trade_statistics(stake_cur, fiat_disp_cur, start_date)
 
         profit_closed_coin = stats['profit_closed_coin']
         profit_closed_ratio_mean = stats['profit_closed_ratio_mean']
@@ -820,9 +801,8 @@ class Telegram(RPCHandler):
     def _balance(self, update: Update, context: CallbackContext) -> None:
         """ Handler for /balance """
         try:
-            result = self._run_async(self._rpc._rpc_balance(
-                self._config['stake_currency'],
-                self._config.get('fiat_display_currency', '')))
+            result = self._rpc._rpc_balance(self._config['stake_currency'],
+                                            self._config.get('fiat_display_currency', ''))
 
             balance_dust_level = self._config['telegram'].get('balance_dust_level', 0.0)
             if not balance_dust_level:
@@ -958,8 +938,8 @@ class Telegram(RPCHandler):
         else:
             fiat_currency = self._config.get('fiat_display_currency', '')
             try:
-                statlist, _, _ = self._run_async(self._rpc._rpc_status_table(
-                    self._config['stake_currency'], fiat_currency))
+                statlist, _, _ = self._rpc._rpc_status_table(
+                    self._config['stake_currency'], fiat_currency)
             except RPCException:
                 self._send_msg(msg='No open trade found.')
                 return
@@ -979,7 +959,7 @@ class Telegram(RPCHandler):
     def _force_exit_action(self, trade_id):
         if trade_id != 'cancel':
             try:
-                self._run_async(self._rpc._rpc_force_exit(trade_id))
+                self._rpc._rpc_force_exit(trade_id)
             except RPCException as e:
                 self._send_msg(str(e))
 
@@ -1001,7 +981,7 @@ class Telegram(RPCHandler):
     def _force_enter_action(self, pair, price: Optional[float], order_side: SignalDirection):
         if pair != 'cancel':
             try:
-                self._run_async(self._rpc._rpc_force_entry(pair, price, order_side=order_side))
+                self._rpc._rpc_force_entry(pair, price, order_side=order_side)
             except RPCException as e:
                 self._send_msg(str(e))
 
@@ -1100,7 +1080,7 @@ class Telegram(RPCHandler):
             if not context.args or len(context.args) == 0:
                 raise RPCException("Trade-id not set.")
             trade_id = int(context.args[0])
-            msg = self._run_async(self._rpc._rpc_delete(trade_id))
+            msg = self._rpc._rpc_delete(trade_id)
             self._send_msg((
                 '`{result_msg}`\n'
                 'Please make sure to take care of this asset on the exchange manually.'

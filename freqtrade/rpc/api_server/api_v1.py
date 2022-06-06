@@ -57,9 +57,9 @@ def version():
 
 
 @router.get('/balance', response_model=Balances, tags=['info'])
-async def balance(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
+def balance(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
     """Account Balances"""
-    return await rpc._rpc_balance(config['stake_currency'], config.get('fiat_display_currency', ''))
+    return rpc._rpc_balance(config['stake_currency'], config.get('fiat_display_currency', ''),)
 
 
 @router.get('/count', response_model=Count, tags=['info'])
@@ -73,10 +73,10 @@ def performance(rpc: RPC = Depends(get_rpc)):
 
 
 @router.get('/profit', response_model=Profit, tags=['info'])
-async def profit(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
-    return await rpc._rpc_trade_statistics(config['stake_currency'],
-                                           config.get('fiat_display_currency')
-                                           )
+def profit(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
+    return rpc._rpc_trade_statistics(config['stake_currency'],
+                                     config.get('fiat_display_currency')
+                                     )
 
 
 @router.get('/stats', response_model=Stats, tags=['info'])
@@ -91,9 +91,9 @@ def daily(timescale: int = 7, rpc: RPC = Depends(get_rpc), config=Depends(get_co
 
 
 @router.get('/status', response_model=List[OpenTradeSchema], tags=['info'])
-async def status(rpc: RPC = Depends(get_rpc)):
+def status(rpc: RPC = Depends(get_rpc)):
     try:
-        return await rpc._rpc_trade_status()
+        return rpc._rpc_trade_status()
     except RPCException:
         return []
 
@@ -106,16 +106,16 @@ def trades(limit: int = 500, offset: int = 0, rpc: RPC = Depends(get_rpc)):
 
 
 @router.get('/trade/{tradeid}', response_model=OpenTradeSchema, tags=['info', 'trading'])
-async def trade(tradeid: int = 0, rpc: RPC = Depends(get_rpc)):
+def trade(tradeid: int = 0, rpc: RPC = Depends(get_rpc)):
     try:
-        return (await rpc._rpc_trade_status([tradeid]))[0]
+        return rpc._rpc_trade_status([tradeid])[0]
     except (RPCException, KeyError):
         raise HTTPException(status_code=404, detail='Trade not found.')
 
 
 @router.delete('/trades/{tradeid}', response_model=DeleteTrade, tags=['info', 'trading'])
-async def trades_delete(tradeid: int, rpc: RPC = Depends(get_rpc)):
-    return await rpc._rpc_delete(tradeid)
+def trades_delete(tradeid: int, rpc: RPC = Depends(get_rpc)):
+    return rpc._rpc_delete(tradeid)
 
 
 # TODO: Missing response model
@@ -139,14 +139,14 @@ def show_config(rpc: Optional[RPC] = Depends(get_rpc_optional), config=Depends(g
 # /forcebuy is deprecated with short addition. use /forceentry instead
 @router.post('/forceenter', response_model=ForceEnterResponse, tags=['trading'])
 @router.post('/forcebuy', response_model=ForceEnterResponse, tags=['trading'])
-async def force_entry(payload: ForceEnterPayload, rpc: RPC = Depends(get_rpc)):
+def force_entry(payload: ForceEnterPayload, rpc: RPC = Depends(get_rpc)):
     ordertype = payload.ordertype.value if payload.ordertype else None
     stake_amount = payload.stakeamount if payload.stakeamount else None
     entry_tag = payload.entry_tag if payload.entry_tag else 'force_entry'
 
-    trade = await rpc._rpc_force_entry(payload.pair, payload.price, order_side=payload.side,
-                                       order_type=ordertype, stake_amount=stake_amount,
-                                       enter_tag=entry_tag)
+    trade = rpc._rpc_force_entry(payload.pair, payload.price, order_side=payload.side,
+                                 order_type=ordertype, stake_amount=stake_amount,
+                                 enter_tag=entry_tag)
 
     if trade:
         return ForceEnterResponse.parse_obj(trade.to_json())
@@ -158,7 +158,7 @@ async def force_entry(payload: ForceEnterPayload, rpc: RPC = Depends(get_rpc)):
 # /forcesell is deprecated with short addition. use /forceexit instead
 @router.post('/forceexit', response_model=ResultMsg, tags=['trading'])
 @router.post('/forcesell', response_model=ResultMsg, tags=['trading'])
-async def forceexit(payload: ForceExitPayload, rpc: RPC = Depends(get_rpc)):
+def forceexit(payload: ForceExitPayload, rpc: RPC = Depends(get_rpc)):
     ordertype = payload.ordertype.value if payload.ordertype else None
     return rpc._rpc_force_exit(payload.tradeid, ordertype)
 
@@ -232,8 +232,8 @@ def pair_candles(
 
 
 @router.get('/pair_history', response_model=PairHistory, tags=['candle data'])
-async def pair_history(pair: str, timeframe: str, timerange: str, strategy: str,
-                       config=Depends(get_config), exchange=Depends(get_exchange)):
+def pair_history(pair: str, timeframe: str, timerange: str, strategy: str,
+                 config=Depends(get_config), exchange=Depends(get_exchange)):
     # The initial call to this endpoint can be slow, as it may need to initialize
     # the exchange class.
     config = deepcopy(config)

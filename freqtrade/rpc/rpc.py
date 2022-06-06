@@ -6,7 +6,7 @@ import logging
 from abc import abstractmethod
 from datetime import date, datetime, timedelta, timezone
 from math import isnan
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Coroutine, Dict, List, Optional, Tuple, Union
 
 import arrow
 import psutil
@@ -100,6 +100,22 @@ class RPC:
         if self._config.get('fiat_display_currency', None):
             self._fiat_converter = CryptoToFiatConverter()
 
+    def _run_async(self, coro: Coroutine):
+        """
+        Async helper
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            if loop:
+                # Oh oh ...
+                pass
+        except RuntimeError:
+            # TODO: asyncio: this can cause quite some delay
+            resp = asyncio.run_coroutine_threadsafe(
+                coro, self._freqtrade.loop).result()
+
+            return resp
+
     @staticmethod
     def _rpc_show_config(config, botstate: Union[State, str],
                          strategy_version: Optional[str] = None) -> Dict[str, Any]:
@@ -150,7 +166,7 @@ class RPC:
         }
         return val
 
-    async def _rpc_trade_status(self, trade_ids: List[int] = []) -> List[Dict[str, Any]]:
+    def _rpc_trade_status(self, trade_ids: List[int] = []) -> List[Dict[str, Any]]:
         """
         Below follows the RPC backend it is prefixed with rpc_ to raise awareness that it is
         a remotely exposed function
@@ -168,13 +184,13 @@ class RPC:
             for trade in trades:
                 order = None
                 if trade.open_order_id:
-                    order = await self._freqtrade.exchange.fetch_order(trade.open_order_id,
-                                                                       trade.pair)
+                    order = self._run_async(self._freqtrade.exchange.fetch_order(
+                        trade.open_order_id, trade.pair))
                 # calculate profit and send message to user
                 if trade.is_open:
                     try:
-                        current_rate = await self._freqtrade.exchange.get_rate(
-                            trade.pair, side='exit', is_short=trade.is_short, refresh=False)
+                        current_rate = self._run_async(self._freqtrade.exchange.get_rate(
+                            trade.pair, side='exit', is_short=trade.is_short, refresh=False))
                     except (ExchangeError, PricingError):
                         current_rate = NAN
                 else:
@@ -224,8 +240,8 @@ class RPC:
                 results.append(trade_dict)
             return results
 
-    async def _rpc_status_table(self, stake_currency: str,
-                                fiat_display_currency: str) -> Tuple[List, List, float]:
+    def _rpc_status_table(self, stake_currency: str,
+                          fiat_display_currency: str) -> Tuple[List, List, float]:
         trades: List[Trade] = Trade.get_open_trades()
         nonspot = self._config.get('trading_mode', TradingMode.SPOT) != TradingMode.SPOT
         if not trades:
@@ -236,8 +252,8 @@ class RPC:
             for trade in trades:
                 # calculate profit and send message to user
                 try:
-                    current_rate = await self._freqtrade.exchange.get_rate(
-                        trade.pair, side='exit', is_short=trade.is_short, refresh=False)
+                    current_rate = self._run_async(self._freqtrade.exchange.get_rate(
+                        trade.pair, side='exit', is_short=trade.is_short, refresh=False))
                 except (PricingError, ExchangeError):
                     current_rate = NAN
                 if len(trade.select_filled_orders(trade.entry_side)) > 0:
@@ -463,7 +479,7 @@ class RPC:
         durations = {'wins': wins_dur, 'draws': draws_dur, 'losses': losses_dur}
         return {'exit_reasons': exit_reasons, 'durations': durations}
 
-    async def _rpc_trade_statistics(
+    def _rpc_trade_statistics(
             self, stake_currency: str, fiat_display_currency: str,
             start_date: datetime = datetime.fromtimestamp(0)) -> Dict[str, Any]:
         """ Returns cumulative profit statistics """
@@ -498,8 +514,8 @@ class RPC:
             else:
                 # Get current rate
                 try:
-                    current_rate = await self._freqtrade.exchange.get_rate(
-                        trade.pair, side='exit', is_short=trade.is_short, refresh=False)
+                    current_rate = self._run_async(self._freqtrade.exchange.get_rate(
+                        trade.pair, side='exit', is_short=trade.is_short, refresh=False))
                 except (PricingError, ExchangeError):
                     current_rate = NAN
                 profit_ratio = trade.calc_profit_ratio(rate=current_rate)
@@ -573,16 +589,16 @@ class RPC:
             'losing_trades': losing_trades,
         }
 
-    async def _rpc_balance(self, stake_currency: str, fiat_display_currency: str) -> Dict:
+    def _rpc_balance(self, stake_currency: str, fiat_display_currency: str) -> Dict:
         """ Returns current account balance per crypto """
         currencies = []
         total = 0.0
         try:
-            tickers = await self._freqtrade.exchange.get_tickers(cached=True)
+            tickers = self._run_async(self._freqtrade.exchange.get_tickers(cached=True))
         except (ExchangeError):
             raise RPCException('Error getting current tickers.')
 
-        await self._freqtrade.wallets.update(require_update=False)
+        self._run_async(self._freqtrade.wallets.update(require_update=False))
         starting_capital = self._freqtrade.wallets.get_starting_balance()
         starting_cap_fiat = self._fiat_converter.convert_amount(
             starting_capital, stake_currency, fiat_display_currency) if self._fiat_converter else 0
@@ -697,10 +713,18 @@ class RPC:
 
         return {'status': 'No more buy will occur from now. Run /reload_config to reset.'}
 
-    async def _rpc_force_exit(
+    def _rpc_force_exit(
             self, trade_id: str, ordertype: Optional[str] = None) -> Dict[str, str]:
         """
         Handler for forceexit <id>.
+        Sells the given trade at current price
+        """
+        return self._run_async(self.__rpc_force_exit_async(trade_id, ordertype))
+
+    async def __rpc_force_exit_async(
+            self, trade_id: str, ordertype: Optional[str] = None) -> Dict[str, str]:
+        """
+        Private Async Handler for forceexit <id>.
         Sells the given trade at current price
         """
         async def _exec_force_exit(trade: Trade) -> None:
@@ -756,13 +780,31 @@ class RPC:
             await self._freqtrade.wallets.update()
             return {'result': f'Created sell order for trade {trade_id}.'}
 
-    async def _rpc_force_entry(self, pair: str, price: Optional[float], *,
-                               order_type: Optional[str] = None,
-                               order_side: SignalDirection = SignalDirection.LONG,
-                               stake_amount: Optional[float] = None,
-                               enter_tag: Optional[str] = 'force_entry') -> Optional[Trade]:
+    def _rpc_force_entry(self, pair: str, price: Optional[float], *,
+                         order_type: Optional[str] = None,
+                         order_side: SignalDirection = SignalDirection.LONG,
+                         stake_amount: Optional[float] = None,
+                         enter_tag: Optional[str] = 'force_entry') -> Optional[Trade]:
         """
         Handler for forcebuy <asset> <price>
+        Buys a pair trade at the given or current price
+        """
+        return self._run_async(self.__rpc_force_entry(
+            pair,
+            price,
+            order_type=order_type,
+            order_side=order_side,
+            stake_amount=stake_amount,
+            enter_tag=enter_tag
+        ))
+
+    async def __rpc_force_entry(self, pair: str, price: Optional[float], *,
+                                order_type: Optional[str] = None,
+                                order_side: SignalDirection = SignalDirection.LONG,
+                                stake_amount: Optional[float] = None,
+                                enter_tag: Optional[str] = 'force_entry') -> Optional[Trade]:
+        """
+        Private async handler for forcebuy <asset> <price>
         Buys a pair trade at the given or current price
         """
 
@@ -809,7 +851,10 @@ class RPC:
         else:
             raise RPCException(f'Failed to enter position for {pair}.')
 
-    async def _rpc_delete(self, trade_id: int) -> Dict[str, Union[str, int]]:
+    def _rpc_delete(self, trade_id: int) -> Dict[str, Union[str, int]]:
+        return self._run_async(self.__rpc_delete_async(trade_id))
+
+    async def __rpc_delete_async(self, trade_id: int) -> Dict[str, Union[str, int]]:
         """
         Handler for delete <id>.
         Delete the given trade and close eventually existing open orders.
