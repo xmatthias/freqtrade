@@ -62,7 +62,7 @@ class VolatilityFilter(IPairList):
                 f"{self._min_volatility}-{self._max_volatility} "
                 f" the last {self._days} {plural(self._days, 'day')}.")
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Validate trading range
         :param pairlist: pairlist to filter or sort
@@ -79,8 +79,8 @@ class VolatilityFilter(IPairList):
         # Get all candles
         candles = {}
         if needed_pairs:
-            candles = self._exchange.refresh_latest_ohlcv(needed_pairs, since_ms=since_ms,
-                                                          cache=False)
+            candles = await self._exchange.refresh_latest_ohlcv(needed_pairs, since_ms=since_ms,
+                                                                cache=False)
 
         if self._enabled:
             for p in deepcopy(pairlist):

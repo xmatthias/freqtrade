@@ -38,7 +38,7 @@ class PerformanceFilter(IPairList):
         """
         return f"{self.name} - Sorting pairs by performance."
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Filters and sorts pairlist and returns the allowlist again.
         Called on each bot iteration - please use internal caching if necessary

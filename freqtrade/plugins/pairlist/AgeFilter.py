@@ -67,7 +67,7 @@ class AgeFilter(IPairList):
             f"{self._max_days_listed} {plural(self._max_days_listed, 'day')}"
         ) if self._max_days_listed else '')
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         :param pairlist: pairlist to filter or sort
         :param tickers: Tickers (from exchange.get_tickers()). May be cached.
@@ -87,7 +87,8 @@ class AgeFilter(IPairList):
                        .floor('day')
                        .shift(days=since_days)
                        .float_timestamp) * 1000
-        candles = self._exchange.refresh_latest_ohlcv(needed_pairs, since_ms=since_ms, cache=False)
+        candles = await self._exchange.refresh_latest_ohlcv(needed_pairs, since_ms=since_ms,
+                                                            cache=False)
         if self._enabled:
             for p in deepcopy(pairlist):
                 daily_candles = candles[(p, '1d', self._config['candle_type_def'])] if (

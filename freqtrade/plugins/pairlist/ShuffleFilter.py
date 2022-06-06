@@ -46,7 +46,7 @@ class ShuffleFilter(IPairList):
         return (f"{self.name} - Shuffling pairs" +
                 (f", seed = {self._seed}." if self._seed is not None else "."))
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Filters and sorts pairlist and returns the whitelist again.
         Called on each bot iteration - please use internal caching if necessary

@@ -38,7 +38,7 @@ class StaticPairList(IPairList):
         """
         return f"{self.name}"
 
-    def gen_pairlist(self, tickers: Dict) -> List[str]:
+    async def gen_pairlist(self, tickers: Dict) -> List[str]:
         """
         Generate the pairlist
         :param tickers: Tickers (from exchange.get_tickers()). May be cached.
@@ -52,7 +52,7 @@ class StaticPairList(IPairList):
             return self._whitelist_for_active_markets(
                 self.verify_whitelist(self._config['exchange']['pair_whitelist'], logger.info))
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Filters and sorts pairlist and returns the whitelist again.
         Called on each bot iteration - please use internal caching if necessary

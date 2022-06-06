@@ -60,7 +60,7 @@ class RangeStabilityFilter(IPairList):
                 f"{self._min_rate_of_change}{max_rate_desc} over the "
                 f"last {plural(self._days, 'day')}.")
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Validate trading range
         :param pairlist: pairlist to filter or sort
@@ -77,8 +77,8 @@ class RangeStabilityFilter(IPairList):
         # Get all candles
         candles = {}
         if needed_pairs:
-            candles = self._exchange.refresh_latest_ohlcv(needed_pairs, since_ms=since_ms,
-                                                          cache=False)
+            candles = await self._exchange.refresh_latest_ohlcv(needed_pairs, since_ms=since_ms,
+                                                                cache=False)
 
         if self._enabled:
             for p in deepcopy(pairlist):

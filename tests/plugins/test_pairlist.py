@@ -512,7 +512,7 @@ async def test_VolumePairList_whitelist_gen(mocker, whitelist_conf, shitcoinmark
                           )
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        refresh_latest_ohlcv=MagicMock(return_value=ohlcv_data),
+        refresh_latest_ohlcv=get_mock_coro(return_value=ohlcv_data),
     )
 
     # Provide for PerformanceFilter's dependency
@@ -671,7 +671,7 @@ async def test_VolumePairList_range(
 
         mocker.patch.multiple(
             'freqtrade.exchange.Exchange',
-            refresh_latest_ohlcv=MagicMock(return_value=ohlcv_data),
+            refresh_latest_ohlcv=get_mock_coro(return_value=ohlcv_data),
         )
 
         await freqtrade.pairlists.refresh_pairlist()
@@ -952,7 +952,7 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
             markets=PropertyMock(return_value=markets),
             exchange_has=MagicMock(return_value=True),
             get_tickers=tickers,
-            refresh_latest_ohlcv=MagicMock(return_value=ohlcv_data),
+            refresh_latest_ohlcv=get_mock_coro(return_value=ohlcv_data),
         )
 
         freqtrade = await get_patched_freqtradebot(mocker, whitelist_conf_agefilter)
@@ -972,14 +972,14 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
             ('LTC/BTC', '1d', CandleType.SPOT): ohlcv_history,
             ('XRP/BTC', '1d', CandleType.SPOT): ohlcv_history.iloc[[0]],
         }
-        mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', return_value=ohlcv_data)
+        mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', get_mock_coro(ohlcv_data))
         await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 1
 
         # Move to next day
         t.move_to("2021-09-02 01:00:00 +00:00")
-        mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', return_value=ohlcv_data)
+        mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', get_mock_coro(ohlcv_data))
         await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 1
@@ -993,7 +993,7 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
             ('LTC/BTC', '1d', CandleType.SPOT): ohlcv_history,
             ('XRP/BTC', '1d', CandleType.SPOT): ohlcv_history,
         }
-        mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', return_value=ohlcv_data)
+        mocker.patch('freqtrade.exchange.Exchange.refresh_latest_ohlcv', get_mock_coro(ohlcv_data))
         await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 4
         # Called once (only for XRP/BTC)
@@ -1062,7 +1062,7 @@ async def test_rangestabilityfilter_caching(
     }
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        refresh_latest_ohlcv=MagicMock(return_value=ohlcv_data),
+        refresh_latest_ohlcv=get_mock_coro(return_value=ohlcv_data),
     )
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)

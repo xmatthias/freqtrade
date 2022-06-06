@@ -41,7 +41,7 @@ class OffsetFilter(IPairList):
             return f"{self.name} - Taking {self._number_pairs} Pairs, starting from {self._offset}."
         return f"{self.name} - Offsetting pairs by {self._offset}."
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Filters and sorts pairlist and returns the whitelist again.
         Called on each bot iteration - please use internal caching if necessary
