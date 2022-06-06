@@ -45,14 +45,14 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
 
     freqtradebot.state = State.RUNNING
     with pytest.raises(RPCException, match=r'.*no active trade*'):
-        await rpc._rpc_trade_status()
+        rpc._rpc_trade_status()
 
     await freqtradebot.enter_positions()
     trades = Trade.get_open_trades()
     trades[0].open_order_id = None
     await freqtradebot.exit_positions(trades)
 
-    results = await rpc._rpc_trade_status()
+    results = rpc._rpc_trade_status()
     assert results[0] == {
         'trade_id': 1,
         'pair': 'ETH/BTC',
@@ -134,7 +134,7 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
 
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
-    results = await rpc._rpc_trade_status()
+    results = rpc._rpc_trade_status()
     assert isnan(results[0]['current_profit'])
     assert isnan(results[0]['current_rate'])
     assert results[0] == {
@@ -236,12 +236,11 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     freqtradebot.state = State.RUNNING
     with pytest.raises(RPCException, match=r'.*no active trade*'):
-        await rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
+        rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
     mocker.patch('freqtrade.exchange.Exchange._is_dry_limit_order_filled', return_value=False)
     await freqtradebot.enter_positions()
 
-    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
-        default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
     assert "Since" in headers
     assert "Pair" in headers
     assert 'instantly' == result[0][2]
@@ -250,7 +249,7 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
     assert isnan(fiat_profit_sum)
 
     mocker.patch('freqtrade.exchange.Exchange._is_dry_limit_order_filled', return_value=True)
-    freqtradebot.process()
+    await freqtradebot.process()
 
     result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
     assert "Since" in headers
@@ -262,8 +261,7 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     # Test with fiatconvert
     rpc._fiat_converter = CryptoToFiatConverter()
-    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
-        default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
     assert "Since" in headers
     assert "Pair" in headers
     assert len(result[0]) == 4
@@ -274,8 +272,7 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     rpc._config['position_adjustment_enable'] = True
     rpc._config['max_entry_position_adjustment'] = 3
-    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
-        default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
     assert "# Entries" in headers
     assert len(result[0]) == 5
     # 4th column should be 1/4 - as 1 order filled (a total of 4 is possible)
@@ -284,8 +281,7 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
 
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
-    result, headers, fiat_profit_sum = await rpc._rpc_status_table(
-        default_conf['stake_currency'], 'USD')
+    result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf['stake_currency'], 'USD')
     assert 'instantly' == result[0][2]
     assert 'ETH/BTC' in result[0][1]
     assert 'nan%' == result[0][3]
@@ -386,14 +382,14 @@ async def test_rpc_delete_trade(mocker, default_conf, fee, markets, caplog, is_s
     create_mock_trades(fee, is_short)
     rpc = RPC(freqtradebot)
     with pytest.raises(RPCException, match='invalid argument'):
-        await rpc._rpc_delete('200')
+        rpc._rpc_delete('200')
 
     trades = Trade.query.all()
     trades[1].stoploss_order_id = '1234'
     trades[2].stoploss_order_id = '1234'
     assert len(trades) > 2
 
-    res = await rpc._rpc_delete('1')
+    res = rpc._rpc_delete('1')
     assert isinstance(res, dict)
     assert res['result'] == 'success'
     assert res['trade_id'] == '1'
@@ -403,7 +399,7 @@ async def test_rpc_delete_trade(mocker, default_conf, fee, markets, caplog, is_s
     cancel_mock.reset_mock()
     stoploss_mock.reset_mock()
 
-    res = await rpc._rpc_delete('2')
+    res = rpc._rpc_delete('2')
     assert isinstance(res, dict)
     assert cancel_mock.call_count == 1
     assert stoploss_mock.call_count == 1
@@ -412,14 +408,14 @@ async def test_rpc_delete_trade(mocker, default_conf, fee, markets, caplog, is_s
     stoploss_mock = mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order',
                                  side_effect=InvalidOrderException)
 
-    res = await rpc._rpc_delete('3')
+    res = rpc._rpc_delete('3')
     assert stoploss_mock.call_count == 1
     stoploss_mock.reset_mock()
 
     cancel_mock = mocker.patch('freqtrade.exchange.Exchange.cancel_order',
                                side_effect=InvalidOrderException)
 
-    res = await rpc._rpc_delete('4')
+    res = rpc._rpc_delete('4')
     assert cancel_mock.call_count == 1
     assert stoploss_mock.call_count == 0
 
@@ -447,7 +443,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     rpc = RPC(freqtradebot)
     rpc._fiat_converter = CryptoToFiatConverter()
 
-    res = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    res = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert res['trade_count'] == 0
     assert res['first_trade_date'] == ''
     assert res['first_trade_timestamp'] == 0
@@ -487,7 +483,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     trade.close_date = datetime.utcnow()
     trade.is_open = False
 
-    stats = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    stats = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert prec_satoshi(stats['profit_closed_coin'], 6.217e-05)
     assert prec_satoshi(stats['profit_closed_percent_mean'], 6.2)
     assert prec_satoshi(stats['profit_closed_fiat'], 0.93255)
@@ -504,7 +500,7 @@ async def test_rpc_trade_statistics(default_conf, ticker, ticker_sell_up, fee,
     # Test non-available pair
     mocker.patch('freqtrade.exchange.Exchange.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
-    stats = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    stats = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert stats['trade_count'] == 2
     assert stats['first_trade_date'] == 'just now'
     assert stats['latest_trade_date'] == 'just now'
@@ -558,7 +554,7 @@ async def test_rpc_trade_statistics_closed(mocker, default_conf, ticker, fee,
     for trade in Trade.query.order_by(Trade.id).all():
         trade.open_rate = None
 
-    stats = await rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
+    stats = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert prec_satoshi(stats['profit_closed_coin'], 0)
     assert prec_satoshi(stats['profit_closed_percent_mean'], 0)
     assert prec_satoshi(stats['profit_closed_fiat'], 0)
@@ -677,7 +673,7 @@ async def test_rpc_balance_handle(default_conf, mocker, tickers):
     rpc = RPC(freqtradebot)
     rpc._fiat_converter = CryptoToFiatConverter()
 
-    result = await rpc._rpc_balance(
+    result = rpc._rpc_balance(
         default_conf['stake_currency'], default_conf['fiat_display_currency'])
     assert prec_satoshi(result['total'], 30.30909624)
     assert prec_satoshi(result['value'], 454636.44360691)
@@ -825,29 +821,29 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
 
     freqtradebot.state = State.STOPPED
     with pytest.raises(RPCException, match=r'.*trader is not running*'):
-        await rpc._rpc_force_exit(None)
+        rpc._rpc_force_exit(None)
 
     freqtradebot.state = State.RUNNING
     with pytest.raises(RPCException, match=r'.*invalid argument*'):
-        await rpc._rpc_force_exit(None)
+        rpc._rpc_force_exit(None)
 
-    msg = await rpc._rpc_force_exit('all')
+    msg = rpc._rpc_force_exit('all')
     assert msg == {'result': 'Created sell orders for all open trades.'}
 
     await freqtradebot.enter_positions()
-    msg = await rpc._rpc_force_exit('all')
+    msg = rpc._rpc_force_exit('all')
     assert msg == {'result': 'Created sell orders for all open trades.'}
 
     await freqtradebot.enter_positions()
-    msg = await rpc._rpc_force_exit('2')
+    msg = rpc._rpc_force_exit('2')
     assert msg == {'result': 'Created sell order for trade 2.'}
 
     freqtradebot.state = State.STOPPED
     with pytest.raises(RPCException, match=r'.*trader is not running*'):
-        await rpc._rpc_force_exit(None)
+        rpc._rpc_force_exit(None)
 
     with pytest.raises(RPCException, match=r'.*trader is not running*'):
-        await rpc._rpc_force_exit('all')
+        rpc._rpc_force_exit('all')
 
     freqtradebot.state = State.RUNNING
     assert cancel_order_mock.call_count == 0
@@ -876,7 +872,7 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
     )
     # check that the trade is called, which is done by ensuring exchange.cancel_order is called
     # and trade amount is updated
-    await rpc._rpc_force_exit('3')
+    rpc._rpc_force_exit('3')
     assert cancel_order_mock.call_count == 1
     assert trade.amount == filled_amount
 
@@ -905,7 +901,7 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
         })
     )
     # check that the trade is called, which is done by ensuring exchange.cancel_order is called
-    msg = await rpc._rpc_force_exit('4')
+    msg = rpc._rpc_force_exit('4')
     assert msg == {'result': 'Created sell order for trade 4.'}
     assert cancel_order_mock.call_count == 2
     assert trade.amount == amount
@@ -922,7 +918,7 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
             'filled': 0.0
         })
     )
-    msg = await rpc._rpc_force_exit('3')
+    msg = rpc._rpc_force_exit('3')
     assert msg == {'result': 'Created sell order for trade 3.'}
     # status quo, no exchange calls
     assert cancel_order_mock.call_count == 3
@@ -1226,16 +1222,16 @@ async def test_rpc_force_entry(mocker, default_conf, ticker, fee, limit_buy_orde
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
     pair = 'ETH/BTC'
-    trade = await rpc._rpc_force_entry(pair, None)
+    trade = rpc._rpc_force_entry(pair, None)
     assert isinstance(trade, Trade)
     assert trade.pair == pair
     assert trade.open_rate == (await ticker())['bid']
 
     # Test buy duplicate
     with pytest.raises(RPCException, match=r'position for ETH/BTC already open - id: 1'):
-        await rpc._rpc_force_entry(pair, 0.0001)
+        rpc._rpc_force_entry(pair, 0.0001)
     pair = 'XRP/BTC'
-    trade = await rpc._rpc_force_entry(pair, 0.0001, order_type='limit')
+    trade = rpc._rpc_force_entry(pair, 0.0001, order_type='limit')
     assert isinstance(trade, Trade)
     assert trade.pair == pair
     assert trade.open_rate == 0.0001
@@ -1243,11 +1239,11 @@ async def test_rpc_force_entry(mocker, default_conf, ticker, fee, limit_buy_orde
     # Test buy pair not with stakes
     with pytest.raises(RPCException,
                        match=r'Wrong pair selected. Only pairs with stake-currency.*'):
-        await rpc._rpc_force_entry('LTC/ETH', 0.0001)
+        rpc._rpc_force_entry('LTC/ETH', 0.0001)
 
     # Test with defined stake_amount
     pair = 'LTC/BTC'
-    trade = await rpc._rpc_force_entry(pair, 0.0001, order_type='limit', stake_amount=0.05)
+    trade = rpc._rpc_force_entry(pair, 0.0001, order_type='limit', stake_amount=0.05)
     assert trade.stake_amount == 0.05
     assert trade.buy_tag == 'force_entry'
 
@@ -1259,7 +1255,7 @@ async def test_rpc_force_entry(mocker, default_conf, ticker, fee, limit_buy_orde
     rpc = RPC(freqtradebot)
     pair = 'TKN/BTC'
     with pytest.raises(RPCException, match=r"Failed to enter position for TKN/BTC."):
-        trade = await rpc._rpc_force_entry(pair, None)
+        trade = rpc._rpc_force_entry(pair, None)
 
 
 async def test_rpc_force_entry_stopped(mocker, default_conf) -> None:

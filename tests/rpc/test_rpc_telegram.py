@@ -189,7 +189,7 @@ async def test_telegram_status(default_conf, update, mocker) -> None:
 
     mocker.patch.multiple(
         'freqtrade.rpc.rpc.RPC',
-        _rpc_trade_status=get_mock_coro(return_value=[{
+        _rpc_trade_status=MagicMock(return_value=[{
             'trade_id': 1,
             'pair': 'ETH/BTC',
             'base_currency': 'ETH',
@@ -241,8 +241,8 @@ async def test_telegram_status_multi_entry(default_conf, update, mocker, fee) ->
     default_conf['position_adjustment_enable'] = True
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_order=MagicMock(return_value=None),
-        get_rate=MagicMock(return_value=0.22),
+        fetch_order=get_mock_coro(return_value=None),
+        get_rate=get_mock_coro(return_value=0.22),
     )
 
     telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
@@ -291,8 +291,8 @@ async def test_telegram_status_closed_trade(default_conf, update, mocker, fee) -
     default_conf['position_adjustment_enable'] = True
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
-        fetch_order=MagicMock(return_value=None),
-        get_rate=MagicMock(return_value=0.22),
+        fetch_order=get_mock_coro(return_value=None),
+        get_rate=get_mock_coro(return_value=0.22),
     )
 
     telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
