@@ -341,7 +341,7 @@ async def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
     msg_mock.reset_mock()
 
     # Create some test data
-    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
+    await freqtradebot.enter_positions()
     # Trigger status while we have a fulfilled order for the open trade
     telegram._status(update=update, context=MagicMock())
 
@@ -398,7 +398,7 @@ async def test_status_table_handle(default_conf, update, ticker, fee, mocker) ->
     msg_mock.reset_mock()
 
     # Create some test data
-    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
+    await freqtradebot.enter_positions()
 
     telegram._status_table(update=update, context=MagicMock())
 
@@ -781,7 +781,7 @@ async def test_profit_handle(default_conf, update, ticker, ticker_sell_up, fee,
     msg_mock.reset_mock()
 
     # Create some test data
-    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
+    await freqtradebot.enter_positions()
     trade = Trade.query.first()
 
     # Simulate fulfilled LIMIT_BUY order for trade
@@ -1031,12 +1031,13 @@ async def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
     )
 
     freqtradebot = FreqtradeBot(default_conf)
+    await freqtradebot.init_bot()
     rpc = RPC(freqtradebot)
     telegram = Telegram(rpc, default_conf)
     patch_get_signal(freqtradebot)
 
     # Create some test data
-    asyncio.new_event_loop().run_until_complete(freqtradebot.enter_positions())
+    await freqtradebot.enter_positions()
 
     trade = Trade.query.first()
     assert trade
@@ -1096,12 +1097,13 @@ async def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee
     )
 
     freqtradebot = FreqtradeBot(default_conf)
+    await freqtradebot.init_bot()
     rpc = RPC(freqtradebot)
     telegram = Telegram(rpc, default_conf)
     patch_get_signal(freqtradebot)
 
     # Create some test data
-    asyncio.get_event_loop().run_until_complete(freqtradebot.enter_positions())
+    await freqtradebot.enter_positions()
 
     # Decrease the price and sell it
     mocker.patch.multiple(
@@ -1168,7 +1170,7 @@ async def test_forceexit_all_handle(default_conf, update, ticker, fee, mocker) -
     patch_get_signal(freqtradebot)
 
     # Create some test data
-    asyncio.get_event_loop().run_until_complete(freqtradebot.enter_positions())
+    await freqtradebot.enter_positions()
     msg_mock.reset_mock()
 
     # /forceexit all
@@ -1240,7 +1242,7 @@ async def test_force_exit_no_pair(default_conf, update, ticker, fee, mocker) -> 
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(return_value=True),
+        _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
     femock = mocker.patch('freqtrade.rpc.rpc.RPC._rpc_force_exit')
     telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
@@ -1255,7 +1257,7 @@ async def test_force_exit_no_pair(default_conf, update, ticker, fee, mocker) -> 
     assert msg_mock.call_args_list[0][1]['msg'] == 'No open trade found.'
 
     # Create some test data
-    freqtradebot.enter_positions()
+    await freqtradebot.enter_positions()
     msg_mock.reset_mock()
 
     # /forceexit
