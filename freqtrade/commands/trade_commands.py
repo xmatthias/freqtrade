@@ -16,6 +16,7 @@ async def start_trading(args: Dict[str, Any]) -> int:
     worker = None
     try:
         worker = Worker(args)
+        await worker.init_worker()
         await worker.run()
     except Exception as e:
         logger.error(str(e))

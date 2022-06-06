@@ -591,7 +591,7 @@ async def test_process_trade_creation(default_conf_usdt, ticker_usdt, limit_orde
     )
 
 
-def test_process_exchange_failures(default_conf_usdt, ticker_usdt, mocker) -> None:
+async def test_process_exchange_failures(default_conf_usdt, ticker_usdt, mocker) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -601,28 +601,30 @@ def test_process_exchange_failures(default_conf_usdt, ticker_usdt, mocker) -> No
     )
     sleep_mock = mocker.patch('time.sleep', side_effect=lambda _: None)
 
-    worker = Worker(args=None, config=default_conf_usdt)
+    worker = await get_patched_worker(mocker, default_conf_usdt)
     patch_get_signal(worker.freqtrade)
 
-    worker._process_running()
+    await worker._process_running()
     assert sleep_mock.has_calls()
 
 
-def test_process_operational_exception(default_conf_usdt, ticker_usdt, mocker) -> None:
+async def test_process_operational_exception(default_conf_usdt, ticker_usdt, mocker) -> None:
     msg_mock = patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker_usdt,
-        create_order=MagicMock(side_effect=OperationalException)
+        create_order=MagicMock(side_effect=OperationalException('fff'))
     )
     worker = Worker(args=None, config=default_conf_usdt)
+    await worker.init_worker()
     patch_get_signal(worker.freqtrade)
 
     assert worker.freqtrade.state == State.RUNNING
 
-    worker._process_running()
+    await worker._process_running()
     assert worker.freqtrade.state == State.STOPPED
+    assert msg_mock.call_count == 1
     assert 'OperationalException' in msg_mock.call_args_list[-1][0][0]['status']
 
 
@@ -4760,12 +4762,12 @@ async def test_order_book_exit_pricing(
                       caplog)
 
 
-def test_startup_state(default_conf_usdt, mocker):
+async def test_startup_state(default_conf_usdt, mocker):
     default_conf_usdt['pairlist'] = {'method': 'VolumePairList',
                                      'config': {'number_assets': 20}
                                      }
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
-    worker = get_patched_worker(mocker, default_conf_usdt)
+    worker = await get_patched_worker(mocker, default_conf_usdt)
     assert worker.freqtrade.state is State.RUNNING
 
 

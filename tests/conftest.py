@@ -216,7 +216,7 @@ async def get_patched_freqtradebot(mocker, config) -> FreqtradeBot:
     return ftbot
 
 
-def get_patched_worker(mocker, config) -> Worker:
+async def get_patched_worker(mocker, config) -> Worker:
     """
     This function patches _init_modules() to not call dependencies
     :param mocker: a Mocker object to apply patches
@@ -224,7 +224,9 @@ def get_patched_worker(mocker, config) -> Worker:
     :return: Worker
     """
     patch_freqtradebot(mocker, config)
-    return Worker(args=None, config=config)
+    worker = Worker(args=None, config=config)
+    await worker.init_worker()
+    return worker
 
 
 def patch_get_signal(

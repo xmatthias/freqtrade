@@ -33,15 +33,17 @@ class Worker:
 
         self._args = args
         self._config = config
-        self._init(False)
 
         self.last_throttle_start_time: float = 0
         self._heartbeat_msg: float = 0
 
+        self._sd_notify = sdnotify.SystemdNotifier() if \
+            self._config.get('internals', {}).get('sd_notify', False) else None
+
         # Tell systemd that we completed initialization phase
         self._notify("READY=1")
 
-    def _init(self, reconfig: bool) -> None:
+    async def init_worker(self, reconfig: bool = False) -> None:
         """
         Also called from the _reconfigure() method (with reconfig=True).
         """
@@ -51,15 +53,12 @@ class Worker:
 
         # Init the instance of the bot
         self.freqtrade = FreqtradeBot(self._config)
-        asyncio.get_event_loop().run_until_complete(self.freqtrade.init_bot())
+        await self.freqtrade.init_bot()
 
         internals_config = self._config.get('internals', {})
         self._throttle_secs = internals_config.get('process_throttle_secs',
                                                    constants.PROCESS_THROTTLE_SECS)
         self._heartbeat_interval = internals_config.get('heartbeat_interval', 60)
-
-        self._sd_notify = sdnotify.SystemdNotifier() if \
-            self._config.get('internals', {}).get('sd_notify', False) else None
 
     def _notify(self, message: str) -> None:
         """
@@ -70,14 +69,14 @@ class Worker:
             logger.debug(f"sd_notify: {message}")
             self._sd_notify.notify(message)
 
-    def run(self) -> None:
+    async def run(self) -> None:
         state = None
         while True:
-            state = self._worker(old_state=state)
+            state = await self._worker(old_state=state)
             if state == State.RELOAD_CONFIG:
                 self._reconfigure()
 
-    def _worker(self, old_state: Optional[State]) -> State:
+    async def _worker(self, old_state: Optional[State]) -> State:
         """
         The main routine that runs each throttling iteration and handles the states.
         :param old_state: the previous service state from the previous call
@@ -94,7 +93,7 @@ class Worker:
             logger.info(
                 f"Changing state{f' from {old_state.name}' if old_state else ''} to: {state.name}")
             if state == State.RUNNING:
-                asyncio.get_event_loop().run_until_complete(self.freqtrade.startup())
+                await self.freqtrade.startup()
 
             if state == State.STOPPED:
                 self.freqtrade.check_for_open_trades()
@@ -107,13 +106,13 @@ class Worker:
             # Ping systemd watchdog before sleeping in the stopped state
             self._notify("WATCHDOG=1\nSTATUS=State: STOPPED.")
 
-            self._throttle(func=self._process_stopped, throttle_secs=self._throttle_secs)
+            await self._throttle(func=self._process_stopped, throttle_secs=self._throttle_secs)
 
         elif state == State.RUNNING:
             # Ping systemd watchdog before throttling
             self._notify("WATCHDOG=1\nSTATUS=State: RUNNING.")
 
-            self._throttle(func=self._process_running, throttle_secs=self._throttle_secs)
+            await self._throttle(func=self._process_running, throttle_secs=self._throttle_secs)
 
         if self._heartbeat_interval:
             now = time.time()
@@ -128,7 +127,8 @@ class Worker:
 
         return state
 
-    def _throttle(self, func: Callable[..., Any], throttle_secs: float, *args, **kwargs) -> Any:
+    async def _throttle(
+            self, func: Callable[..., Any], throttle_secs: float, *args, **kwargs) -> Any:
         """
         Throttles the given callable that it
         takes at least `min_secs` to finish execution.
@@ -138,20 +138,20 @@ class Worker:
         """
         self.last_throttle_start_time = time.time()
         logger.debug("========================================")
-        result = func(*args, **kwargs)
+        result = await func(*args, **kwargs)
         time_passed = time.time() - self.last_throttle_start_time
         sleep_duration = max(throttle_secs - time_passed, 0.0)
         logger.debug(f"Throttling with '{func.__name__}()': sleep for {sleep_duration:.2f} s, "
                      f"last iteration took {time_passed:.2f} s.")
-        time.sleep(sleep_duration)
+        await asyncio.sleep(sleep_duration)
         return result
 
-    def _process_stopped(self) -> None:
-        asyncio.get_event_loop().run_until_complete(self.freqtrade.process_stopped())
+    async def _process_stopped(self) -> None:
+        await self.freqtrade.process_stopped()
 
-    def _process_running(self) -> None:
+    async def _process_running(self) -> None:
         try:
-            asyncio.get_event_loop().run_until_complete(self.freqtrade.process())
+            await self.freqtrade.process()
         except TemporaryError as error:
             logger.warning(f"Error: {error}, retrying in {constants.RETRY_TIMEOUT} seconds...")
             time.sleep(constants.RETRY_TIMEOUT)
@@ -173,10 +173,10 @@ class Worker:
         self._notify("RELOADING=1")
 
         # Clean up current freqtrade modules
-        asyncio.get_event_loop().run_until_complete(self.freqtrade.cleanup())
+        asyncio.run(self.freqtrade.cleanup())
 
         # Load and validate config and create new instance of the bot
-        self._init(True)
+        self.init_worker(True)
 
         self.freqtrade.notify_status('config reloaded')
 
@@ -189,4 +189,4 @@ class Worker:
 
         if self.freqtrade:
             self.freqtrade.notify_status('process died')
-            asyncio.get_event_loop().run_until_complete(self.freqtrade.cleanup())
+            asyncio.run(self.freqtrade.cleanup())
