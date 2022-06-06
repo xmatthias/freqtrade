@@ -29,7 +29,8 @@ from freqtrade.rpc.rpc import RPCException
 from freqtrade.rpc.telegram import Telegram, authorized_only
 from tests.conftest import (CURRENT_TEST_STRATEGY, create_mock_trades, get_mock_coro,
                             get_patched_freqtradebot, get_patched_freqtradebot_thread, log_has,
-                            log_has_re, patch_exchange, patch_get_signal, patch_whitelist)
+                            log_has_re, patch_eventloop_threading, patch_exchange, patch_get_signal,
+                            patch_whitelist)
 
 
 pytestmark = pytest.mark.asyncio
@@ -1019,9 +1020,9 @@ async def test_reload_config_handle(default_conf, update, mocker) -> None:
 async def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
                                          ticker_sell_up, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
-    # msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
-    # mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
-    # patch_exchange(mocker)
+    msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
+    mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
+    patch_exchange(mocker)
     patch_whitelist(mocker, default_conf)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -1029,12 +1030,11 @@ async def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
         get_fee=fee,
         _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
-    telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
-
-    # freqtradebot = FreqtradeBot(default_conf)
-    # await freqtradebot.init_bot()
-    # rpc = RPC(freqtradebot)
-    # telegram = Telegram(rpc, default_conf)
+    freqtradebot = FreqtradeBot(default_conf)
+    await freqtradebot.init_bot()
+    patch_eventloop_threading(freqtradebot)
+    rpc = RPC(freqtradebot)
+    telegram = Telegram(rpc, default_conf)
     patch_get_signal(freqtradebot)
 
     # Create some test data
@@ -1085,10 +1085,10 @@ async def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee
                                                ticker_sell_down, mocker) -> None:
     mocker.patch('freqtrade.rpc.fiat_convert.CryptoToFiatConverter._find_price',
                  return_value=15000.0)
-    # msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
-    # mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
-    # patch_exchange(mocker)
-    # patch_whitelist(mocker, default_conf)
+    msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
+    mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
+    patch_exchange(mocker)
+    patch_whitelist(mocker, default_conf)
 
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
@@ -1097,11 +1097,11 @@ async def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee
         _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
 
-    telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
-    # freqtradebot = FreqtradeBot(default_conf)
-    # await freqtradebot.init_bot()
-    # rpc = RPC(freqtradebot)
-    # telegram = Telegram(rpc, default_conf)
+    freqtradebot = FreqtradeBot(default_conf)
+    await freqtradebot.init_bot()
+    patch_eventloop_threading(freqtradebot)
+    rpc = RPC(freqtradebot)
+    telegram = Telegram(rpc, default_conf)
     patch_get_signal(freqtradebot)
 
     # Create some test data
@@ -1156,9 +1156,9 @@ async def test_forceexit_all_handle(default_conf, update, ticker, fee, mocker) -
     patch_exchange(mocker)
     mocker.patch('freqtrade.rpc.fiat_convert.CryptoToFiatConverter._find_price',
                  return_value=15000.0)
-    # msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
-    # mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
-    # patch_whitelist(mocker, default_conf)
+    msg_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg', MagicMock())
+    mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
+    patch_whitelist(mocker, default_conf)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
@@ -1166,10 +1166,11 @@ async def test_forceexit_all_handle(default_conf, update, ticker, fee, mocker) -
         _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
     default_conf['max_open_trades'] = 4
-    telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
-    # freqtradebot = FreqtradeBot(default_conf)
-    # rpc = RPC(freqtradebot)
-    # telegram = Telegram(rpc, default_conf)
+    freqtradebot = FreqtradeBot(default_conf)
+    await freqtradebot.init_bot()
+    patch_eventloop_threading(freqtradebot)
+    rpc = RPC(freqtradebot)
+    telegram = Telegram(rpc, default_conf)
     patch_get_signal(freqtradebot)
 
     # Create some test data

@@ -442,7 +442,6 @@ def test_api_balance(botclient, mocker, rpc_balance, tickers):
     mocker.patch('freqtrade.exchange.Exchange.get_tickers', tickers)
     mocker.patch('freqtrade.exchange.Exchange.get_valid_pair_combination',
                  side_effect=lambda a, b: f"{a}/{b}")
-    # TODO: asyncio: fix this test - the below should be awaited.
     asyncio.get_event_loop().run_until_complete(ftbot.wallets.update())
 
     rc = client_get(client, f"{BASE_URI}/balance")
@@ -1210,9 +1209,9 @@ def test_api_forceexit(botclient, mocker, ticker, fee, markets):
     create_mock_trades(fee)
 
     rc = client_post(client, f"{BASE_URI}/forceexit",
-                     data='{"tradeid": "1"}')
+                     data='{"tradeid": "5"}')
     assert_response(rc)
-    assert rc.json() == {'result': 'Created sell order for trade 1.'}
+    assert rc.json() == {'result': 'Created sell order for trade 5.'}
 
 
 def test_api_pair_candles(botclient, ohlcv_history):

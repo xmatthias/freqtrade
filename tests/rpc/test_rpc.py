@@ -387,6 +387,7 @@ async def test_rpc_delete_trade(mocker, default_conf, fee, markets, caplog, is_s
     trades = Trade.query.all()
     trades[1].stoploss_order_id = '1234'
     trades[2].stoploss_order_id = '1234'
+    Trade.commit()
     assert len(trades) > 2
 
     res = rpc._rpc_delete('1')
@@ -873,7 +874,9 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
     # check that the trade is called, which is done by ensuring exchange.cancel_order is called
     # and trade amount is updated
     rpc._rpc_force_exit('3')
+    Trade.commit()
     assert cancel_order_mock.call_count == 1
+    trade = Trade.query.filter(Trade.id == '3').first()
     assert trade.amount == filled_amount
 
     mocker.patch(
