@@ -135,7 +135,7 @@ async def exchange(request, exchange_conf):
 
 
 @pytest.fixture(params=EXCHANGES, scope="class")
-def exchange_futures(request, exchange_conf, class_mocker):
+async def exchange_futures(request, exchange_conf, class_mocker):
     if not EXCHANGES[request.param].get('futures') is True:
         yield None, request.param
     else:
@@ -149,7 +149,7 @@ def exchange_futures(request, exchange_conf, class_mocker):
             'freqtrade.exchange.binance.Binance.fill_leverage_tiers')
         class_mocker.patch('freqtrade.exchange.exchange.Exchange.fetch_trading_fees')
         class_mocker.patch('freqtrade.exchange.okx.Okx.additional_exchange_init')
-        exchange = ExchangeResolver.load_exchange(request.param, exchange_conf, validate=True)
+        exchange = await ExchangeResolver.load_exchange(request.param, exchange_conf, validate=True)
 
         yield exchange, request.param
 
@@ -289,7 +289,8 @@ class TestCCXTExchange():
         now = datetime.now(timezone.utc) - timedelta(minutes=(timeframe_to_minutes(timeframe) * 2))
         assert exchange.klines(pair_tf).iloc[-1]['date'] >= timeframe_to_prev_date(timeframe, now)
 
-    def test_ccxt__async_get_candle_history(self, exchange):
+    @pytest.mark.asyncio
+    async def test_ccxt__async_get_candle_history(self, exchange):
         exchange, exchangename = exchange
         # For some weired reason, this test returns random lengths for bittrex.
         if not exchange._ft_has['ohlcv_has_history'] or exchangename == 'bittrex':
@@ -304,12 +305,11 @@ class TestCCXTExchange():
             since = now - timedelta(days=offset)
             since_ms = int(since.timestamp() * 1000)
 
-            res = exchange.loop.run_until_complete(exchange._async_get_candle_history(
+            res = await exchange._async_get_candle_history(
                 pair=pair,
                 timeframe=timeframe,
                 since_ms=since_ms,
                 candle_type=candle_type
-            )
             )
             assert res
             assert res[0] == pair
@@ -321,7 +321,8 @@ class TestCCXTExchange():
             assert len(candles) >= min(candle_count, candle_count1)
             assert candles[0][0] == since_ms or (since_ms + timeframe_ms)
 
-    def test_ccxt_fetch_funding_rate_history(self, exchange_futures):
+    @pytest.mark.asyncio
+    async def test_ccxt_fetch_funding_rate_history(self, exchange_futures):
         exchange, exchangename = exchange_futures
         if not exchange:
             # exchange_futures only returns values for supported exchanges
@@ -333,7 +334,7 @@ class TestCCXTExchange():
                                             exchange._ft_has['mark_ohlcv_timeframe'])
         pair_tf = (pair, timeframe_ff, CandleType.FUNDING_RATE)
 
-        funding_ohlcv = exchange.refresh_latest_ohlcv(
+        funding_ohlcv = await exchange.refresh_latest_ohlcv(
             [pair_tf],
             since_ms=since,
             drop_incomplete=False)
@@ -359,7 +360,8 @@ class TestCCXTExchange():
             (rate['open'].min() != rate['open'].max())
         )
 
-    def test_ccxt_fetch_mark_price_history(self, exchange_futures):
+    @pytest.mark.asyncio
+    async def test_ccxt_fetch_mark_price_history(self, exchange_futures):
         exchange, exchangename = exchange_futures
         if not exchange:
             # exchange_futures only returns values for supported exchanges
@@ -368,7 +370,7 @@ class TestCCXTExchange():
         since = int((datetime.now(timezone.utc) - timedelta(days=5)).timestamp() * 1000)
         pair_tf = (pair, '1h', CandleType.MARK)
 
-        mark_ohlcv = exchange.refresh_latest_ohlcv(
+        mark_ohlcv = await exchange.refresh_latest_ohlcv(
             [pair_tf],
             since_ms=since,
             drop_incomplete=False)
@@ -383,7 +385,8 @@ class TestCCXTExchange():
         assert mark_candles[mark_candles['date'] == prev_hour].iloc[0]['open'] != 0.0
         assert mark_candles[mark_candles['date'] == this_hour].iloc[0]['open'] != 0.0
 
-    def test_ccxt__calculate_funding_fees(self, exchange_futures):
+    @pytest.mark.asyncio
+    async def test_ccxt__calculate_funding_fees(self, exchange_futures):
         exchange, exchangename = exchange_futures
         if not exchange:
             # exchange_futures only returns values for supported exchanges
@@ -391,7 +394,7 @@ class TestCCXTExchange():
         pair = EXCHANGES[exchangename].get('futures_pair', EXCHANGES[exchangename]['pair'])
         since = datetime.now(timezone.utc) - timedelta(days=5)
 
-        funding_fee = exchange._fetch_and_calculate_funding_fees(
+        funding_fee = await exchange._fetch_and_calculate_funding_fees(
             pair, 20, is_short=False, open_date=since)
 
         assert isinstance(funding_fee, float)
