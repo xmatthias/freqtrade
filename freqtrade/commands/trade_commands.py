@@ -5,7 +5,7 @@ from typing import Any, Dict
 logger = logging.getLogger(__name__)
 
 
-def start_trading(args: Dict[str, Any]) -> int:
+async def start_trading(args: Dict[str, Any]) -> int:
     """
     Main entry point for trading mode
     """
@@ -16,7 +16,7 @@ def start_trading(args: Dict[str, Any]) -> int:
     worker = None
     try:
         worker = Worker(args)
-        worker.run()
+        await worker.run()
     except Exception as e:
         logger.error(str(e))
         logger.exception("Fatal exception!")

@@ -42,7 +42,7 @@ def test_setup_utils_configuration():
     assert config['dry_run'] is True
 
 
-def test_start_trading_fail(mocker, caplog):
+async def test_start_trading_fail(mocker, caplog):
 
     mocker.patch("freqtrade.worker.Worker.run", MagicMock(side_effect=OperationalException))
 
@@ -53,13 +53,13 @@ def test_start_trading_fail(mocker, caplog):
         'trade',
         '-c', 'config_examples/config_bittrex.example.json'
     ]
-    start_trading(get_args(args))
+    await start_trading(get_args(args))
     assert exitmock.call_count == 1
 
     exitmock.reset_mock()
     caplog.clear()
     mocker.patch("freqtrade.worker.Worker.__init__", MagicMock(side_effect=OperationalException))
-    start_trading(get_args(args))
+    await start_trading(get_args(args))
     assert exitmock.call_count == 0
     assert log_has('Fatal exception!', caplog)
 
