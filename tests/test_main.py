@@ -145,10 +145,10 @@ def test_main_reload_config(mocker, default_conf, caplog) -> None:
     patch_exchange(mocker)
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', MagicMock())
     # Simulate Running, reload, running workflow
-    worker_mock = MagicMock(side_effect=[State.RUNNING,
-                                         State.RELOAD_CONFIG,
-                                         State.RUNNING,
-                                         OperationalException("Oh snap!")])
+    worker_mock = get_mock_coro(side_effect=[State.RUNNING,
+                                             State.RELOAD_CONFIG,
+                                             State.RUNNING,
+                                             OperationalException("Oh snap!")])
     mocker.patch('freqtrade.worker.Worker._worker', worker_mock)
     patched_configuration_load_config_file(mocker, default_conf)
     mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
@@ -157,27 +157,20 @@ def test_main_reload_config(mocker, default_conf, caplog) -> None:
     mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
     mocker.patch('freqtrade.freqtradebot.init_db', MagicMock())
 
-    args = Arguments([
-        'trade',
-        '-c',
-        'config_examples/config_bittrex.example.json'
-    ]).get_parsed_arg()
-    worker = Worker(args=args, config=default_conf)
     with pytest.raises(SystemExit):
         main(['trade', '-c', 'config_examples/config_bittrex.example.json'])
 
     assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
-    assert worker_mock.call_count == 4
+    assert worker_mock.call_count == 2
     assert reconfigure_mock.call_count == 1
-    assert isinstance(worker.freqtrade, FreqtradeBot)
 
 
-def test_reconfigure(mocker, default_conf) -> None:
+async def test_reconfigure(mocker, default_conf) -> None:
     patch_exchange(mocker)
     mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', get_mock_coro())
     mocker.patch(
         'freqtrade.worker.Worker._worker',
-        MagicMock(side_effect=OperationalException('Oh snap!'))
+        get_mock_coro(side_effect=OperationalException('Oh snap!'))
     )
     mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
     patched_configuration_load_config_file(mocker, default_conf)
@@ -190,6 +183,7 @@ def test_reconfigure(mocker, default_conf) -> None:
         'config_examples/config_bittrex.example.json'
     ]).get_parsed_arg()
     worker = Worker(args=args, config=default_conf)
+    await worker.init_worker()
     freqtrade = worker.freqtrade
 
     # Renew mock to return modified data
@@ -199,7 +193,7 @@ def test_reconfigure(mocker, default_conf) -> None:
 
     worker._config = conf
     # reconfigure should return a new instance
-    worker._reconfigure()
+    await worker._reconfigure()
     freqtrade2 = worker.freqtrade
 
     # Verify we have a new instance with the new config

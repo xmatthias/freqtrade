@@ -26,5 +26,5 @@ async def start_trading(args: Dict[str, Any]) -> int:
     finally:
         if worker:
             logger.info("worker found ... calling exit")
-            worker.exit()
+            await worker.exit()
     return 0

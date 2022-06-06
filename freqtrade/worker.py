@@ -33,6 +33,9 @@ class Worker:
 
         self._args = args
         self._config = config
+        # TODO: asyncio - stupid workaround to satisfy tests.
+        if self._config is None:
+            self.init_config()
 
         self.last_throttle_start_time: float = 0
         self._heartbeat_msg: float = 0
@@ -43,13 +46,16 @@ class Worker:
         # Tell systemd that we completed initialization phase
         self._notify("READY=1")
 
+    def init_config(self):
+        self._config = Configuration(self._args, None).get_config()
+
     async def init_worker(self, reconfig: bool = False) -> None:
         """
         Also called from the _reconfigure() method (with reconfig=True).
         """
         if reconfig or self._config is None:
             # Load configuration
-            self._config = Configuration(self._args, None).get_config()
+            self.init_config()
 
         # Init the instance of the bot
         self.freqtrade = FreqtradeBot(self._config)
@@ -74,7 +80,7 @@ class Worker:
         while True:
             state = await self._worker(old_state=state)
             if state == State.RELOAD_CONFIG:
-                self._reconfigure()
+                await self._reconfigure()
 
     async def _worker(self, old_state: Optional[State]) -> State:
         """
@@ -164,7 +170,7 @@ class Worker:
             logger.exception('OperationalException. Stopping trader ...')
             self.freqtrade.state = State.STOPPED
 
-    def _reconfigure(self) -> None:
+    async def _reconfigure(self) -> None:
         """
         Cleans up current freqtradebot instance, reloads the configuration and
         replaces it with the new instance
@@ -173,20 +179,20 @@ class Worker:
         self._notify("RELOADING=1")
 
         # Clean up current freqtrade modules
-        asyncio.run(self.freqtrade.cleanup())
+        await self.freqtrade.cleanup()
 
         # Load and validate config and create new instance of the bot
-        self.init_worker(True)
+        await self.init_worker(True)
 
         self.freqtrade.notify_status('config reloaded')
 
         # Tell systemd that we completed reconfiguration
         self._notify("READY=1")
 
-    def exit(self) -> None:
+    async def exit(self) -> None:
         # Tell systemd that we are exiting now
         self._notify("STOPPING=1")
 
         if self.freqtrade:
             self.freqtrade.notify_status('process died')
-            asyncio.run(self.freqtrade.cleanup())
+            await self.freqtrade.cleanup()
