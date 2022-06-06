@@ -2625,6 +2625,7 @@ async def test_check_handle_cancelled_buy(
     freqtrade = FreqtradeBot(default_conf_usdt)
     await freqtrade.init_bot()
 
+    open_trade.orders = []
     open_trade.is_short = is_short
     Trade.query.session.add(open_trade)
 
@@ -3017,6 +3018,7 @@ async def test_handle_cancel_enter(
     await freqtrade.init_bot()
     freqtrade._notify_enter_cancel = get_mock_coro()
 
+    # TODO: Convert to real trade
     trade = MagicMock()
     trade.pair = 'LTC/USDT'
     trade.open_rate = 200
@@ -3024,6 +3026,7 @@ async def test_handle_cancel_enter(
     trade.entry_side = "buy"
     l_order['filled'] = 0.0
     l_order['status'] = 'open'
+    trade.nr_of_successful_entries = 0
     reason = CANCEL_REASON['TIMEOUT']
     assert await freqtrade.handle_cancel_enter(trade, l_order, reason)
     assert cancel_order_mock.call_count == 1
@@ -3067,7 +3070,9 @@ async def test_handle_cancel_enter_exchanges(mocker, caplog, default_conf_usdt, 
     await freqtrade.init_bot()
 
     reason = CANCEL_REASON['TIMEOUT']
+    # TODO: Convert to real trade
     trade = MagicMock()
+    trade.nr_of_successful_entries = 0
     trade.pair = 'LTC/ETH'
     trade.entry_side = "sell" if is_short else "buy"
     assert await freqtrade.handle_cancel_enter(trade, limit_buy_order_canceled_empty, reason)
@@ -3102,12 +3107,14 @@ async def test_handle_cancel_enter_corder_empty(mocker, default_conf_usdt, limit
     await freqtrade.init_bot()
     freqtrade._notify_enter_cancel = get_mock_coro()
 
+    # TODO: Convert to real trade
     trade = MagicMock()
     trade.pair = 'LTC/USDT'
     trade.entry_side = "buy"
     trade.open_rate = 200
     trade.entry_side = "buy"
     trade.open_order_id = "open_order_noop"
+    trade.nr_of_successful_entries = 0
     l_order['filled'] = 0.0
     l_order['status'] = 'open'
     reason = CANCEL_REASON['TIMEOUT']
