@@ -733,7 +733,7 @@ class FreqtradeBot(LoggingMixin):
         # Updating wallets
         await self.wallets.update()
 
-        self._notify_enter(trade, order, order_type)
+        await self._notify_enter(trade, order, order_type)
 
         if pos_adjust:
             if order_status == 'closed':
@@ -832,8 +832,8 @@ class FreqtradeBot(LoggingMixin):
 
         return enter_limit_requested, stake_amount, leverage
 
-    def _notify_enter(self, trade: Trade, order: Dict, order_type: Optional[str] = None,
-                      fill: bool = False) -> None:
+    async def _notify_enter(self, trade: Trade, order: Dict, order_type: Optional[str] = None,
+                            fill: bool = False) -> None:
         """
         Sends rpc notification when a entry order occurred.
         """
@@ -844,7 +844,7 @@ class FreqtradeBot(LoggingMixin):
 
         current_rate = trade.open_rate_requested
         if self.dataprovider.runmode in (RunMode.DRY_RUN, RunMode.LIVE):
-            current_rate = self.exchange.get_rate(
+            current_rate = await self.exchange.get_rate(
                 trade.pair, side='entry', is_short=trade.is_short, refresh=False)
 
         msg = {
@@ -1707,7 +1707,7 @@ class FreqtradeBot(LoggingMixin):
             self.handle_protections(trade.pair, trade.trade_direction)
         elif send_msg and not trade.open_order_id and not stoploss_order:
             # Enter fill
-            self._notify_enter(trade, order, fill=True)
+            await self._notify_enter(trade, order, fill=True)
 
         return False
 
