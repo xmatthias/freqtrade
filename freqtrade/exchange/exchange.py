@@ -161,7 +161,6 @@ class Exchange:
             "markets_refresh_interval", 60) * 60
 
     async def init_exchange(self, load_markets: bool = True, validate: bool = True) -> None:
-        self.loop = asyncio.get_running_loop()
         exchange_config = self._config['exchange']
 
         # Initialize ccxt objects
@@ -1179,8 +1178,8 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    def fetch_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
-        return self.fetch_order(order_id, pair, params)
+    async def fetch_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
+        return await self.fetch_order(order_id, pair, params)
 
     async def fetch_order_or_stoploss_order(self, order_id: str, pair: str,
                                             stoploss_order: bool = False) -> Dict:
@@ -1230,8 +1229,8 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    def cancel_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
-        return self.cancel_order(order_id, pair, params)
+    async def cancel_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
+        return await self.cancel_order(order_id, pair, params)
 
     def is_cancel_order_result_suitable(self, corder) -> bool:
         if not isinstance(corder, dict):

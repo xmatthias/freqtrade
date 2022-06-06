@@ -71,15 +71,15 @@ class Gateio(Exchange):
                             }
         return trades
 
-    def fetch_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
-        return self.fetch_order(
+    async def fetch_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
+        return await self.fetch_order(
             order_id=order_id,
             pair=pair,
             params={'stop': True}
         )
 
-    def cancel_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
-        return self.cancel_order(
+    async def cancel_stoploss_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
+        return await self.cancel_order(
             order_id=order_id,
             pair=pair,
             params={'stop': True}
