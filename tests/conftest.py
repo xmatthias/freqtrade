@@ -1,7 +1,9 @@
 # pragma pylint: disable=missing-docstring
+import asyncio
 import json
 import logging
 import re
+import threading
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -214,6 +216,26 @@ async def get_patched_freqtradebot(mocker, config) -> FreqtradeBot:
     ftbot = FreqtradeBot(config)
     await ftbot.init_bot()
     return ftbot
+
+
+async def get_patched_freqtradebot_thread(mocker, config) -> FreqtradeBot:
+    ftbot = await get_patched_freqtradebot(mocker, config)
+    patch_eventloop_threading(ftbot)
+    return ftbot
+
+
+def patch_eventloop_threading(ftbot):
+    is_init = False
+
+    def thread_fuck():
+        nonlocal is_init
+        ftbot.loop = asyncio.new_event_loop()
+        is_init = True
+        ftbot.loop.run_forever()
+    x = threading.Thread(target=thread_fuck, daemon=True)
+    x.start()
+    while not is_init:
+        pass
 
 
 async def get_patched_worker(mocker, config) -> Worker:

@@ -26,10 +26,8 @@ from freqtrade.rpc.api_server import ApiServer
 from freqtrade.rpc.api_server.api_auth import create_token, get_user_from_token
 from freqtrade.rpc.api_server.uvicorn_threaded import UvicornServer
 from tests.conftest import (CURRENT_TEST_STRATEGY, create_mock_trades, get_mock_coro,
-                            get_patched_freqtradebot, log_has, log_has_re, patch_get_signal)
-
-
-pytestmark = pytest.mark.asyncio
+                            get_patched_freqtradebot, get_patched_freqtradebot_thread, log_has,
+                            log_has_re, patch_get_signal)
 
 
 BASE_URI = "/api/v1"
@@ -50,7 +48,7 @@ async def botclient(default_conf, mocker):
                                         "password": _TEST_PASS,
                                         }})
 
-    ftbot = await get_patched_freqtradebot(mocker, default_conf)
+    ftbot = await get_patched_freqtradebot_thread(mocker, default_conf)
     rpc = RPC(ftbot)
     mocker.patch('freqtrade.rpc.api_server.ApiServer.start_api', MagicMock())
     try:
@@ -244,6 +242,7 @@ def test_api_stop_workflow(botclient):
     assert rc.json() == {'status': 'already running'}
 
 
+@pytest.mark.asyncio
 async def test_api__init__(default_conf, mocker):
     """
     Test __init__() method
@@ -315,6 +314,7 @@ def test_api_UvicornServer_run_no_uvloop(mocker, import_fails):
     assert serve_mock.call_count == 1
 
 
+@pytest.mark.asyncio
 async def test_api_run(default_conf, mocker, caplog):
     default_conf.update({"api_server": {"enabled": True,
                                         "listen_ip_address": "127.0.0.1",
@@ -392,6 +392,7 @@ async def test_api_run(default_conf, mocker, caplog):
     ApiServer.shutdown()
 
 
+@pytest.mark.asyncio
 async def test_api_cleanup(default_conf, mocker, caplog):
     default_conf.update({"api_server": {"enabled": True,
                                         "listen_ip_address": "127.0.0.1",
@@ -761,8 +762,6 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
 def test_api_profit(botclient, mocker, ticker, fee, markets, is_short, expected):
     ftbot, client = botclient
     patch_get_signal(ftbot)
-    # TODO: asyncio - this mock should not be needed if wallets update correctly.
-    mocker.patch("freqtrade.wallets.Wallets.get_starting_balance", return_value=1000.003260873)
     mocker.patch.multiple(
         'freqtrade.exchange.Exchange',
         get_balances=get_mock_coro(return_value=ticker),
@@ -1097,7 +1096,7 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
     # enable forcebuy
     ftbot.config['force_entry_enable'] = True
 
-    fbuy_mock = get_mock_coro(return_value=None)
+    fbuy_mock = MagicMock(return_value=None)
     mocker.patch("freqtrade.rpc.RPC._rpc_force_entry", fbuy_mock)
     rc = client_post(client, f"{BASE_URI}/{endpoint}",
                      data='{"pair": "ETH/BTC"}')
@@ -1105,7 +1104,7 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
     assert rc.json() == {"status": "Error entering long trade for pair ETH/BTC."}
 
     # Test creating trade
-    fbuy_mock = get_mock_coro(return_value=Trade(
+    fbuy_mock = MagicMock(return_value=Trade(
         pair='ETH/BTC',
         amount=1,
         amount_requested=1,
