@@ -104,18 +104,10 @@ class RPC:
         """
         Async helper
         """
-        try:
-            loop = asyncio.get_running_loop()
-            if loop:
-                # Oh oh ...
-                raise OperationalException('Event loop running where it shouldn not')
-                pass
-        except RuntimeError:
-            # TODO: asyncio: this can cause quite some delay
-            resp = asyncio.run_coroutine_threadsafe(
-                coro, self._freqtrade.loop).result()
+        resp = asyncio.run_coroutine_threadsafe(
+            coro, self._freqtrade.loop).result()
 
-            return resp
+        return resp
 
     @staticmethod
     def _rpc_show_config(config, botstate: Union[State, str],

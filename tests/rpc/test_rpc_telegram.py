@@ -2,8 +2,10 @@
 # pragma pylint: disable=protected-access, unused-argument, invalid-name
 # pragma pylint: disable=too-many-lines, too-many-arguments
 
+import asyncio
 import logging
 import re
+import threading
 from datetime import datetime, timedelta, timezone
 from functools import reduce
 from random import choice, randint
@@ -72,6 +74,19 @@ async def get_telegram_testobject(mocker, default_conf, mock=True, ftbot=None):
         )
     if not ftbot:
         ftbot = await get_patched_freqtradebot(mocker, default_conf)
+    is_init = False
+
+    def thread_fuck():
+        nonlocal is_init
+        ftbot.loop = asyncio.new_event_loop()
+        is_init = True
+        ftbot.loop.run_forever()
+    x = threading.Thread(target=thread_fuck, daemon=True)
+    x.start()
+    while not is_init:
+        print("isinit false")
+        pass
+
     rpc = RPC(ftbot)
     telegram = Telegram(rpc, default_conf)
 
