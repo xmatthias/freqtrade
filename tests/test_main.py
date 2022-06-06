@@ -9,7 +9,6 @@ import pytest
 from freqtrade.commands import Arguments
 from freqtrade.enums import State
 from freqtrade.exceptions import FreqtradeException, OperationalException
-from freqtrade.freqtradebot import FreqtradeBot
 from freqtrade.main import main
 from freqtrade.worker import Worker
 from tests.conftest import (get_mock_coro, log_has, log_has_re, patch_exchange,
@@ -182,7 +181,7 @@ async def test_reconfigure(mocker, default_conf) -> None:
         '-c',
         'config_examples/config_bittrex.example.json'
     ]).get_parsed_arg()
-    worker = Worker(args=args, config=default_conf)
+    worker = Worker(args=args)
     await worker.init_worker()
     freqtrade = worker.freqtrade
 

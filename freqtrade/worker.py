@@ -25,17 +25,14 @@ class Worker:
     Freqtradebot worker class
     """
 
-    def __init__(self, args: Dict[str, Any], config: Dict[str, Any] = None) -> None:
+    def __init__(self, args: Dict[str, Any]) -> None:
         """
         Init all variables and objects the bot needs to work
         """
         logger.info(f"Starting worker {__version__}")
 
         self._args = args
-        self._config = config
-        # TODO: asyncio - stupid workaround to satisfy tests.
-        if self._config is None:
-            self.init_config()
+        self.init_config()
 
         self.last_throttle_start_time: float = 0
         self._heartbeat_msg: float = 0

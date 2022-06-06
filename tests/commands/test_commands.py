@@ -48,7 +48,7 @@ async def test_start_trading_fail(mocker, caplog):
 
     mocker.patch("freqtrade.worker.Worker.__init__", MagicMock(return_value=None))
 
-    exitmock = mocker.patch("freqtrade.worker.Worker.exit", MagicMock())
+    exitmock = mocker.patch("freqtrade.worker.Worker.exit", get_mock_coro())
     args = [
         'trade',
         '-c', 'config_examples/config_bittrex.example.json'
