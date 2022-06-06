@@ -2,7 +2,6 @@
 # pragma pylint: disable=protected-access, unused-argument, invalid-name
 # pragma pylint: disable=too-many-lines, too-many-arguments
 
-import asyncio
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -1029,6 +1028,7 @@ async def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
         get_fee=fee,
         _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
+    # telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
 
     freqtradebot = FreqtradeBot(default_conf)
     await freqtradebot.init_bot()
@@ -1096,6 +1096,7 @@ async def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee
         _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
 
+    # telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
     freqtradebot = FreqtradeBot(default_conf)
     await freqtradebot.init_bot()
     rpc = RPC(freqtradebot)
@@ -1164,6 +1165,7 @@ async def test_forceexit_all_handle(default_conf, update, ticker, fee, mocker) -
         _is_dry_limit_order_filled=get_mock_coro(return_value=True),
     )
     default_conf['max_open_trades'] = 4
+    # telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
     freqtradebot = FreqtradeBot(default_conf)
     rpc = RPC(freqtradebot)
     telegram = Telegram(rpc, default_conf)

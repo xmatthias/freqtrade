@@ -21,7 +21,7 @@ from freqtrade.constants import CANCEL_REASON, DATETIME_PRINT_FORMAT
 from freqtrade.data.history import load_data
 from freqtrade.enums import (CandleType, ExitCheckTuple, ExitType, SignalDirection, State,
                              TradingMode)
-from freqtrade.exceptions import ExchangeError, PricingError
+from freqtrade.exceptions import ExchangeError, OperationalException, PricingError
 from freqtrade.exchange import timeframe_to_minutes, timeframe_to_msecs
 from freqtrade.loggers import bufferHandler
 from freqtrade.misc import decimals_per_coin, shorten_date
@@ -108,6 +108,7 @@ class RPC:
             loop = asyncio.get_running_loop()
             if loop:
                 # Oh oh ...
+                raise OperationalException('Event loop running where it shouldn not')
                 pass
         except RuntimeError:
             # TODO: asyncio: this can cause quite some delay
