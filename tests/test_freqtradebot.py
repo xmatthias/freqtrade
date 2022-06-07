@@ -5180,7 +5180,7 @@ async def test_update_funding_fees_schedule(
 
     time_machine.move_to(f"{t2} +00:00")
     # Check schedule jobs in debugging with freqtrade._schedule.jobs
-    freqtrade._schedule.run_pending()
+    await freqtrade._schedule.run_pending()
 
     assert freqtrade.update_funding_fees.call_count == calls
 
@@ -5331,7 +5331,7 @@ async def test_update_funding_fees(
             ))
 
     else:
-        freqtrade._schedule.run_pending()
+        await freqtrade._schedule.run_pending()
 
     # Funding fees for 00:00 and 08:00
     for trade in trades:

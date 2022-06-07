@@ -10,8 +10,6 @@ from math import isclose
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
-from schedule import Scheduler
-
 from freqtrade import __version__, constants
 from freqtrade.configuration import validate_config_consistency
 from freqtrade.constants import BuySell, LongShort
@@ -33,6 +31,7 @@ from freqtrade.resolvers import ExchangeResolver, StrategyResolver
 from freqtrade.rpc import RPCManager
 from freqtrade.strategy.interface import IStrategy
 from freqtrade.strategy.strategy_wrapper import strategy_safe_wrapper
+from freqtrade.vendor.AsyncSchedule import AsyncScheduler
 from freqtrade.wallets import Wallets
 
 
@@ -114,7 +113,7 @@ class FreqtradeBot(LoggingMixin):
 
         self.trading_mode: TradingMode = self.config.get('trading_mode', TradingMode.SPOT)
 
-        self._schedule = Scheduler()
+        self._schedule = AsyncScheduler()
 
         if self.trading_mode == TradingMode.FUTURES:
 
@@ -122,16 +121,12 @@ class FreqtradeBot(LoggingMixin):
                 await self.update_funding_fees()
                 await self.wallets.update()
 
-            def executor():
-                # TODO: asyncio - this does not actually work.
-                self.loop.call_soon_threadsafe(update)
-
             # TODO: This would be more efficient if scheduled in utc time, and performed at each
             # TODO: funding interval, specified by funding_fee_times on the exchange classes
             for time_slot in range(0, 24):
                 for minutes in [0, 15, 30, 45]:
                     t = str(time(time_slot, minutes, 2))
-                    self._schedule.every().day.at(t).do(executor)
+                    self._schedule.every().day.at(t).do(update)
         self.last_process = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
         self.strategy.ft_bot_start()
@@ -224,7 +219,7 @@ class FreqtradeBot(LoggingMixin):
         if self.get_free_open_trades():
             await self.enter_positions()
         if self.trading_mode == TradingMode.FUTURES:
-            self._schedule.run_pending()
+            await self._schedule.run_pending()
         Trade.commit()
         self.last_process = datetime.now(timezone.utc)
 
@@ -321,7 +316,7 @@ class FreqtradeBot(LoggingMixin):
                 logger.warning(f"Error updating Order {order.order_id} due to {e}")
 
         if self.trading_mode == TradingMode.FUTURES:
-            self._schedule.run_pending()
+            await self._schedule.run_pending()
 
     async def update_closed_trades_without_assigned_fees(self):
         """
