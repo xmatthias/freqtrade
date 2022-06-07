@@ -1120,7 +1120,7 @@ class RPC:
         from freqtrade.resolvers.strategy_resolver import StrategyResolver
         strategy = StrategyResolver.load_strategy(config)
         strategy.dp = DataProvider(config, exchange=exchange, pairlists=None,
-                                   loop=asyncio.get_event_loop())
+                                   loop=asyncio.new_event_loop())
 
         df_analyzed = strategy.analyze_ticker(_data[pair], {'pair': pair})
 
