@@ -91,7 +91,7 @@ class Edge:
             except IndexError:
                 self.fee = None
 
-    def calculate(self, pairs: List[str]) -> bool:
+    async def calculate(self, pairs: List[str]) -> bool:
         if self.fee is None and pairs:
             self.fee = self.exchange.get_fee(pairs[0])
 
@@ -109,7 +109,7 @@ class Edge:
             timerange_startup = deepcopy(self._timerange)
             timerange_startup.subtract_start(timeframe_to_seconds(
                 self.strategy.timeframe) * self.strategy.startup_candle_count)
-            refresh_data(
+            await refresh_data(
                 datadir=self.config['datadir'],
                 pairs=pairs,
                 exchange=self.exchange,
@@ -126,7 +126,7 @@ class Edge:
                 timerange_startup = deepcopy(self._timerange)
                 timerange_startup.subtract_start(timeframe_to_seconds(
                     timeframe) * self.strategy.startup_candle_count)
-                refresh_data(
+                await refresh_data(
                     datadir=self.config['datadir'],
                     pairs=inf_pairs,
                     exchange=self.exchange,

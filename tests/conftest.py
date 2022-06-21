@@ -184,7 +184,7 @@ def patch_edge(mocker) -> None:
             'LTC/BTC': PairInfo(-0.21, 0.66, 3.71, 0.50, 1.71, 11, 20),
         }
     ))
-    mocker.patch('freqtrade.edge.Edge.calculate', MagicMock(return_value=True))
+    mocker.patch('freqtrade.edge.Edge.calculate', get_mock_coro(return_value=True))
 
 
 # Functions for recurrent object patching

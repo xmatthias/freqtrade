@@ -33,15 +33,17 @@ class EdgeCli:
         # Ensure using dry-run
         self.config['dry_run'] = True
         self.config['stake_amount'] = constants.UNLIMITED_STAKE_AMOUNT
-        # TODO: asyncio: FIXME
-        self.exchange = asyncio.get_event_loop().run_until_complete(
-            ExchangeResolver.load_exchange(self.config['exchange']['name'], self.config))
+
+    async def init_async(self):
+
+        self.exchange = await ExchangeResolver.load_exchange(self.config['exchange']['name'],
+                                                             self.config)
         self.strategy = StrategyResolver.load_strategy(self.config)
-        self.strategy.dp = DataProvider(config, self.exchange, asyncio.get_event_loop())
+        self.strategy.dp = DataProvider(self.config, self.exchange, asyncio.get_event_loop())
 
         validate_config_consistency(self.config)
 
-        self.edge = Edge(config, self.exchange, self.strategy)
+        self.edge = Edge(self.config, self.exchange, self.strategy)
         # Set refresh_pairs to false for edge-cli (it must be true for edge)
         self.edge._refresh_pairs = False
 
@@ -49,8 +51,8 @@ class EdgeCli:
             'timerange') is None else str(self.config.get('timerange')))
         self.strategy.ft_bot_start()
 
-    def start(self) -> None:
-        result = self.edge.calculate(self.config['exchange']['pair_whitelist'])
+    async def start(self) -> None:
+        result = await self.edge.calculate(self.config['exchange']['pair_whitelist'])
         if result:
             print('')  # blank line for readability
             print(generate_edge_table(self.edge._cached_pairs))

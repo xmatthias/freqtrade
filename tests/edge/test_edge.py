@@ -14,7 +14,7 @@ from freqtrade.data.converter import ohlcv_to_dataframe
 from freqtrade.edge import Edge, PairInfo
 from freqtrade.enums import ExitType
 from freqtrade.exceptions import OperationalException
-from tests.conftest import get_patched_freqtradebot, log_has
+from tests.conftest import get_mock_coro, get_patched_freqtradebot, log_has
 from tests.optimize import (BTContainer, BTrade, _build_backtest_dataframe,
                             _get_frame_time_from_offset)
 
@@ -225,7 +225,7 @@ async def test_edge_heartbeat_calculate(mocker, edge_conf):
     # should not recalculate if heartbeat not reached
     edge._last_updated = arrow.utcnow().int_timestamp - heartbeat + 1
 
-    assert edge.calculate(edge_conf['exchange']['pair_whitelist']) is False
+    assert await edge.calculate(edge_conf['exchange']['pair_whitelist']) is False
 
 
 def mocked_load_data(datadir, pairs=[], timeframe='0m',
@@ -265,11 +265,11 @@ def mocked_load_data(datadir, pairs=[], timeframe='0m',
 async def test_edge_process_downloaded_data(mocker, edge_conf):
     freqtrade = await get_patched_freqtradebot(mocker, edge_conf)
     mocker.patch('freqtrade.exchange.Exchange.get_fee', MagicMock(return_value=0.001))
-    mocker.patch('freqtrade.edge.edge_positioning.refresh_data', MagicMock())
+    mocker.patch('freqtrade.edge.edge_positioning.refresh_data', get_mock_coro())
     mocker.patch('freqtrade.edge.edge_positioning.load_data', mocked_load_data)
     edge = Edge(edge_conf, freqtrade.exchange, freqtrade.strategy)
 
-    assert edge.calculate(edge_conf['exchange']['pair_whitelist'])
+    assert await edge.calculate(edge_conf['exchange']['pair_whitelist'])
     assert len(edge._cached_pairs) == 2
     assert edge._last_updated <= arrow.utcnow().int_timestamp + 2
 
@@ -277,11 +277,11 @@ async def test_edge_process_downloaded_data(mocker, edge_conf):
 async def test_edge_process_no_data(mocker, edge_conf, caplog):
     freqtrade = await get_patched_freqtradebot(mocker, edge_conf)
     mocker.patch('freqtrade.exchange.Exchange.get_fee', MagicMock(return_value=0.001))
-    mocker.patch('freqtrade.edge.edge_positioning.refresh_data', MagicMock())
+    mocker.patch('freqtrade.edge.edge_positioning.refresh_data', get_mock_coro())
     mocker.patch('freqtrade.edge.edge_positioning.load_data', MagicMock(return_value={}))
     edge = Edge(edge_conf, freqtrade.exchange, freqtrade.strategy)
 
-    assert not edge.calculate(edge_conf['exchange']['pair_whitelist'])
+    assert not await edge.calculate(edge_conf['exchange']['pair_whitelist'])
     assert len(edge._cached_pairs) == 0
     assert log_has("No data found. Edge is stopped ...", caplog)
     assert edge._last_updated == 0
@@ -296,7 +296,7 @@ async def test_edge_process_no_trades(mocker, edge_conf, caplog):
     mocker.patch('freqtrade.edge.Edge._find_trades_for_stoploss_range', return_value=[])
     edge = Edge(edge_conf, freqtrade.exchange, freqtrade.strategy)
 
-    assert not edge.calculate(edge_conf['exchange']['pair_whitelist'])
+    assert not await edge.calculate(edge_conf['exchange']['pair_whitelist'])
     assert len(edge._cached_pairs) == 0
     assert log_has("No trades found.", caplog)
 
@@ -315,7 +315,7 @@ async def test_edge_process_no_pairs(mocker, edge_conf, caplog):
     assert fee_mock.call_count == 0
     assert edge.fee is None
 
-    assert not edge.calculate(['XRP/USDT'])
+    assert not await edge.calculate(['XRP/USDT'])
     assert fee_mock.call_count == 1
     assert edge.fee == 0.001
 

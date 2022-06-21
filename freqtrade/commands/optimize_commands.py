@@ -117,7 +117,7 @@ def start_hyperopt(args: Dict[str, Any]) -> None:
         # Same in Edge and Backtesting start() functions.
 
 
-def start_edge(args: Dict[str, Any]) -> None:
+async def start_edge(args: Dict[str, Any]) -> None:
     """
     Start Edge script
     :param args: Cli args from Arguments()
@@ -131,4 +131,5 @@ def start_edge(args: Dict[str, Any]) -> None:
 
     # Initialize Edge object
     edge_cli = EdgeCli(config)
-    edge_cli.start()
+    await edge_cli.init_async()
+    await edge_cli.start()
