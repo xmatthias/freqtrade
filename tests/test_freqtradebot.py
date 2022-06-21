@@ -2053,9 +2053,6 @@ async def test_update_trade_state_withorderdict(
             order_id=order_id,
         )
     )
-    # TODO: asyncTESTS - uncomment ??
-    # await freqtrade.update_trade_state(trade, order_id, limit_buy_order_usdt)
-    # assert trade.amount != amount
     log_text = r'Applying fee on amount for .*'
     await freqtrade.update_trade_state(trade, order_id, order)
     assert trade.amount != amount
