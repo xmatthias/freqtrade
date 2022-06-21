@@ -1,17 +1,13 @@
 # pragma pylint: disable=missing-docstring
 
-from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
-from freqtrade.commands import Arguments
-from freqtrade.enums import State
-from freqtrade.exceptions import FreqtradeException, OperationalException
+from freqtrade.exceptions import FreqtradeException
 from freqtrade.main import main
-from freqtrade.worker import Worker
-from tests.conftest import (get_mock_coro, log_has, log_has_re, patch_exchange,
+from tests.conftest import (log_has, log_has_re, patch_exchange,
                             patched_configuration_load_config_file)
 
 
@@ -59,142 +55,65 @@ def test_main_start_hyperopt(mocker) -> None:
 
 
 def test_main_fatal_exception(mocker, default_conf, caplog) -> None:
-    patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', MagicMock())
-    mocker.patch('freqtrade.worker.Worker._worker', MagicMock(side_effect=Exception))
-    patched_configuration_load_config_file(mocker, default_conf)
-    mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
-    mocker.patch('freqtrade.freqtradebot.init_db', MagicMock())
+    mocker.patch('freqtrade.commands.start_trading', MagicMock(side_effect=Exception))
 
     args = ['trade', '-c', 'config_examples/config_bittrex.example.json']
 
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
+    # assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
     assert log_has('Fatal exception!', caplog)
 
 
 def test_main_keyboard_interrupt(mocker, default_conf, caplog) -> None:
     patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', MagicMock())
-    mocker.patch('freqtrade.worker.Worker._worker', MagicMock(side_effect=KeyboardInterrupt))
+    mocker.patch('freqtrade.commands.start_trading', MagicMock(side_effect=KeyboardInterrupt))
     patched_configuration_load_config_file(mocker, default_conf)
-    mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
-    mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
-    mocker.patch('freqtrade.freqtradebot.init_db', MagicMock())
 
     args = ['trade', '-c', 'config_examples/config_bittrex.example.json']
 
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
+    # assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
     assert log_has('SIGINT received, aborting ...', caplog)
 
 
 def test_main_operational_exception(mocker, default_conf, caplog) -> None:
     patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', MagicMock())
-    mocker.patch(
-        'freqtrade.worker.Worker._worker',
-        MagicMock(side_effect=FreqtradeException('Oh snap!'))
-    )
-    patched_configuration_load_config_file(mocker, default_conf)
-    mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
-    mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
-    mocker.patch('freqtrade.freqtradebot.init_db', MagicMock())
+    mocker.patch('freqtrade.commands.start_trading',
+                 MagicMock(side_effect=FreqtradeException('Oh snap!')))
 
     args = ['trade', '-c', 'config_examples/config_bittrex.example.json']
 
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
     assert log_has('Oh snap!', caplog)
 
 
 def test_main_operational_exception1(mocker, default_conf, caplog) -> None:
     patch_exchange(mocker)
     mocker.patch(
-        'freqtrade.commands.list_commands.validate_exchanges',
+        'freqtrade.commands.start_list_exchanges',
         MagicMock(side_effect=ValueError('Oh snap!'))
     )
-    patched_configuration_load_config_file(mocker, default_conf)
+    # patched_configuration_load_config_file(mocker, default_conf)
 
     args = ['list-exchanges']
 
-    # Test Main + the KeyboardInterrupt exception
+    # # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
 
     assert log_has('Fatal exception!', caplog)
     assert not log_has_re(r'SIGINT.*', caplog)
     mocker.patch(
-        'freqtrade.commands.list_commands.validate_exchanges',
+        'freqtrade.commands.start_list_exchanges',
         MagicMock(side_effect=KeyboardInterrupt)
     )
     with pytest.raises(SystemExit):
         main(args)
 
     assert log_has_re(r'SIGINT.*', caplog)
-
-
-def test_main_reload_config(mocker, default_conf, caplog) -> None:
-    patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', MagicMock())
-    # Simulate Running, reload, running workflow
-    worker_mock = get_mock_coro(side_effect=[State.RUNNING,
-                                             State.RELOAD_CONFIG,
-                                             State.RUNNING,
-                                             OperationalException("Oh snap!")])
-    mocker.patch('freqtrade.worker.Worker._worker', worker_mock)
-    patched_configuration_load_config_file(mocker, default_conf)
-    mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
-    reconfigure_mock = mocker.patch('freqtrade.worker.Worker._reconfigure', MagicMock())
-
-    mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
-    mocker.patch('freqtrade.freqtradebot.init_db', MagicMock())
-
-    with pytest.raises(SystemExit):
-        main(['trade', '-c', 'config_examples/config_bittrex.example.json'])
-
-    assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
-    assert worker_mock.call_count == 2
-    assert reconfigure_mock.call_count == 1
-
-
-async def test_reconfigure(mocker, default_conf) -> None:
-    patch_exchange(mocker)
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', get_mock_coro())
-    mocker.patch(
-        'freqtrade.worker.Worker._worker',
-        get_mock_coro(side_effect=OperationalException('Oh snap!'))
-    )
-    mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
-    patched_configuration_load_config_file(mocker, default_conf)
-    mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
-    mocker.patch('freqtrade.freqtradebot.init_db', MagicMock())
-
-    args = Arguments([
-        'trade',
-        '-c',
-        'config_examples/config_bittrex.example.json'
-    ]).get_parsed_arg()
-    worker = Worker(args=args)
-    await worker.init_worker()
-    freqtrade = worker.freqtrade
-
-    # Renew mock to return modified data
-    conf = deepcopy(default_conf)
-    conf['stake_amount'] += 1
-    patched_configuration_load_config_file(mocker, conf)
-
-    worker._config = conf
-    # reconfigure should return a new instance
-    await worker._reconfigure()
-    freqtrade2 = worker.freqtrade
-
-    # Verify we have a new instance with the new config
-    assert freqtrade is not freqtrade2
-    assert freqtrade.config['stake_amount'] + 1 == freqtrade2.config['stake_amount']

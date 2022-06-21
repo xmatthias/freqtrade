@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from zipfile import ZipFile
 
 import arrow
@@ -62,6 +62,24 @@ async def test_start_trading_fail(mocker, caplog):
     await start_trading(get_args(args))
     assert exitmock.call_count == 0
     assert log_has('Fatal exception!', caplog)
+
+
+async def test_start_trading_kbinterrupt(mocker, caplog):
+
+    mocker.patch("freqtrade.worker.Worker.init_worker",
+                 AsyncMock(side_effect=KeyboardInterrupt))
+
+    mocker.patch("freqtrade.worker.Worker.__init__", MagicMock(return_value=None))
+
+    exitmock = mocker.patch("freqtrade.worker.Worker.exit", get_mock_coro())
+    args = [
+        'trade',
+        '-c', 'config_examples/config_bittrex.example.json'
+    ]
+    await start_trading(get_args(args))
+    assert exitmock.call_count == 1
+
+    assert log_has('SIGINT received, aborting ...', caplog)
 
 
 def test_start_webserver(mocker, caplog):

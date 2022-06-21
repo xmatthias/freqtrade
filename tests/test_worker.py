@@ -6,6 +6,7 @@ import pytest
 
 from freqtrade.data.dataprovider import DataProvider
 from freqtrade.enums import State
+from freqtrade.exceptions import OperationalException
 from tests.conftest import get_mock_coro, get_patched_worker, log_has, log_has_re
 
 
@@ -127,3 +128,32 @@ async def test_worker_heartbeat_stopped(default_conf, mocker, caplog):
     worker._heartbeat_msg -= 70
     await worker._worker(old_state=State.STOPPED)
     assert log_has_re(message, caplog)
+
+
+async def test_worker_reload_config(mocker, default_conf) -> None:
+    worker = await get_patched_worker(mocker, default_conf)
+
+    # # Simulate Running, reload, running workflow
+    worker_mock = get_mock_coro(side_effect=[State.RUNNING,
+                                             State.RELOAD_CONFIG,
+                                             State.RUNNING,
+                                             OperationalException("Oh snap!")])
+    mocker.patch('freqtrade.worker.Worker._worker', worker_mock)
+    reconfigure_mock = mocker.patch('freqtrade.worker.Worker._reconfigure', get_mock_coro())
+
+    with pytest.raises(OperationalException, match="Oh snap!"):
+        await worker.run()
+
+    assert worker_mock.call_count == 4
+    assert reconfigure_mock.call_count == 1
+
+
+async def test_worker_reconfigure(mocker, default_conf) -> None:
+    worker = await get_patched_worker(mocker, default_conf)
+    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.cleanup', get_mock_coro())
+    mocker.patch('freqtrade.worker.Worker.init_worker', get_mock_coro())
+    notify_mock = mocker.patch('freqtrade.worker.Worker._notify')
+    mocker.patch('freqtrade.freqtradebot.RPCManager', MagicMock())
+
+    await worker._reconfigure()
+    assert notify_mock.call_count == 2
