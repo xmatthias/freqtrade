@@ -93,7 +93,7 @@ class Exchange:
         :return: None
         """
         self._api: ccxt.Exchange
-        self._api_async: ccxt_async.Exchange
+        self._api_async: ccxt_async.Exchange = None
         self._markets: Dict = {}
         self._trading_fees: Dict[str, Any] = {}
         self._leverage_tiers: Dict[str, List[Dict]] = {}
@@ -2166,9 +2166,10 @@ class Exchange:
             raise OperationalException(e) from e
 
     @retrier_async
-    async def get_market_leverage_tiers(self, symbol) -> List[Dict]:
+    async def get_market_leverage_tiers(self, symbol: str) -> Tuple[str, List[Dict]]:
         try:
-            return await self._api_async.fetch_market_leverage_tiers(symbol)
+            tier = await self._api_async.fetch_market_leverage_tiers(symbol)
+            return symbol, tier
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
@@ -2202,8 +2203,13 @@ class Exchange:
                     f"Initializing leverage_tiers for {len(symbols)} markets. "
                     "This will take about a minute.")
 
-                for symbol in sorted(symbols):
-                    tiers[symbol] = await self.get_market_leverage_tiers(symbol)
+                coros = [self.get_market_leverage_tiers(symbol) for symbol in sorted(symbols)]
+
+                for input_coro in chunks(coros, 100):
+
+                    results = await asyncio.gather(*input_coro, return_exceptions=True)
+                    for symbol, res in results:
+                        tiers[symbol] = res
 
                 logger.info(f"Done initializing {len(symbols)} markets.")
 

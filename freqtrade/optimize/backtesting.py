@@ -977,6 +977,7 @@ class Backtesting:
                 return False
             else:
                 del trade.orders[trade.orders.index(order)]
+                trade.open_order_id = None
                 self.canceled_entry_orders += 1
 
             # place new order if result was not None
@@ -1065,6 +1066,7 @@ class Backtesting:
                         # Close trade
                         open_trade_count -= 1
                         open_trades[pair].remove(t)
+                        LocalTrade.trades_open.remove(t)
                         self.wallets.update()
 
                 # 2. Process entries.
@@ -1088,6 +1090,8 @@ class Backtesting:
                         open_trade_count += 1
                         # logger.debug(f"{pair} - Emulate creation of new trade: {trade}.")
                         open_trades[pair].append(trade)
+                        LocalTrade.add_bt_trade(trade)
+                        self.wallets.update()
 
                 for trade in list(open_trades[pair]):
                     # 3. Process entry orders.
@@ -1095,7 +1099,6 @@ class Backtesting:
                     if order and self._get_order_filled(order.price, row):
                         order.close_bt_order(current_time, trade)
                         trade.open_order_id = None
-                        LocalTrade.add_bt_trade(trade)
                         self.wallets_update()
 
                     # 4. Create exit orders (if any)
@@ -1274,13 +1277,14 @@ class Backtesting:
                 self.results['strategy_comparison'].extend(results['strategy_comparison'])
             else:
                 self.results = results
-
+            dt_appendix = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             if self.config.get('export', 'none') in ('trades', 'signals'):
-                store_backtest_stats(self.config['exportfilename'], self.results)
+                store_backtest_stats(self.config['exportfilename'], self.results, dt_appendix)
 
             if (self.config.get('export', 'none') == 'signals' and
                     self.dataprovider.runmode == RunMode.BACKTEST):
-                store_backtest_signal_candles(self.config['exportfilename'], self.processed_dfs)
+                store_backtest_signal_candles(
+                    self.config['exportfilename'], self.processed_dfs, dt_appendix)
 
         # Results may be mixed up now. Sort them so they follow --strategy-list order.
         if 'strategy_list' in self.config and len(self.results) > 0:

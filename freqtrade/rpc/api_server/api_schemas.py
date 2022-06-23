@@ -104,6 +104,10 @@ class Profit(BaseModel):
     best_pair_profit_ratio: float
     winning_trades: int
     losing_trades: int
+    profit_factor: float
+    max_drawdown: float
+    max_drawdown_abs: float
+    trading_volume: Optional[float]
 
 
 class SellReason(BaseModel):
@@ -120,6 +124,8 @@ class Stats(BaseModel):
 class DailyRecord(BaseModel):
     date: date
     abs_profit: float
+    rel_profit: float
+    starting_balance: float
     fiat_value: float
     trade_count: int
 
@@ -277,6 +283,7 @@ class OpenTradeSchema(TradeSchema):
 class TradeResponse(BaseModel):
     trades: List[TradeSchema]
     trades_count: int
+    offset: int
     total_trades: int
 
 
