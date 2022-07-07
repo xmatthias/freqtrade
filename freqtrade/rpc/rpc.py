@@ -802,7 +802,9 @@ class RPC:
                                                is_short=is_short,
                                                enter_tag=enter_tag,
                                                ):
+            logger.info("returned from entry")
             Trade.commit()
+            logger.info("after commit")
             trade = Trade.get_trades([Trade.is_open.is_(True), Trade.pair == pair]).first()
             return trade
         else:

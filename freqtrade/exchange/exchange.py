@@ -207,14 +207,16 @@ class Exchange:
         """
         Destructor - clean up async stuff
         """
-        self.close()
+        pass
+        # TODO: asyncio: needed (?)
+        # self.close()
 
-    def close(self):
+    async def close(self):
         logger.debug("Exchange object destroyed, closing async loop")
         if (self._api_async and inspect.iscoroutinefunction(self._api_async.close)
                 and self._api_async.session):
             logger.info("Closing async ccxt session.")
-            self.loop.run_until_complete(self._api_async.close())
+            await self._api_async.close()
 
     async def _init_ccxt(self, exchange_config: Dict[str, Any], ccxt_module: CcxtModuleType = ccxt,
                          ccxt_kwargs: Dict = {}) -> ccxt.Exchange:
