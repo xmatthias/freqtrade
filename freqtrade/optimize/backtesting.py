@@ -91,7 +91,7 @@ class Backtesting:
             ExchangeResolver.load_exchange(self._exchange_name, self.config))
         self.dataprovider = DataProvider(self.config, self.exchange, loop=self.loop)
 
-        if self.config.get('strategy_list', None):
+        if self.config.get('strategy_list'):
             for strat in list(self.config['strategy_list']):
                 stratconf = deepcopy(self.config)
                 stratconf['strategy'] = strat
@@ -194,6 +194,7 @@ class Backtesting:
         self.strategy.order_types['stoploss_on_exchange'] = False
 
         self.strategy.ft_bot_start()
+        strategy_safe_wrapper(self.strategy.bot_loop_start, supress_error=True)()
 
     def _load_protections(self, strategy: IStrategy):
         if self.config.get('enable_protections', False):
@@ -732,7 +733,7 @@ class Backtesting:
                 pair=pair, current_time=current_time, current_rate=propose_rate,
                 proposed_stake=stake_amount, min_stake=min_stake_amount,
                 max_stake=min(stake_available, max_stake_amount),
-                entry_tag=entry_tag, side=direction)
+                leverage=leverage, entry_tag=entry_tag, side=direction)
 
         stake_amount_val = self.wallets.validate_stake_amount(
             pair=pair,
@@ -1150,8 +1151,6 @@ class Backtesting:
         logger.info(f"Running backtesting for Strategy {strat.get_strategy_name()}")
         backtest_start_time = datetime.now(timezone.utc)
         self._set_strategy(strat)
-
-        strategy_safe_wrapper(self.strategy.bot_loop_start, supress_error=True)()
 
         # Use max_open_trades in backtesting, except --disable-max-market-positions is set
         if self.config.get('use_max_market_positions', True):
