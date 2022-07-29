@@ -69,7 +69,7 @@ class FreqtradeBot(LoggingMixin):
         validate_config_consistency(self.config)
 
         self.exchange = await ExchangeResolver.load_exchange(
-            self.config['exchange']['name'], self.config)
+            self.config['exchange']['name'], self.config, load_leverage_tiers=True)
 
         init_db(self.config['db_url'])
 
@@ -342,6 +342,8 @@ class FreqtradeBot(LoggingMixin):
             if not trade.is_open and not trade.fee_updated(trade.exit_side):
                 # Get sell fee
                 order = trade.select_order(trade.exit_side, False)
+                if not order:
+                    order = trade.select_order('stoploss', False)
                 if order:
                     logger.info(
                         f"Updating {trade.exit_side}-fee on trade {trade}"

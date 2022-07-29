@@ -12,6 +12,7 @@ from unittest.mock import ANY, MagicMock
 
 import arrow
 import pytest
+from pandas import DataFrame
 from telegram import Chat, Message, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, NetworkError, TelegramError
 
@@ -694,6 +695,7 @@ async def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell
     # Simulate fulfilled LIMIT_SELL order for trade
     oobj = Order.parse_from_ccxt_object(
         limit_sell_order_usdt, limit_sell_order_usdt['symbol'], 'sell')
+    trade.orders.append(oobj)
     trade.update_trade(oobj)
 
     trade.close_date = datetime.now(timezone.utc)
@@ -715,7 +717,7 @@ async def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell
     assert '*Best Performing:* `ETH/USDT: 9.45%`' in msg_mock.call_args_list[-1][0][0]
     assert '*Max Drawdown:*' in msg_mock.call_args_list[-1][0][0]
     assert '*Profit factor:*' in msg_mock.call_args_list[-1][0][0]
-    assert '*Trading volume:* `60 USDT`' in msg_mock.call_args_list[-1][0][0]
+    assert '*Trading volume:* `126 USDT`' in msg_mock.call_args_list[-1][0][0]
 
 
 @pytest.mark.parametrize('is_short', [True, False])
@@ -1668,8 +1670,17 @@ async def test_show_config_handle(default_conf, update, mocker) -> None:
     (RPCMessageType.ENTRY, 'Long', 'long_signal_01', 1.0),
     (RPCMessageType.ENTRY, 'Long', 'long_signal_01', 5.0),
     (RPCMessageType.ENTRY, 'Short', 'short_signal_01', 2.0)])
-async def test_send_msg_buy_notification(default_conf, mocker, caplog, message_type,
-                                         enter, enter_signal, leverage) -> None:
+async def test_send_msg_enter_notification(default_conf, mocker, caplog, message_type,
+                                           enter, enter_signal, leverage) -> None:
+    default_conf['telegram']['notification_settings']['show_candle'] = 'ohlc'
+    df = DataFrame({
+        'open': [1.1],
+        'high': [2.2],
+        'low': [1.0],
+        'close': [1.5],
+    })
+    mocker.patch('freqtrade.data.dataprovider.DataProvider.get_analyzed_dataframe',
+                 return_value=(df, 1))
 
     msg = {
         'type': message_type,
@@ -1687,6 +1698,7 @@ async def test_send_msg_buy_notification(default_conf, mocker, caplog, message_t
         'fiat_currency': 'USD',
         'current_rate': 1.099e-05,
         'amount': 1333.3333333333335,
+        'analyzed_candle': {'open': 1.1, 'high': 2.2, 'low': 1.0, 'close': 1.5},
         'open_date': arrow.utcnow().shift(hours=-1)
     }
     telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
@@ -1696,6 +1708,7 @@ async def test_send_msg_buy_notification(default_conf, mocker, caplog, message_t
 
     assert msg_mock.call_args[0][0] == (
         f'\N{LARGE BLUE CIRCLE} *Binance (dry):* {enter} ETH/BTC (#1)\n'
+        '*Candle OHLC*: `1.1, 2.2, 1.0, 1.5`\n'
         f'*Enter Tag:* `{enter_signal}`\n'
         '*Amount:* `1333.33333333`\n'
         f'{leverage_text}'
@@ -1723,7 +1736,7 @@ async def test_send_msg_buy_notification(default_conf, mocker, caplog, message_t
 @pytest.mark.parametrize('message_type,enter_signal', [
     (RPCMessageType.ENTRY_CANCEL, 'long_signal_01'),
     (RPCMessageType.ENTRY_CANCEL, 'short_signal_01')])
-async def test_send_msg_buy_cancel_notification(
+async def test_send_msg_enter_cancel_notification(
         default_conf, mocker, message_type, enter_signal) -> None:
 
     telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)

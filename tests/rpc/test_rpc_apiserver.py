@@ -1403,10 +1403,10 @@ def test_api_strategies(botclient):
 
     assert rc.json() == {'strategies': [
         'HyperoptableStrategy',
+        'HyperoptableStrategyV2',
         'InformativeDecoratorTest',
         'StrategyTestV2',
         'StrategyTestV3',
-        'StrategyTestV3Analysis',
         'StrategyTestV3Futures'
     ]}
 

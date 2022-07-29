@@ -88,7 +88,8 @@ class Backtesting:
 
         self._exchange_name = self.config['exchange']['name']
         self.exchange = self.loop.run_until_complete(
-            ExchangeResolver.load_exchange(self._exchange_name, self.config))
+            ExchangeResolver.load_exchange(
+                self._exchange_name, self.config, load_leverage_tiers=True))
         self.dataprovider = DataProvider(self.config, self.exchange, loop=self.loop)
 
         if self.config.get('strategy_list'):
