@@ -49,7 +49,7 @@ class EdgeCli:
 
         self.edge._timerange = TimeRange.parse_timerange(None if self.config.get(
             'timerange') is None else str(self.config.get('timerange')))
-        self.strategy.ft_bot_start()
+        await self.strategy.ft_bot_start()
 
     async def start(self) -> None:
         result = await self.edge.calculate(self.config['exchange']['pair_whitelist'])

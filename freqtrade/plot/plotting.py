@@ -635,7 +635,7 @@ def load_and_plot_trades(config: Dict[str, Any]):
     exchange = loop.run_until_complete(
         ExchangeResolver.load_exchange(config['exchange']['name'], config))
     IStrategy.dp = DataProvider(config, exchange, loop)
-    strategy.ft_bot_start()
+    loop.run_until_complete(strategy.ft_bot_start())
     strategy.bot_loop_start()
     plot_elements = init_plotscript(config, list(exchange.markets), strategy.startup_candle_count)
     timerange = plot_elements['timerange']

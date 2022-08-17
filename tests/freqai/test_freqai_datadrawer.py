@@ -9,9 +9,9 @@ from tests.conftest import get_patched_exchange
 from tests.freqai.conftest import get_patched_freqai_strategy
 
 
-def test_update_historic_data(mocker, freqai_conf):
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+async def test_update_historic_data(mocker, freqai_conf):
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     freqai = strategy.freqai
     freqai.live = True
@@ -30,9 +30,9 @@ def test_update_historic_data(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_load_all_pairs_histories(mocker, freqai_conf):
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+async def test_load_all_pairs_histories(mocker, freqai_conf):
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     freqai = strategy.freqai
     freqai.live = True
@@ -49,9 +49,9 @@ def test_load_all_pairs_histories(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_get_base_and_corr_dataframes(mocker, freqai_conf):
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+async def test_get_base_and_corr_dataframes(mocker, freqai_conf):
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     freqai = strategy.freqai
     freqai.live = True
@@ -75,9 +75,9 @@ def test_get_base_and_corr_dataframes(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_use_strategy_to_populate_indicators(mocker, freqai_conf):
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+async def test_use_strategy_to_populate_indicators(mocker, freqai_conf):
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai

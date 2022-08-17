@@ -197,7 +197,7 @@ class Backtesting:
         # And the regular "stoploss" function would not apply to that case
         self.strategy.order_types['stoploss_on_exchange'] = False
 
-        self.strategy.ft_bot_start()
+        self.loop.run_until_complete(self.strategy.ft_bot_start())
         strategy_safe_wrapper(self.strategy.bot_loop_start, supress_error=True)()
 
     def _load_protections(self, strategy: IStrategy):
@@ -872,7 +872,7 @@ class Backtesting:
                     amount=amount,
                     leverage=leverage,
                     is_short=is_short,
-            )))
+                )))
 
             order = Order(
                 id=self.order_id_counter,

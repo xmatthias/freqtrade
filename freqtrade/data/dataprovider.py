@@ -29,8 +29,8 @@ MAX_DATAFRAME_CANDLES = 1000
 
 class DataProvider:
 
-    def __init__(self, config: dict, exchange: Optional[Exchange], loop: asyncio.AbstractEventLoop,
-                 pairlists=None, ) -> None:
+    def __init__(self, config: dict, exchange: Optional[Exchange],
+                 loop: asyncio.AbstractEventLoop = None, pairlists=None) -> None:
         self._config = config
         self._exchange = exchange
         self._pairlists = pairlists

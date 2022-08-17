@@ -68,9 +68,9 @@ def get_patched_data_drawer(mocker, freqaiconf):
     return dd
 
 
-def get_patched_freqai_strategy(mocker, freqaiconf):
+async def get_patched_freqai_strategy(mocker, freqaiconf):
     strategy = StrategyResolver.load_strategy(freqaiconf)
-    strategy.ft_bot_start()
+    await strategy.ft_bot_start()
 
     return strategy
 

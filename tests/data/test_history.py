@@ -411,8 +411,8 @@ def test_init(default_conf, mocker) -> None:
     )
 
 
-def test_init_with_refresh(default_conf, mocker) -> None:
-    exchange = get_patched_exchange(mocker, default_conf)
+async def test_init_with_refresh(default_conf, mocker) -> None:
+    exchange = await get_patched_exchange(mocker, default_conf)
     refresh_data(
         datadir=Path(''),
         pairs=[],

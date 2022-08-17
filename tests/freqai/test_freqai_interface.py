@@ -17,11 +17,11 @@ def is_arm() -> bool:
     return "arm" in machine or "aarch64" in machine
 
 
-def test_train_model_in_series_LightGBM(mocker, freqai_conf):
+async def test_train_model_in_series_LightGBM(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -45,12 +45,12 @@ def test_train_model_in_series_LightGBM(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_train_model_in_series_LightGBMMultiModel(mocker, freqai_conf):
+async def test_train_model_in_series_LightGBMMultiModel(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
     freqai_conf.update({"strategy": "freqai_test_multimodel_strat"})
     freqai_conf.update({"freqaimodel": "LightGBMRegressorMultiTarget"})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -77,13 +77,13 @@ def test_train_model_in_series_LightGBMMultiModel(mocker, freqai_conf):
 
 
 @pytest.mark.skipif(is_arm(), reason="no ARM for Catboost ...")
-def test_train_model_in_series_Catboost(mocker, freqai_conf):
+async def test_train_model_in_series_Catboost(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
     freqai_conf.update({"freqaimodel": "CatboostRegressor"})
     # freqai_conf.get('freqai', {}).update(
     #     {'model_training_parameters': {"n_estimators": 100, "verbose": 0}})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
 
     strategy.freqai_info = freqai_conf.get("freqai", {})
@@ -110,12 +110,12 @@ def test_train_model_in_series_Catboost(mocker, freqai_conf):
 
 
 @pytest.mark.skipif(is_arm(), reason="no ARM for Catboost ...")
-def test_train_model_in_series_CatboostClassifier(mocker, freqai_conf):
+async def test_train_model_in_series_CatboostClassifier(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
     freqai_conf.update({"freqaimodel": "CatboostClassifier"})
     freqai_conf.update({"strategy": "freqai_test_classifier"})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
 
     strategy.freqai_info = freqai_conf.get("freqai", {})
@@ -141,12 +141,12 @@ def test_train_model_in_series_CatboostClassifier(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_train_model_in_series_LightGBMClassifier(mocker, freqai_conf):
+async def test_train_model_in_series_LightGBMClassifier(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
     freqai_conf.update({"freqaimodel": "LightGBMClassifier"})
     freqai_conf.update({"strategy": "freqai_test_classifier"})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
 
     strategy.freqai_info = freqai_conf.get("freqai", {})
@@ -172,10 +172,10 @@ def test_train_model_in_series_LightGBMClassifier(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_start_backtesting(mocker, freqai_conf):
+async def test_start_backtesting(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180120-20180130"})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -197,11 +197,11 @@ def test_start_backtesting(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_start_backtesting_subdaily_backtest_period(mocker, freqai_conf):
+async def test_start_backtesting_subdaily_backtest_period(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180120-20180124"})
     freqai_conf.get("freqai", {}).update({"backtest_period_days": 0.5})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -222,10 +222,10 @@ def test_start_backtesting_subdaily_backtest_period(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_start_backtesting_from_existing_folder(mocker, freqai_conf, caplog):
+async def test_start_backtesting_from_existing_folder(mocker, freqai_conf, caplog):
     freqai_conf.update({"timerange": "20180120-20180130"})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -247,8 +247,8 @@ def test_start_backtesting_from_existing_folder(mocker, freqai_conf, caplog):
     # without deleting the exiting folder structure, re-run
 
     freqai_conf.update({"timerange": "20180120-20180130"})
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -270,11 +270,11 @@ def test_start_backtesting_from_existing_folder(mocker, freqai_conf, caplog):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_follow_mode(mocker, freqai_conf):
+async def test_follow_mode(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -300,8 +300,8 @@ def test_follow_mode(mocker, freqai_conf):
 
     freqai_conf.get("freqai", {}).update({"follow_mode": "true"})
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -318,13 +318,13 @@ def test_follow_mode(mocker, freqai_conf):
     shutil.rmtree(Path(freqai.dk.full_path))
 
 
-def test_principal_component_analysis(mocker, freqai_conf):
+async def test_principal_component_analysis(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
     freqai_conf.get("freqai", {}).get("feature_parameters", {}).update(
         {"princpial_component_analysis": "true"})
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai

@@ -302,9 +302,9 @@ def test_populate_any_indicators(default_conf, testdatadir) -> None:
     assert len(processed['UNITTEST/BTC']) == 102  # partial candle was removed
 
 
-def test_freqai_not_initialized(default_conf) -> None:
+async def test_freqai_not_initialized(default_conf) -> None:
     strategy = StrategyResolver.load_strategy(default_conf)
-    strategy.ft_bot_start()
+    await strategy.ft_bot_start()
     with pytest.raises(OperationalException, match=r'freqAI is not enabled\.'):
         strategy.freqai.start()
 
@@ -938,11 +938,11 @@ def test_hyperopt_parameters():
     assert list(boolpar.range) == [True, False]
 
 
-def test_auto_hyperopt_interface(default_conf):
+async def test_auto_hyperopt_interface(default_conf):
     default_conf.update({'strategy': 'HyperoptableStrategyV2'})
     PairLocks.timeframe = default_conf['timeframe']
     strategy = StrategyResolver.load_strategy(default_conf)
-    strategy.ft_bot_start()
+    await strategy.ft_bot_start()
     with pytest.raises(OperationalException):
         next(strategy.enumerate_parameters('deadBeef'))
 
