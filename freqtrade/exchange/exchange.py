@@ -2428,7 +2428,7 @@ class Exchange:
         """
         return 0.0
 
-    def get_liquidation_price(
+    async def get_liquidation_price(
             self,
             pair: str,
             open_rate: float,
@@ -2444,7 +2444,7 @@ class Exchange:
             self.trading_mode == TradingMode.FUTURES
         ):
             wallet_balance = (amount * open_rate) / leverage
-            isolated_liq = self.get_or_calculate_liquidation_price(
+            isolated_liq = await self.get_or_calculate_liquidation_price(
                 pair=pair,
                 open_rate=open_rate,
                 is_short=is_short,
@@ -2617,7 +2617,7 @@ class Exchange:
         else:
             return 0.0
 
-    def get_or_calculate_liquidation_price(
+    async def get_or_calculate_liquidation_price(
         self,
         pair: str,
         # Dry-run
@@ -2650,7 +2650,7 @@ class Exchange:
                 upnl_ex_1=upnl_ex_1
             )
         else:
-            positions = self.fetch_positions(pair)
+            positions = await self.fetch_positions(pair)
             if len(positions) > 0:
                 pos = positions[0]
                 isolated_liq = pos['liquidationPrice']

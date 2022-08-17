@@ -4683,7 +4683,7 @@ async def test_liquidation_price_is_none(
     default_conf['trading_mode'] = trading_mode
     default_conf['margin_mode'] = margin_mode
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
-    assert exchange.get_or_calculate_liquidation_price(
+    assert await exchange.get_or_calculate_liquidation_price(
         pair='DOGE/USDT',
         open_rate=open_rate,
         is_short=is_short,
@@ -4717,7 +4717,7 @@ async def test_liquidation_price(
     default_conf['liquidation_buffer'] = 0.0
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
     exchange.get_maintenance_ratio_and_amt = MagicMock(return_value=(mm_ratio, maintenance_amt))
-    assert isclose(round(exchange.get_or_calculate_liquidation_price(
+    assert isclose(round(await exchange.get_or_calculate_liquidation_price(
         pair='DOGE/USDT',
         open_rate=open_rate,
         is_short=is_short,
@@ -5237,7 +5237,7 @@ async def test_get_liquidation_price(
     # default_conf_usdt.update({
     #     "dry_run": False,
     # })
-    liq = exchange.get_liquidation_price(
+    liq = await exchange.get_liquidation_price(
         pair='ETH/USDT:USDT',
         open_rate=open_rate,
         amount=amount,
