@@ -93,6 +93,9 @@ class Backtesting:
         self.dataprovider = DataProvider(self.config, self.exchange, loop=self.loop)
 
         if self.config.get('strategy_list'):
+            if self.config.get('freqai', {}).get('enabled', False):
+                raise OperationalException(
+                    "You can't use strategy_list and freqai at the same time.")
             for strat in list(self.config['strategy_list']):
                 stratconf = deepcopy(self.config)
                 stratconf['strategy'] = strat
@@ -211,6 +214,15 @@ class Backtesting:
         as tuple.
         """
         self.progress.init_step(BacktestState.DATALOAD, 1)
+
+        if self.config.get('freqai', {}).get('enabled', False):
+            startup_candles = int(self.config.get('freqai', {}).get('startup_candles', 0))
+            if not startup_candles:
+                raise OperationalException('FreqAI backtesting module requires user set '
+                                           'startup_candles in config.')
+            self.required_startup += int(self.config.get('freqai', {}).get('startup_candles', 0))
+            logger.info(f'Increasing startup_candle_count for freqai to {self.required_startup}')
+            self.config['startup_candle_count'] = self.required_startup
 
         data = history.load_data(
             datadir=self.config['datadir'],

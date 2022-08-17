@@ -12,7 +12,7 @@ from freqtrade.enums import CandleType, RunMode, TradingMode
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange import timeframe_to_minutes
 from freqtrade.exchange.exchange import market_is_active
-from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
+from freqtrade.plugins.pairlist.pairlist_helpers import dynamic_expand_pairlist, expand_pairlist
 from freqtrade.resolvers import ExchangeResolver
 
 
@@ -51,7 +51,8 @@ async def start_download_data(args: Dict[str, Any]) -> None:
                                                     load_markets=True, validate=False)
     markets = [p for p, m in exchange.markets.items() if market_is_active(m)
                or config.get('include_inactive')]
-    expanded_pairs = expand_pairlist(config['pairs'], markets)
+
+    expanded_pairs = dynamic_expand_pairlist(config, markets)
 
     # Manual validations of relevant settings
     if not config['exchange'].get('skip_pair_validation', False):

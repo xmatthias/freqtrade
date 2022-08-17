@@ -487,6 +487,9 @@ class Hyperopt:
         self.backtesting.loop = None  # type: ignore
         self.backtesting.pairlists._loop = None  # type: ignore
         self.backtesting.dataprovider._loop = None  # type: ignore
+        self.backtesting.exchange._cache_lock = None  # type: ignore
+        # self.backtesting.exchange = None  # type: ignore
+        self.backtesting.pairlists = None  # type: ignore
 
         cpus = cpu_count()
         logger.info(f"Found {cpus} CPU cores. Let's make them scream!")

@@ -145,11 +145,29 @@ class IStrategy(ABC, HyperStrategyMixin):
                     informative_data.candle_type = config['candle_type_def']
                 self._ft_informative.append((informative_data, cls_method))
 
+    def load_freqAI_model(self) -> None:
+        if self.config.get('freqai', {}).get('enabled', False):
+            # Import here to avoid importing this if freqAI is disabled
+            from freqtrade.resolvers.freqaimodel_resolver import FreqaiModelResolver
+
+            self.freqai = FreqaiModelResolver.load_freqaimodel(self.config)
+            self.freqai_info = self.config["freqai"]
+        else:
+            # Gracious failures if freqAI is disabled but "start" is called.
+            class DummyClass():
+                def start(self, *args, **kwargs):
+                    raise OperationalException(
+                        'freqAI is not enabled. '
+                        'Please enable it in your config to use this strategy.')
+            self.freqai = DummyClass()  # type: ignore
+
     def ft_bot_start(self, **kwargs) -> None:
         """
         Strategy init - runs after dataprovider has been added.
         Must call bot_start()
         """
+        self.load_freqAI_model()
+
         strategy_safe_wrapper(self.bot_start)()
 
         self.ft_load_hyper_params(self.config.get('runmode') == RunMode.HYPEROPT)
@@ -557,6 +575,22 @@ class IStrategy(ABC, HyperStrategyMixin):
         """
         return None
 
+    def populate_any_indicators(self, pair: str, df: DataFrame, tf: str,
+                                informative: DataFrame = None,
+                                set_generalized_indicators: bool = False) -> DataFrame:
+        """
+        Function designed to automatically generate, name and merge features
+        from user indicated timeframes in the configuration file. User can add
+        additional features here, but must follow the naming convention.
+        This method is *only* used in FreqaiDataKitchen class and therefore
+        it is only called if FreqAI is active.
+        :param pair: pair to be used as informative
+        :param df: strategy dataframe which will receive merges from informatives
+        :param tf: timeframe of the dataframe which will modify the feature names
+        :param informative: the dataframe associated with the informative pair
+        """
+        return df
+
 ###
 # END - Intended to be overridden by strategy
 ###
@@ -583,9 +617,6 @@ class IStrategy(ABC, HyperStrategyMixin):
                 )
                 informative_pairs.append(pair_tf)
             else:
-                if not self.dp:
-                    raise OperationalException('@informative decorator with unspecified asset '
-                                               'requires DataProvider instance.')
                 for pair in self.dp.current_whitelist():
                     informative_pairs.append((pair, inf_data.timeframe, candle_type))
         return list(set(informative_pairs))
@@ -679,10 +710,9 @@ class IStrategy(ABC, HyperStrategyMixin):
             # Defs that only make change on new candle data.
             dataframe = self.analyze_ticker(dataframe, metadata)
             self._last_candle_seen_per_pair[pair] = dataframe.iloc[-1]['date']
-            if self.dp:
-                self.dp._set_cached_df(
-                    pair, self.timeframe, dataframe,
-                    candle_type=self.config.get('candle_type_def', CandleType.SPOT))
+            self.dp._set_cached_df(
+                pair, self.timeframe, dataframe,
+                candle_type=self.config.get('candle_type_def', CandleType.SPOT))
         else:
             logger.debug("Skipping TA Analysis for already analyzed candle")
             dataframe[SignalType.ENTER_LONG.value] = 0
@@ -703,8 +733,6 @@ class IStrategy(ABC, HyperStrategyMixin):
         The analyzed dataframe is then accessible via `dp.get_analyzed_dataframe()`.
         :param pair: Pair to analyze.
         """
-        if not self.dp:
-            raise OperationalException("DataProvider not found.")
         dataframe = self.dp.ohlcv(
             pair, self.timeframe, candle_type=self.config.get('candle_type_def', CandleType.SPOT)
         )
