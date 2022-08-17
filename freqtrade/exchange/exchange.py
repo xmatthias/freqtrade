@@ -16,7 +16,7 @@ import arrow
 import ccxt
 import ccxt.async_support as ccxt_async
 from cachetools import TTLCache
-from ccxt import ROUND_DOWN, ROUND_UP, TICK_SIZE, TRUNCATE, Precise, decimal_to_precision
+from ccxt import ROUND_DOWN, ROUND_UP, TICK_SIZE, TRUNCATE, decimal_to_precision
 from pandas import DataFrame
 
 from freqtrade.constants import (DEFAULT_AMOUNT_RESERVE_PERCENT, NON_OPEN_EXCHANGE_STATES, BuySell,
@@ -32,6 +32,7 @@ from freqtrade.exchange.common import (API_FETCH_ORDER_RETRY_COUNT, BAD_EXCHANGE
                                        retrier_async)
 from freqtrade.misc import chunks, deep_merge_dicts, safe_value_fallback2
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
+from freqtrade.util import FtPrecise
 
 
 CcxtModuleType = Any
@@ -700,10 +701,10 @@ class Exchange:
             #                                    counting_mode=self.precisionMode,
             #                                    ))
             if self.precisionMode == TICK_SIZE:
-                precision = Precise(str(self.markets[pair]['precision']['price']))
-                price_str = Precise(str(price))
+                precision = FtPrecise(self.markets[pair]['precision']['price'])
+                price_str = FtPrecise(price)
                 missing = price_str % precision
-                if not missing == Precise("0"):
+                if not missing == FtPrecise("0"):
                     price = round(float(str(price_str - missing + precision)), 14)
             else:
                 symbol_prec = self.markets[pair]['precision']['price']
@@ -841,6 +842,7 @@ class Exchange:
             dry_order.update({
                 'average': average,
                 'filled': _amount,
+                'remaining': 0.0,
                 'cost': (dry_order['amount'] * average) / leverage
             })
             # market orders will always incurr taker fees
@@ -1328,11 +1330,19 @@ class Exchange:
             raise OperationalException(e) from e
 
     @retrier_async
-    async def fetch_positions(self) -> List[Dict]:
+    async def fetch_positions(self, pair: str = None) -> List[Dict]:
+        """
+        Fetch positions from the exchange.
+        If no pair is given, all positions are returned.
+        :param pair: Pair for the query
+        """
         if self._config['dry_run'] or self.trading_mode != TradingMode.FUTURES:
             return []
         try:
-            positions: List[Dict] = await self._api_async.fetch_positions()
+            symbols = []
+            if pair:
+                symbols.append(pair)
+            positions: List[Dict] = await self._api_async.fetch_positions(symbols)
             self._log_exchange_response('fetch_positions', positions)
             return positions
         except ccxt.DDoSProtection as e:
@@ -1544,7 +1554,8 @@ class Exchange:
         return price_side
 
     async def get_rate(self, pair: str, refresh: bool,
-                       side: EntryExit, is_short: bool) -> float:
+                       side: EntryExit, is_short: bool,
+                       order_book: Optional[dict] = None, ticker: Optional[dict] = None) -> float:
         """
         Calculates bid/ask target
         bid rate - between current ask price and last price
@@ -1576,22 +1587,24 @@ class Exchange:
         if conf_strategy.get('use_order_book', False):
 
             order_book_top = conf_strategy.get('order_book_top', 1)
-            order_book = await self.fetch_l2_order_book(pair, order_book_top)
+            if order_book is None:
+                order_book = await self.fetch_l2_order_book(pair, order_book_top)
             logger.debug('order_book %s', order_book)
             # top 1 = index 0
             try:
                 rate = order_book[f"{price_side}s"][order_book_top - 1][0]
             except (IndexError, KeyError) as e:
                 logger.warning(
-                    f"{name} Price at location {order_book_top} from orderbook could not be "
-                    f"determined. Orderbook: {order_book}"
+                    f"{pair} - {name} Price at location {order_book_top} from orderbook "
+                    f"could not be determined. Orderbook: {order_book}"
                 )
                 raise PricingError from e
-            logger.debug(f"{name} price from orderbook {price_side_word}"
+            logger.debug(f"{pair} - {name} price from orderbook {price_side_word}"
                          f"side - top {order_book_top} order book {side} rate {rate:.8f}")
         else:
             logger.debug(f"Using Last {price_side_word} / Last Price")
-            ticker = await self.fetch_ticker(pair)
+            if ticker is None:
+                ticker = await self.fetch_ticker(pair)
             ticker_rate = ticker[price_side]
             if ticker['last'] and ticker_rate:
                 if side == 'entry' and ticker_rate > ticker['last']:
@@ -1607,6 +1620,34 @@ class Exchange:
         cache_rate[pair] = rate
 
         return rate
+
+    async def get_rates(self, pair: str, refresh: bool, is_short: bool) -> Tuple[float, float]:
+        entry_rate = None
+        exit_rate = None
+        if not refresh:
+            entry_rate = self._entry_rate_cache.get(pair)
+            exit_rate = self._exit_rate_cache.get(pair)
+            if entry_rate:
+                logger.debug(f"Using cached buy rate for {pair}.")
+            if exit_rate:
+                logger.debug(f"Using cached sell rate for {pair}.")
+
+        entry_pricing = self._config.get('entry_pricing', {})
+        exit_pricing = self._config.get('exit_pricing', {})
+        order_book = ticker = None
+        if not entry_rate and entry_pricing.get('use_order_book', False):
+            order_book_top = max(entry_pricing.get('order_book_top', 1),
+                                 exit_pricing.get('order_book_top', 1))
+            order_book = await self.fetch_l2_order_book(pair, order_book_top)
+            entry_rate = await self.get_rate(pair, refresh, 'entry', is_short,
+                                             order_book=order_book)
+        elif not entry_rate:
+            ticker = await self.fetch_ticker(pair)
+            entry_rate = await self.get_rate(pair, refresh, 'entry', is_short, ticker=ticker)
+        if not exit_rate:
+            exit_rate = await self.get_rate(pair, refresh, 'exit',
+                                            is_short, order_book=order_book, ticker=ticker)
+        return entry_rate, exit_rate
 
     # Fee handling
 
@@ -2020,7 +2061,7 @@ class Exchange:
             else:
                 logger.debug(
                     "Fetching trades for pair %s, since %s %s...",
-                    pair,  since,
+                    pair, since,
                     '(' + arrow.get(since // 1000).isoformat() + ') ' if since is not None else ''
                 )
                 trades = await self._api_async.fetch_trades(pair, since=since, limit=1000)
@@ -2576,7 +2617,6 @@ class Exchange:
         else:
             return 0.0
 
-    @retrier
     def get_or_calculate_liquidation_price(
         self,
         pair: str,
@@ -2610,20 +2650,12 @@ class Exchange:
                 upnl_ex_1=upnl_ex_1
             )
         else:
-            try:
-                positions = self._api.fetch_positions([pair])
-                if len(positions) > 0:
-                    pos = positions[0]
-                    isolated_liq = pos['liquidationPrice']
-                else:
-                    return None
-            except ccxt.DDoSProtection as e:
-                raise DDosProtection(e) from e
-            except (ccxt.NetworkError, ccxt.ExchangeError) as e:
-                raise TemporaryError(
-                    f'Could not set margin mode due to {e.__class__.__name__}. Message: {e}') from e
-            except ccxt.BaseError as e:
-                raise OperationalException(e) from e
+            positions = self.fetch_positions(pair)
+            if len(positions) > 0:
+                pos = positions[0]
+                isolated_liq = pos['liquidationPrice']
+            else:
+                return None
 
         if isolated_liq:
             buffer_amount = abs(open_rate - isolated_liq) * self.liquidation_buffer
