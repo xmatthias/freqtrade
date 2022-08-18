@@ -221,7 +221,7 @@ async def test_fetch_stoploss_order_ftx(default_conf, mocker, limit_sell_order, 
     order = {'id': 'X', 'status': 'closed', 'info': {'orderId': None}, 'average': 0.254}
     api_mock.fetch_orders = get_mock_coro(return_value=[order])
     api_mock.fetch_order.reset_mock()
-    api_mock.privateGetConditionalOrdersConditionalOrderIdTriggers = MagicMock(
+    api_mock.privateGetConditionalOrdersConditionalOrderIdTriggers = get_mock_coro(
         return_value={'result': [
             {'orderId': 'mocked_market_sell', 'type': 'market', 'side': 'sell', 'price': 0.254}
         ]})

@@ -1390,7 +1390,7 @@ class Exchange:
             if tickers:
                 return tickers
         try:
-            tickers = await self._api.fetch_bids_asks(symbols)
+            tickers = await self._api_async.fetch_bids_asks(symbols)
             with self._cache_lock:
                 self._fetch_tickers_cache['fetch_bids_asks'] = tickers
             return tickers
@@ -1418,7 +1418,7 @@ class Exchange:
             if tickers:
                 return tickers
         try:
-            tickers = await self._api.fetch_tickers(symbols)
+            tickers = await self._api_async.fetch_tickers(symbols)
             with self._cache_lock:
                 self._fetch_tickers_cache['fetch_tickers'] = tickers
             return tickers

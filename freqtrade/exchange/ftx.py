@@ -121,8 +121,10 @@ class Ftx(Exchange):
                     # So we need to get it through the endpoint
                     # /conditional_orders/{conditional_order_id}/triggers
                     if not real_order_id:
-                        res = self._api.privateGetConditionalOrdersConditionalOrderIdTriggers(
-                            params={'conditional_order_id': order_id})
+                        res = (
+                            await
+                            self._api_async.privateGetConditionalOrdersConditionalOrderIdTriggers(
+                                params={'conditional_order_id': order_id}))
                         self._log_exchange_response('fetch_stoploss_order2', res)
                         real_order_id = res['result'][0]['orderId'] if res.get(
                             'result', []) else None
