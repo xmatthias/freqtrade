@@ -63,12 +63,17 @@ class FreqtradeBot(LoggingMixin):
         self.config = config
 
         self.strategy: IStrategy = StrategyResolver.load_strategy(self.config)
-
-    async def init_bot(self):
-
+        LoggingMixin.__init__(self, logger, timeframe_to_seconds(self.strategy.timeframe))
+        # Protect exit-logic from forcesell and vice versa
+        self._exit_lock = Lock()
+        self.trading_mode: TradingMode = self.config.get('trading_mode', TradingMode.SPOT)
+        # Set initial bot state from config
+        initial_state = self.config.get('initial_state')
+        self.state = State[initial_state.upper()] if initial_state else State.STOPPED
         # Check config consistency here since strategies can set certain options
         validate_config_consistency(self.config)
 
+    async def init_bot(self):
         self.exchange = await ExchangeResolver.load_exchange(
             self.config['exchange']['name'], self.config, load_leverage_tiers=True)
 
@@ -101,16 +106,6 @@ class FreqtradeBot(LoggingMixin):
             self.config.get('edge', {}).get('enabled', False) else None
 
         self.active_pair_whitelist = await self._refresh_active_whitelist()
-
-        # Set initial bot state from config
-        initial_state = self.config.get('initial_state')
-        self.state = State[initial_state.upper()] if initial_state else State.STOPPED
-
-        # Protect exit-logic from forcesell and vice versa
-        self._exit_lock = Lock()
-        LoggingMixin.__init__(self, logger, timeframe_to_seconds(self.strategy.timeframe))
-
-        self.trading_mode: TradingMode = self.config.get('trading_mode', TradingMode.SPOT)
 
         self._schedule = AsyncScheduler()
 
