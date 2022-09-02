@@ -160,7 +160,7 @@ class IStrategy(ABC, HyperStrategyMixin):
                     "corr_pairlist, this may take a while if the data is not "
                     "already on disk."
                 )
-                download_all_data_for_training(self.dp, self.config)
+                await download_all_data_for_training(self.dp, self.config)
         else:
             # Gracious failures if freqAI is disabled but "start" is called.
             class DummyClass():

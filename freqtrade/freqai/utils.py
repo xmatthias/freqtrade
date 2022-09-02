@@ -13,7 +13,7 @@ from freqtrade.plugins.pairlist.pairlist_helpers import dynamic_expand_pairlist
 logger = logging.getLogger(__name__)
 
 
-def download_all_data_for_training(dp: DataProvider, config: dict) -> None:
+async def download_all_data_for_training(dp: DataProvider, config: dict) -> None:
     """
     Called only once upon start of bot to download the necessary data for
     populating indicators and training the model.
@@ -33,7 +33,7 @@ def download_all_data_for_training(dp: DataProvider, config: dict) -> None:
 
     new_pairs_days = int((timerange.stopts - timerange.startts) / 86400)
 
-    refresh_backtest_ohlcv_data(
+    await refresh_backtest_ohlcv_data(
         dp._exchange,
         pairs=all_pairs,
         timeframes=config["freqai"]["feature_parameters"].get("include_timeframes"),
