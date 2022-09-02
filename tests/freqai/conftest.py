@@ -81,11 +81,11 @@ def get_patched_freqaimodel(mocker, freqaiconf):
     return freqaimodel
 
 
-def make_data_dictionary(mocker, freqai_conf):
+async def make_data_dictionary(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180110-20180130"})
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -126,9 +126,9 @@ def make_data_dictionary(mocker, freqai_conf):
     return freqai
 
 
-def get_freqai_live_analyzed_dataframe(mocker, freqaiconf):
-    strategy = get_patched_freqai_strategy(mocker, freqaiconf)
-    exchange = get_patched_exchange(mocker, freqaiconf)
+async def get_freqai_live_analyzed_dataframe(mocker, freqaiconf):
+    strategy = await get_patched_freqai_strategy(mocker, freqaiconf)
+    exchange = await get_patched_exchange(mocker, freqaiconf)
     strategy.dp = DataProvider(freqaiconf, exchange)
     freqai = strategy.freqai
     freqai.live = True
@@ -140,9 +140,9 @@ def get_freqai_live_analyzed_dataframe(mocker, freqaiconf):
     return strategy.dp.get_analyzed_dataframe('ADA/BTC', '5m')
 
 
-def get_freqai_analyzed_dataframe(mocker, freqaiconf):
-    strategy = get_patched_freqai_strategy(mocker, freqaiconf)
-    exchange = get_patched_exchange(mocker, freqaiconf)
+async def get_freqai_analyzed_dataframe(mocker, freqaiconf):
+    strategy = await get_patched_freqai_strategy(mocker, freqaiconf)
+    exchange = await get_patched_exchange(mocker, freqaiconf)
     strategy.dp = DataProvider(freqaiconf, exchange)
     strategy.freqai_info = freqaiconf.get("freqai", {})
     freqai = strategy.freqai
@@ -156,9 +156,9 @@ def get_freqai_analyzed_dataframe(mocker, freqaiconf):
     return freqai.dk.use_strategy_to_populate_indicators(strategy, corr_df, base_df, 'LTC/BTC')
 
 
-def get_ready_to_train(mocker, freqaiconf):
-    strategy = get_patched_freqai_strategy(mocker, freqaiconf)
-    exchange = get_patched_exchange(mocker, freqaiconf)
+async def get_ready_to_train(mocker, freqaiconf):
+    strategy = await get_patched_freqai_strategy(mocker, freqaiconf)
+    exchange = await get_patched_exchange(mocker, freqaiconf)
     strategy.dp = DataProvider(freqaiconf, exchange)
     strategy.freqai_info = freqaiconf.get("freqai", {})
     freqai = strategy.freqai

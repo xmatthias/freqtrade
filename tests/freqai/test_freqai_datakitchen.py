@@ -69,8 +69,8 @@ def test_check_if_model_expired(mocker, freqai_conf, timestamp, expected):
     shutil.rmtree(Path(dk.full_path))
 
 
-def test_use_DBSCAN_to_remove_outliers(mocker, freqai_conf, caplog):
-    freqai = make_data_dictionary(mocker, freqai_conf)
+async def test_use_DBSCAN_to_remove_outliers(mocker, freqai_conf, caplog):
+    freqai = await make_data_dictionary(mocker, freqai_conf)
     # freqai_conf['freqai']['feature_parameters'].update({"outlier_protection_percentage": 1})
     freqai.dk.use_DBSCAN_to_remove_outliers(predict=False)
     assert log_has_re(
@@ -79,15 +79,15 @@ def test_use_DBSCAN_to_remove_outliers(mocker, freqai_conf, caplog):
     )
 
 
-def test_compute_distances(mocker, freqai_conf):
-    freqai = make_data_dictionary(mocker, freqai_conf)
+async def test_compute_distances(mocker, freqai_conf):
+    freqai = await make_data_dictionary(mocker, freqai_conf)
     freqai_conf['freqai']['feature_parameters'].update({"DI_threshold": 1})
     avg_mean_dist = freqai.dk.compute_distances()
     assert round(avg_mean_dist, 2) == 2.56
 
 
-def test_use_SVM_to_remove_outliers_and_outlier_protection(mocker, freqai_conf, caplog):
-    freqai = make_data_dictionary(mocker, freqai_conf)
+async def test_use_SVM_to_remove_outliers_and_outlier_protection(mocker, freqai_conf, caplog):
+    freqai = await make_data_dictionary(mocker, freqai_conf)
     freqai_conf['freqai']['feature_parameters'].update({"outlier_protection_percentage": 0.1})
     freqai.dk.use_SVM_to_remove_outliers(predict=False)
     assert log_has_re(
