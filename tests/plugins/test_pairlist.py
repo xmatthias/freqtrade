@@ -367,6 +367,9 @@ async def test_VolumePairList_refresh_empty(mocker, markets_empty, whitelist_con
     ([{"method": "VolumePairList", "number_assets": 5, "sort_key": "quoteVolume"},
       {"method": "PrecisionFilter"}],
      "BTC", ['ETH/BTC', 'TKN/BTC', 'LTC/BTC', 'XRP/BTC']),
+    ([{"method": "VolumePairList", "number_assets": 5, "sort_key": "quoteVolume"},
+      {"method": "PrecisionFilter"}],
+     "USDT", ['ETH/USDT', 'NANO/USDT']),
     # PriceFilter and VolumePairList
     ([{"method": "VolumePairList", "number_assets": 5, "sort_key": "quoteVolume"},
       {"method": "PriceFilter", "low_price_ratio": 0.03}],
