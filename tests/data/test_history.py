@@ -410,7 +410,7 @@ def test_init(default_conf, mocker) -> None:
 
 async def test_init_with_refresh(default_conf, mocker) -> None:
     exchange = await get_patched_exchange(mocker, default_conf)
-    refresh_data(
+    await refresh_data(
         datadir=Path(''),
         pairs=[],
         timeframe=default_conf['timeframe'],

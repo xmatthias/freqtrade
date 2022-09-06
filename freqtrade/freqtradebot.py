@@ -1444,7 +1444,7 @@ class FreqtradeBot(LoggingMixin):
             trade.open_order_id = None
             trade.exit_reason = None
             cancelled = True
-            self.wallets.update()
+            await self.wallets.update()
         else:
             # TODO: figure out how to handle partially complete sell orders
             reason = constants.CANCEL_REASON['PARTIALLY_FILLED_KEEP_OPEN']

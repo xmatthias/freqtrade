@@ -265,8 +265,8 @@ async def test_additional_exchange_init_okx(default_conf, mocker):
     assert exchange.net_only
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, 'okx',
-                           "additional_exchange_init", "fetch_accounts")
+    await ccxt_exceptionhandlers(mocker, default_conf, api_mock, 'okx',
+                                 "additional_exchange_init", "fetch_accounts")
 
 
 async def test_load_leverage_tiers_okx(default_conf, mocker, markets, tmpdir, caplog, time_machine):

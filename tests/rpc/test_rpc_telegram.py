@@ -1258,7 +1258,7 @@ async def test_force_enter_handle_exception(default_conf, update, mocker) -> Non
 async def test_force_enter_no_pair(default_conf, update, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
 
-    fbuy_mock = get_mock_coro(return_value=None)
+    fbuy_mock = MagicMock(return_value=None)
     mocker.patch('freqtrade.rpc.RPC._rpc_force_entry', fbuy_mock)
 
     telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)

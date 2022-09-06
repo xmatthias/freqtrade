@@ -4090,7 +4090,7 @@ async def test_ignore_roi_if_entry_signal(default_conf_usdt, limit_order, limit_
     oobj = Order.parse_from_ccxt_object(
         limit_order[eside], limit_order[eside]['symbol'], eside)
     trade.update_trade(oobj)
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     if is_short:
         patch_get_signal(freqtrade, enter_long=False, enter_short=True, exit_short=True)
     else:

@@ -561,7 +561,7 @@ class Backtesting:
                 if self._get_order_filled(order.price, row):
                     order.close_bt_order(current_date, trade)
                     trade.recalc_trade_from_orders()
-                self.wallets.update()
+                self.wallets_update()
                 return pos_trade
 
         return trade
@@ -1133,7 +1133,7 @@ class Backtesting:
                         open_trade_count -= 1
                         open_trades[pair].remove(t)
                         LocalTrade.trades_open.remove(t)
-                        self.wallets.update()
+                        self.wallets_update()
 
                 # 2. Process entries.
                 # without positionstacking, we can only have one open trade per pair.
@@ -1157,7 +1157,7 @@ class Backtesting:
                         # logger.debug(f"{pair} - Emulate creation of new trade: {trade}.")
                         open_trades[pair].append(trade)
                         LocalTrade.add_bt_trade(trade)
-                        self.wallets.update()
+                        self.wallets_update()
 
                 for trade in list(open_trades[pair]):
                     # 3. Process entry orders.
@@ -1189,7 +1189,7 @@ class Backtesting:
                             open_trades[pair].remove(trade)
                             LocalTrade.close_bt_trade(trade)
                             trades.append(trade)
-                        self.wallets.update()
+                        self.wallets_update()
                         self.run_protections(
                             enable_protections, pair, current_time, trade.trade_direction)
 
