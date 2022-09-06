@@ -12,9 +12,6 @@ from freqtrade.plugins.pairlistmanager import PairListManager
 from tests.conftest import get_mock_coro, get_patched_exchange
 
 
-pytestmark = pytest.mark.asyncio
-
-
 @pytest.mark.parametrize('candle_type', [
     'mark',
     '',

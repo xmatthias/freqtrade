@@ -9,9 +9,6 @@ from tests.conftest import get_mock_coro, get_patched_exchange
 from tests.exchange.test_exchange import async_ccxt_exception
 
 
-pytestmark = pytest.mark.asyncio
-
-
 @pytest.mark.parametrize('limitratio,expected,side', [
     (None, 220 * 0.99, "sell"),
     (0.99, 220 * 0.99, "sell"),

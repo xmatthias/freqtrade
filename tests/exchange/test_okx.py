@@ -11,9 +11,6 @@ from tests.conftest import get_mock_coro, get_patched_exchange, log_has
 from tests.exchange.test_exchange import ccxt_exceptionhandlers
 
 
-pytestmark = pytest.mark.asyncio
-
-
 async def test_okx_ohlcv_candle_limit(default_conf, mocker):
     exchange = await get_patched_exchange(mocker, default_conf, id='okx')
     timeframes = ('1m', '5m', '1h')

@@ -11,8 +11,6 @@ from tests.conftest import get_mock_coro, get_patched_exchange
 from .test_exchange import async_ccxt_exception
 
 
-pytestmark = pytest.mark.asyncio
-
 STOPLOSS_ORDERTYPE = 'stop'
 
 

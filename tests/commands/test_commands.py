@@ -29,9 +29,6 @@ from tests.conftest import (CURRENT_TEST_STRATEGY, create_mock_trades, get_args,
 from tests.conftest_trades import MOCK_TRADE_COUNT
 
 
-pytestmark = pytest.mark.asyncio
-
-
 def test_setup_utils_configuration():
     args = [
         'list-exchanges', '--config', 'config_examples/config_bittrex.example.json',

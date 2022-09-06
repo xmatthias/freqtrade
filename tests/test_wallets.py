@@ -8,9 +8,6 @@ from freqtrade.exceptions import DependencyException
 from tests.conftest import create_mock_trades, get_mock_coro, get_patched_freqtradebot, patch_wallet
 
 
-pytestmark = pytest.mark.asyncio
-
-
 async def test_sync_wallet_at_boot(mocker, default_conf):
     default_conf['dry_run'] = False
     mocker.patch.multiple(

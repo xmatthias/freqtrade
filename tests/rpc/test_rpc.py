@@ -19,8 +19,6 @@ from tests.conftest import (create_mock_trades, create_mock_trades_usdt, get_moc
                             patch_get_signal)
 
 
-pytestmark = pytest.mark.asyncio
-
 # Functions for recurrent object patching
 
 

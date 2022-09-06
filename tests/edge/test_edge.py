@@ -19,9 +19,6 @@ from tests.optimize import (BTContainer, BTrade, _build_backtest_dataframe,
                             _get_frame_time_from_offset)
 
 
-pytestmark = pytest.mark.asyncio
-
-
 # Cases to be tested:
 # 1) Open trade should be removed from the end
 # 2) Two complete trades within dataframe (with sell hit for all)

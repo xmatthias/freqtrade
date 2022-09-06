@@ -10,9 +10,6 @@ from freqtrade.resolvers.exchange_resolver import ExchangeResolver
 from tests.conftest import get_mock_coro, get_patched_exchange
 
 
-pytestmark = pytest.mark.asyncio
-
-
 async def test_validate_order_types_gateio(default_conf, mocker):
     default_conf['exchange']['name'] = 'gateio'
     mocker.patch('freqtrade.exchange.Exchange._init_ccxt')

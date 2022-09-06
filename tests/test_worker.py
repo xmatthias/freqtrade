@@ -10,9 +10,6 @@ from freqtrade.exceptions import OperationalException
 from tests.conftest import get_mock_coro, get_patched_worker, log_has, log_has_re
 
 
-pytestmark = pytest.mark.asyncio
-
-
 async def test_worker_state(mocker, default_conf, markets) -> None:
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets))
     worker = await get_patched_worker(mocker, default_conf)

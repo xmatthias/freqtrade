@@ -32,9 +32,6 @@ from tests.conftest import (CURRENT_TEST_STRATEGY, get_mock_coro, get_patched_ex
                             log_has_re, patch_exchange)
 
 
-pytestmark = pytest.mark.asyncio
-
-
 def _backup_file(file: Path, copy_file: bool = False) -> None:
     """
     Backup existing file to avoid deleting the user file

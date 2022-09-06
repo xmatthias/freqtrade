@@ -4,15 +4,10 @@ import time
 from collections import deque
 from unittest.mock import MagicMock
 
-import pytest
-
 from freqtrade.enums import RPCMessageType
 from freqtrade.rpc import RPCManager
 from freqtrade.rpc.api_server.webserver import ApiServer
 from tests.conftest import get_patched_freqtradebot, log_has
-
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test__init__(mocker, default_conf) -> None:

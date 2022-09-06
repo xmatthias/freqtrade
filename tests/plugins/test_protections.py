@@ -11,9 +11,6 @@ from freqtrade.plugins.protectionmanager import ProtectionManager
 from tests.conftest import get_patched_freqtradebot, log_has_re
 
 
-pytestmark = pytest.mark.asyncio
-
-
 def generate_mock_trade(pair: str, fee: float, is_open: bool,
                         exit_reason: str = ExitType.EXIT_SIGNAL,
                         min_ago_open: int = None, min_ago_close: int = None,

@@ -20,9 +20,6 @@ from tests.conftest import (create_mock_trades_usdt, get_mock_coro, get_patched_
                             get_patched_freqtradebot, log_has, log_has_re, num_log_has)
 
 
-pytestmark = pytest.mark.asyncio
-
-
 @pytest.fixture(scope="function")
 def whitelist_conf(default_conf):
     default_conf['stake_currency'] = 'BTC'

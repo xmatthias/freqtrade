@@ -31,9 +31,6 @@ from tests.conftest_trades import (MOCK_TRADE_COUNT, entry_side, exit_side, mock
                                    mock_order_4, mock_order_5_stoploss, mock_order_6_sell)
 
 
-pytestmark = pytest.mark.asyncio
-
-
 def patch_RPCManager(mocker) -> MagicMock:
     """
     This function mock RPC manager to avoid repeating this code in almost every tests

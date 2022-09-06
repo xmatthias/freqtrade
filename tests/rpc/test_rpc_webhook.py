@@ -13,9 +13,6 @@ from freqtrade.rpc.webhook import Webhook
 from tests.conftest import get_patched_freqtradebot, log_has
 
 
-pytestmark = pytest.mark.asyncio
-
-
 def get_webhook_dict() -> dict:
     return {
         "enabled": True,
