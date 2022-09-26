@@ -491,7 +491,7 @@ async def test_dca_exiting(default_conf_usdt, ticker_usdt, fee, mocker, caplog) 
     assert len(trade.orders) == 1
     assert pytest.approx(trade.stake_amount) == 60
     assert pytest.approx(trade.amount) == 30.0
-    assert log_has_re("Remaining amount of 1.6.* would be too small.", caplog)
+    assert log_has_re("Remaining amount of 1.6.* would be smaller than the minimum of 10.", caplog)
 
     freqtrade.strategy.adjust_trade_position = MagicMock(return_value=-20)
 
@@ -510,9 +510,21 @@ async def test_dca_exiting(default_conf_usdt, ticker_usdt, fee, mocker, caplog) 
     freqtrade.strategy.adjust_trade_position = MagicMock(return_value=-50)
     await freqtrade.process()
     assert log_has_re("Adjusting amount to trade.amount as it is higher.*", caplog)
-    assert log_has_re("Remaining amount of 0.0 would be too small.", caplog)
+    assert log_has_re("Remaining amount of 0.0 would be smaller than the minimum of 10.", caplog)
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 2
     assert trade.orders[-1].ft_order_side == 'sell'
     assert pytest.approx(trade.stake_amount) == 40.198
     assert trade.is_open
+
+    # use amount that would trunc to 0.0 once selling
+    mocker.patch("freqtrade.exchange.Exchange.amount_to_contract_precision",
+                 lambda s, p, v: round(v, 1))
+    freqtrade.strategy.adjust_trade_position = MagicMock(return_value=-0.01)
+    await freqtrade.process()
+    trade = Trade.get_trades().first()
+    assert len(trade.orders) == 2
+    assert trade.orders[-1].ft_order_side == 'sell'
+    assert pytest.approx(trade.stake_amount) == 40.198
+    assert trade.is_open
+    assert log_has_re('Amount to exit is 0.0 due to exchange limits - not exiting.', caplog)

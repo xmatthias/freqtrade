@@ -6,7 +6,7 @@ import logging
 from functools import partial
 from typing import Dict, List
 
-from freqtrade.constants import ListPairsWithTimeframes
+from freqtrade.constants import Config, ListPairsWithTimeframes
 from freqtrade.enums import CandleType
 from freqtrade.exceptions import OperationalException
 from freqtrade.mixins import LoggingMixin
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class PairListManager(LoggingMixin):
 
-    def __init__(self, exchange, config: dict, loop: asyncio.AbstractEventLoop) -> None:
+    def __init__(self, exchange, config: Config, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
         self._exchange = exchange
         self._config = config

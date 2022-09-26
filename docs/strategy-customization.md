@@ -264,7 +264,8 @@ def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFram
 ### Exit signal rules
 
 Edit the method `populate_exit_trend()` into your strategy file to update your exit strategy.
-Please note that the exit-signal is only used if `use_exit_signal` is set to true in the configuration.
+The exit-signal is only used for exits if `use_exit_signal` is set to true in the configuration.
+`use_exit_signal` will not influence [signal collision rules](#colliding-signals) - which will still apply and can prevent entries.
 
 It's important to always return the dataframe without removing/modifying the columns `"open", "high", "low", "close", "volume"`, otherwise these fields would contain something unexpected.
 
@@ -823,6 +824,8 @@ Options:
 - Rename the columns for you to create unique columns
 - Merge the dataframe without lookahead bias
 - Forward-fill (optional)
+
+For a full sample, please refer to the [complete data provider example](#complete-data-provider-sample) below.
 
 All columns of the informative dataframe will be available on the returning dataframe in a renamed fashion:
 

@@ -968,6 +968,7 @@ async def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
         'gain': 'profit',
         'leverage': 1.0,
         'limit': 1.173e-05,
+        'order_rate': 1.173e-05,
         'amount': 91.07468123,
         'order_type': 'limit',
         'open_rate': 1.098e-05,
@@ -1042,6 +1043,7 @@ async def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee
         'gain': 'loss',
         'leverage': 1.0,
         'limit': 1.043e-05,
+        'order_rate': 1.043e-05,
         'amount': 91.07468123,
         'order_type': 'limit',
         'open_rate': 1.098e-05,
@@ -1105,6 +1107,7 @@ async def test_forceexit_all_handle(default_conf, update, ticker, fee, mocker) -
         'pair': 'ETH/BTC',
         'gain': 'loss',
         'leverage': 1.0,
+        'order_rate': 1.099e-05,
         'limit': 1.099e-05,
         'amount': 91.07468123,
         'order_type': 'limit',
@@ -1754,7 +1757,7 @@ async def test_send_msg_enter_notification(default_conf, mocker, caplog, message
         'exchange': 'Binance',
         'pair': 'ETH/BTC',
         'leverage': leverage,
-        'limit': 1.099e-05,
+        'open_rate': 1.099e-05,
         'order_type': 'limit',
         'direction': enter,
         'stake_amount': 0.01465333,
@@ -1925,7 +1928,7 @@ async def test_send_msg_sell_notification(default_conf, mocker) -> None:
         'leverage': 1.0,
         'direction': 'Long',
         'gain': 'loss',
-        'limit': 3.201e-05,
+        'order_rate': 3.201e-05,
         'amount': 1333.3333333333335,
         'order_type': 'market',
         'open_rate': 7.5e-05,
@@ -1960,7 +1963,7 @@ async def test_send_msg_sell_notification(default_conf, mocker) -> None:
         'pair': 'KEY/ETH',
         'direction': 'Long',
         'gain': 'loss',
-        'limit': 3.201e-05,
+        'order_rate': 3.201e-05,
         'amount': 1333.3333333333335,
         'order_type': 'market',
         'open_rate': 7.5e-05,
@@ -1999,7 +2002,7 @@ async def test_send_msg_sell_notification(default_conf, mocker) -> None:
         'pair': 'KEY/ETH',
         'direction': 'Long',
         'gain': 'loss',
-        'limit': 3.201e-05,
+        'order_rate': 3.201e-05,
         'amount': 1333.3333333333335,
         'order_type': 'market',
         'open_rate': 7.5e-05,
@@ -2148,11 +2151,11 @@ async def test_send_msg_strategy_msg_notification(default_conf, mocker) -> None:
 
 
 async def test_send_msg_unknown_type(default_conf, mocker) -> None:
-    telegram, _, _ = await get_telegram_testobject(mocker, default_conf)
-    with pytest.raises(NotImplementedError, match=r'Unknown message type: None'):
-        telegram.send_msg({
-            'type': None,
-        })
+    telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
+    telegram.send_msg({
+        'type': None,
+    })
+    msg_mock.call_count == 0
 
 
 @pytest.mark.parametrize('message_type,enter,enter_signal,leverage', [
@@ -2172,7 +2175,7 @@ async def test_send_msg_buy_notification_no_fiat(
         'exchange': 'Binance',
         'pair': 'ETH/BTC',
         'leverage': leverage,
-        'limit': 1.099e-05,
+        'open_rate': 1.099e-05,
         'order_type': 'limit',
         'direction': enter,
         'stake_amount': 0.01465333,
@@ -2215,7 +2218,7 @@ async def test_send_msg_sell_notification_no_fiat(
         'gain': 'loss',
         'leverage': leverage,
         'direction': direction,
-        'limit': 3.201e-05,
+        'order_rate': 3.201e-05,
         'amount': 1333.3333333333335,
         'order_type': 'limit',
         'open_rate': 7.5e-05,

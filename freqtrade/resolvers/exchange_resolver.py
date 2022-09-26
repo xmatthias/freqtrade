@@ -4,6 +4,7 @@ This module loads custom exchanges
 import logging
 
 import freqtrade.exchange as exchanges
+from freqtrade.constants import Config
 from freqtrade.exchange import MAP_EXCHANGE_CHILDCLASS, Exchange
 from freqtrade.resolvers import IResolver
 
@@ -18,7 +19,7 @@ class ExchangeResolver(IResolver):
     object_type = Exchange
 
     @staticmethod
-    async def load_exchange(exchange_name: str, config: dict, *, load_markets: bool = True,
+    async def load_exchange(exchange_name: str, config: Config, *, load_markets: bool = True,
                             validate: bool = True, load_leverage_tiers: bool = False) -> Exchange:
         """
         Load the custom class from config parameter

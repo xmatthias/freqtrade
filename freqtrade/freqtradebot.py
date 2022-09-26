@@ -10,9 +10,9 @@ from math import isclose
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
-from freqtrade import __version__, constants
+from freqtrade import constants
 from freqtrade.configuration import validate_config_consistency
-from freqtrade.constants import BuySell, LongShort
+from freqtrade.constants import BuySell, Config, LongShort
 from freqtrade.data.converter import order_book_to_dataframe
 from freqtrade.data.dataprovider import DataProvider
 from freqtrade.edge import Edge
@@ -44,7 +44,7 @@ class FreqtradeBot(LoggingMixin):
     This is from here the bot start its logic.
     """
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: Config) -> None:
         """
         Init all variables and objects the bot needs to work
         :param config: configuration dict, you can use Configuration.get_config()
@@ -52,7 +52,6 @@ class FreqtradeBot(LoggingMixin):
         """
         self.active_pair_whitelist: List[str] = []
 
-        logger.info('Starting freqtrade %s', __version__)
         self.loop = asyncio.get_event_loop()
 
         # Init bot state
@@ -142,15 +141,20 @@ class FreqtradeBot(LoggingMixin):
         :return: None
         """
         logger.info('Cleaning up modules ...')
+        try:
+            # Wrap db activities in shutdown to avoid problems if database is gone,
+            # and raises further exceptions.
+            if self.config['cancel_open_orders_on_exit']:
+                await self.cancel_all_open_orders()
 
-        if self.config['cancel_open_orders_on_exit']:
-            await self.cancel_all_open_orders()
+            self.check_for_open_trades()
 
-        self.check_for_open_trades()
+        finally:
+            self.strategy.ft_bot_cleanup()
 
-        self.rpc.cleanup()
-        Trade.commit()
-        await self.exchange.close()
+            self.rpc.cleanup()
+            Trade.commit()
+            await self.exchange.close()
 
     async def startup(self) -> None:
         """
@@ -278,16 +282,17 @@ class FreqtradeBot(LoggingMixin):
     async def update_funding_fees(self):
         if self.trading_mode == TradingMode.FUTURES:
             trades = Trade.get_open_trades()
-            for trade in trades:
-                funding_fees = await self.exchange.get_funding_fees(
-                    pair=trade.pair,
-                    amount=trade.amount,
-                    is_short=trade.is_short,
-                    open_date=trade.open_date_utc
-                )
-                trade.funding_fees = funding_fees
-        else:
-            return 0.0
+            try:
+                for trade in trades:
+                    funding_fees = await self.exchange.get_funding_fees(
+                        pair=trade.pair,
+                        amount=trade.amount,
+                        is_short=trade.is_short,
+                        open_date=trade.date_last_filled_utc
+                    )
+                    trade.funding_fees = funding_fees
+            except ExchangeError:
+                logger.warning("Could not update funding fees for open trades.")
 
     def startup_backpopulate_precision(self):
 
@@ -582,7 +587,9 @@ class FreqtradeBot(LoggingMixin):
 
         if stake_amount is not None and stake_amount < 0.0:
             # We should decrease our position
-            amount = abs(float(FtPrecise(stake_amount) / FtPrecise(current_exit_rate)))
+            amount = self.exchange.amount_to_contract_precision(
+                trade.pair,
+                abs(float(FtPrecise(stake_amount) / FtPrecise(current_exit_rate))))
             if amount > trade.amount:
                 # This is currently ineffective as remaining would become < min tradable
                 # Fixing this would require checking for 0.0 there -
@@ -591,9 +598,14 @@ class FreqtradeBot(LoggingMixin):
                     f"Adjusting amount to trade.amount as it is higher. {amount} > {trade.amount}")
                 amount = trade.amount
 
+            if amount == 0.0:
+                logger.info("Amount to exit is 0.0 due to exchange limits - not exiting.")
+                return
+
             remaining = (trade.amount - amount) * current_exit_rate
             if remaining < min_exit_stake:
-                logger.info(f'Remaining amount of {remaining} would be too small.')
+                logger.info(f"Remaining amount of {remaining} would be smaller "
+                            f"than the minimum of {min_exit_stake}.")
                 return
 
             await self.execute_trade_exit(trade, current_exit_rate, exit_check=ExitCheckTuple(
@@ -663,14 +675,12 @@ class FreqtradeBot(LoggingMixin):
         if not stake_amount:
             return False
 
-        if pos_adjust:
-            logger.info(f"Position adjust: about to create a new order for {pair} with stake: "
-                        f"{stake_amount} for {trade}")
-        else:
-            logger.info(
-                f"{name} signal found: about create a new trade for {pair} with stake_amount: "
-                f"{stake_amount} ...")
-
+        msg = (f"Position adjust: about to create a new order for {pair} with stake: "
+               f"{stake_amount} for {trade}" if pos_adjust
+               else
+               f"{name} signal found: about create a new trade for {pair} with stake_amount: "
+               f"{stake_amount} ...")
+        logger.info(msg)
         amount = (stake_amount / enter_limit_requested) * leverage
         order_type = ordertype or self.strategy.order_types['entry']
 
@@ -730,10 +740,15 @@ class FreqtradeBot(LoggingMixin):
         fee = self.exchange.get_fee(symbol=pair, taker_or_maker='maker')
         base_currency = self.exchange.get_pair_base_currency(pair)
         open_date = datetime.now(timezone.utc)
-        funding_fees = await self.exchange.get_funding_fees(
-            pair=pair, amount=amount, is_short=is_short, open_date=open_date)
         # This is a new trade
         if trade is None:
+            funding_fees = 0.0
+            try:
+                funding_fees = await self.exchange.get_funding_fees(
+                    pair=pair, amount=amount, is_short=is_short, open_date=open_date)
+            except ExchangeError:
+                logger.warning("Could not find funding fee.")
+
             trade = Trade(
                 pair=pair,
                 base_currency=base_currency,
@@ -910,7 +925,7 @@ class FreqtradeBot(LoggingMixin):
             'stake_amount': trade.stake_amount,
             'stake_currency': self.config['stake_currency'],
             'fiat_currency': self.config.get('fiat_display_currency', None),
-            'amount': order.safe_amount_after_fee,
+            'amount': order.safe_amount_after_fee if fill else (order.amount or trade.amount),
             'open_date': trade.open_date or datetime.utcnow(),
             'current_rate': current_rate,
             'sub_trade': sub_trade,
@@ -1070,6 +1085,7 @@ class FreqtradeBot(LoggingMixin):
             order_obj = Order.parse_from_ccxt_object(stoploss_order, trade.pair, 'stoploss')
             trade.orders.append(order_obj)
             trade.stoploss_order_id = str(stoploss_order['id'])
+            trade.stoploss_last_update = datetime.now(timezone.utc)
             return True
         except InsufficientFundsError as e:
             logger.warning(f"Unable to place stoploss order {e}.")
@@ -1143,10 +1159,9 @@ class FreqtradeBot(LoggingMixin):
             if await self.create_stoploss_order(trade=trade, stop_price=stop_price):
                 # The above will return False if the placement failed and the trade was force-sold.
                 # in which case the trade will be closed - which we must check below.
-                trade.stoploss_last_update = datetime.utcnow()
                 return False
 
-        # If stoploss order is canceled for some reason we add it
+        # If stoploss order is canceled for some reason we add it again
         if (trade.is_open
                 and stoploss_order
                 and stoploss_order['status'] in ('canceled', 'cancelled')):
@@ -1185,7 +1200,8 @@ class FreqtradeBot(LoggingMixin):
         if self.exchange.stoploss_adjust(stoploss_norm, order, side=trade.exit_side):
             # we check if the update is necessary
             update_beat = self.strategy.order_types.get('stoploss_on_exchange_interval', 60)
-            if (datetime.utcnow() - trade.stoploss_last_update).total_seconds() >= update_beat:
+            upd_req = datetime.now(timezone.utc) - timedelta(seconds=update_beat)
+            if trade.stoploss_last_update_utc and upd_req >= trade.stoploss_last_update_utc:
                 # cancelling the current stoploss on exchange first
                 logger.info(f"Cancelling current stoploss on exchange for pair {trade.pair} "
                             f"(orderid:{order['id']}) in order to add another one ...")
@@ -1509,12 +1525,16 @@ class FreqtradeBot(LoggingMixin):
         :param exit_check: CheckTuple with signal and reason
         :return: True if it succeeds False
         """
-        trade.funding_fees = await self.exchange.get_funding_fees(
-            pair=trade.pair,
-            amount=trade.amount,
-            is_short=trade.is_short,
-            open_date=trade.open_date_utc,
-        )
+        try:
+            trade.funding_fees = await self.exchange.get_funding_fees(
+                pair=trade.pair,
+                amount=trade.amount,
+                is_short=trade.is_short,
+                open_date=trade.date_last_filled_utc,
+            )
+        except ExchangeError:
+            logger.warning("Could not update funding fee.")
+
         exit_type = 'exit'
         exit_reason = exit_tag or exit_check.exit_reason
         if exit_check.exit_type in (
@@ -1606,14 +1626,14 @@ class FreqtradeBot(LoggingMixin):
         # second condition is for mypy only; order will always be passed during sub trade
         if sub_trade and order is not None:
             amount = order.safe_filled if fill else order.amount
-            profit_rate = order.safe_price
+            order_rate: float = order.safe_price
 
-            profit = trade.calc_profit(rate=profit_rate, amount=amount, open_rate=trade.open_rate)
-            profit_ratio = trade.calc_profit_ratio(profit_rate, amount, trade.open_rate)
+            profit = trade.calc_profit(rate=order_rate, amount=amount, open_rate=trade.open_rate)
+            profit_ratio = trade.calc_profit_ratio(order_rate, amount, trade.open_rate)
         else:
-            profit_rate = trade.close_rate if trade.close_rate else trade.close_rate_requested
-            profit = trade.calc_profit(rate=profit_rate) + (0.0 if fill else trade.realized_profit)
-            profit_ratio = trade.calc_profit_ratio(profit_rate)
+            order_rate = trade.close_rate if trade.close_rate else trade.close_rate_requested
+            profit = trade.calc_profit(rate=order_rate) + (0.0 if fill else trade.realized_profit)
+            profit_ratio = trade.calc_profit_ratio(order_rate)
             amount = trade.amount
         gain = "profit" if profit_ratio > 0 else "loss"
 
@@ -1626,11 +1646,12 @@ class FreqtradeBot(LoggingMixin):
             'leverage': trade.leverage,
             'direction': 'Short' if trade.is_short else 'Long',
             'gain': gain,
-            'limit': profit_rate,
+            'limit': order_rate,  # Deprecated
+            'order_rate': order_rate,
             'order_type': order_type,
             'amount': amount,
             'open_rate': trade.open_rate,
-            'close_rate': profit_rate,
+            'close_rate': order_rate,
             'current_rate': current_rate,
             'profit_amount': profit,
             'profit_ratio': profit_ratio,
