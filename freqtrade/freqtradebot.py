@@ -83,7 +83,7 @@ class FreqtradeBot(LoggingMixin):
 
         PairLocks.timeframe = self.config['timeframe']
 
-        self.pairlists = PairListManager(self.exchange, self.config, asyncio.get_event_loop())
+        self.pairlists = PairListManager(self.exchange, self.config)
 
         # RPC runs in separate threads, can start handling external commands just after
         # initialization, even before Freqtradebot has a chance to start its throttling,

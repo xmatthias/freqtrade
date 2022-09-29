@@ -367,7 +367,7 @@ async def test_freqai_informative_pairs(mocker, freqai_conf, timeframes, corr_pa
     })
     strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
     exchange = await get_patched_exchange(mocker, freqai_conf)
-    pairlists = PairListManager(exchange, freqai_conf, asyncio.get_event_loop())
+    pairlists = PairListManager(exchange, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange, asyncio.get_event_loop(), pairlists)
     pairlist = strategy.dp.current_whitelist()
 

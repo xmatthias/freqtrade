@@ -301,7 +301,7 @@ async def test_current_whitelist(mocker, default_conf, tickers):
                           get_tickers=tickers)
     exchange = await get_patched_exchange(mocker, default_conf)
 
-    pairlist = PairListManager(exchange, default_conf, asyncio.get_event_loop())
+    pairlist = PairListManager(exchange, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop(), pairlist)
 
     # Simulate volumepairs from exchange.

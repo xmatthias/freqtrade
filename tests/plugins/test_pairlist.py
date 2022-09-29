@@ -1,6 +1,5 @@
 # pragma pylint: disable=missing-docstring,C0103,protected-access
 
-import asyncio
 import logging
 import time
 from unittest.mock import MagicMock, PropertyMock
@@ -127,7 +126,7 @@ async def test_log_cached(mocker, static_pl_conf, markets, tickers):
 async def test_load_pairlist_noexist(mocker, markets, default_conf):
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets))
-    plm = PairListManager(freqtrade.exchange, default_conf, asyncio.get_event_loop())
+    plm = PairListManager(freqtrade.exchange, default_conf)
     with pytest.raises(OperationalException,
                        match=r"Impossible to load Pairlist 'NonexistingPairList'. "
                              r"This class does not exist or contains Python code errors."):
@@ -138,7 +137,7 @@ async def test_load_pairlist_noexist(mocker, markets, default_conf):
 async def test_load_pairlist_verify_multi(mocker, markets_static, default_conf):
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     mocker.patch('freqtrade.exchange.Exchange.markets', PropertyMock(return_value=markets_static))
-    plm = PairListManager(freqtrade.exchange, default_conf, asyncio.get_event_loop())
+    plm = PairListManager(freqtrade.exchange, default_conf)
     # Call different versions one after the other, should always consider what was passed in
     # and have no side-effects (therefore the same check multiple times)
     assert plm.verify_whitelist(['ETH/BTC', 'XRP/BTC', ], print) == ['ETH/BTC', 'XRP/BTC']
@@ -271,7 +270,7 @@ async def test_refresh_pairlist_dynamic(mocker, shitcoinmarkets, tickers, whitel
     with pytest.raises(OperationalException,
                        match=r'`number_assets` not specified. Please check your configuration '
                              r'for "pairlist.config.number_assets"'):
-        PairListManager(freqtrade.exchange, whitelist_conf, asyncio.get_event_loop())
+        PairListManager(freqtrade.exchange, whitelist_conf)
 
 
 async def test_refresh_pairlist_dynamic_2(mocker, shitcoinmarkets, tickers_base, whitelist_conf_2):
@@ -693,7 +692,7 @@ def test_PrecisionFilter_error(mocker, whitelist_conf) -> None:
 
     with pytest.raises(OperationalException,
                        match=r"PrecisionFilter can only work with stoploss defined\..*"):
-        PairListManager(MagicMock, whitelist_conf, asyncio.get_event_loop())
+        PairListManager(MagicMock, whitelist_conf)
 
 
 async def test_PerformanceFilter_error(mocker, whitelist_conf, caplog) -> None:
@@ -702,7 +701,7 @@ async def test_PerformanceFilter_error(mocker, whitelist_conf, caplog) -> None:
         del Trade.query
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
     exchange = await get_patched_exchange(mocker, whitelist_conf)
-    pm = PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
+    pm = PairListManager(exchange, whitelist_conf)
     await pm.refresh_pairlist()
 
     assert log_has("PerformanceFilter is not available in this mode.", caplog)
@@ -715,11 +714,11 @@ async def test_ShuffleFilter_init(mocker, whitelist_conf, caplog) -> None:
     ]
 
     exchange = await get_patched_exchange(mocker, whitelist_conf)
-    PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
+    PairListManager(exchange, whitelist_conf)
     assert log_has("Backtesting mode detected, applying seed value: 42", caplog)
     caplog.clear()
     whitelist_conf['runmode'] = RunMode.DRY_RUN
-    PairListManager(exchange, whitelist_conf, asyncio.get_event_loop())
+    PairListManager(exchange, whitelist_conf)
     assert not log_has("Backtesting mode detected, applying seed value: 42", caplog)
     assert log_has("Live mode detected, not applying seed.", caplog)
 
@@ -733,7 +732,7 @@ async def test_PerformanceFilter_lookback(mocker, default_conf_usdt, fee, caplog
     ]
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
     exchange = await get_patched_exchange(mocker, default_conf_usdt)
-    pm = PairListManager(exchange, default_conf_usdt, asyncio.get_event_loop())
+    pm = PairListManager(exchange, default_conf_usdt)
     await pm.refresh_pairlist()
 
     assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
@@ -759,7 +758,7 @@ async def test_PerformanceFilter_keep_mid_order(mocker, default_conf_usdt, fee, 
     ]
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
     exchange = await get_patched_exchange(mocker, default_conf_usdt)
-    pm = PairListManager(exchange, default_conf_usdt, asyncio.get_event_loop())
+    pm = PairListManager(exchange, default_conf_usdt)
     await pm.refresh_pairlist()
 
     assert pm.whitelist == ['ETH/USDT', 'LTC/USDT', 'XRP/USDT',
@@ -1013,7 +1012,7 @@ def test_OffsetFilter_error(mocker, whitelist_conf) -> None:
 
     with pytest.raises(OperationalException,
                        match=r'OffsetFilter requires offset to be >= 0'):
-        PairListManager(MagicMock, whitelist_conf, asyncio.get_event_loop())
+        PairListManager(MagicMock, whitelist_conf)
 
 
 async def test_rangestabilityfilter_checks(mocker, default_conf, markets, tickers):

@@ -1,7 +1,6 @@
 """
 PairList manager class
 """
-import asyncio
 import logging
 from functools import partial
 from typing import Dict, List
@@ -20,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 class PairListManager(LoggingMixin):
 
-    def __init__(self, exchange, config: Config, loop: asyncio.AbstractEventLoop) -> None:
-        self._loop = loop
+    def __init__(self, exchange, config: Config) -> None:
         self._exchange = exchange
         self._config = config
         self._whitelist = self._config['exchange'].get('pair_whitelist')

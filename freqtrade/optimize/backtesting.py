@@ -114,7 +114,7 @@ class Backtesting:
         self.timeframe = str(self.config.get('timeframe'))
         self.timeframe_min = timeframe_to_minutes(self.timeframe)
         self.init_backtest_detail()
-        self.pairlists = PairListManager(self.exchange, self.config, asyncio.get_event_loop())
+        self.pairlists = PairListManager(self.exchange, self.config)
         if 'VolumePairList' in self.pairlists.name_list:
             raise OperationalException("VolumePairList not allowed for backtesting. "
                                        "Please use StaticPairList instead.")
