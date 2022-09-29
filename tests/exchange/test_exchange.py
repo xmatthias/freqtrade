@@ -1939,9 +1939,9 @@ async def test_fetch_ticker_sync(default_conf, mocker, exchange_name):
     assert ticker['bid'] == 0.5
     assert ticker['ask'] == 1
 
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
-                           "fetch_ticker_sync", "fetch_ticker",
-                           pair='ETH/BTC')
+    await ccxt_exceptionhandlers(mocker, default_conf, api_mock, exchange_name,
+                                 "fetch_ticker_sync", "fetch_ticker",
+                                 pair='ETH/BTC')
 
     api_mock.fetch_ticker = MagicMock(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
@@ -3948,14 +3948,14 @@ async def test__set_leverage(mocker, default_conf, exchange_name, trading_mode):
     (MarginMode.CROSS),
     (MarginMode.ISOLATED)
 ])
-def test_set_margin_mode(mocker, default_conf, margin_mode):
+async def test_set_margin_mode(mocker, default_conf, margin_mode):
 
     api_mock = MagicMock()
     api_mock.set_margin_mode = MagicMock()
     type(api_mock).has = PropertyMock(return_value={'setMarginMode': True})
     default_conf['dry_run'] = False
 
-    ccxt_exceptionhandlers(
+    await async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,

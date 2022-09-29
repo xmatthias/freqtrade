@@ -305,7 +305,7 @@ async def test_current_whitelist(mocker, default_conf, tickers):
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop(), pairlist)
 
     # Simulate volumepairs from exchange.
-    pairlist.refresh_pairlist()
+    await pairlist.refresh_pairlist()
 
     assert dp.current_whitelist() == pairlist._whitelist
     # The identity of the 2 lists should not be identical, but a copy
