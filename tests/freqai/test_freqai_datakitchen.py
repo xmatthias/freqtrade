@@ -71,10 +71,7 @@ async def test_use_DBSCAN_to_remove_outliers(mocker, freqai_conf, caplog):
     freqai = await make_data_dictionary(mocker, freqai_conf)
     # freqai_conf['freqai']['feature_parameters'].update({"outlier_protection_percentage": 1})
     freqai.dk.use_DBSCAN_to_remove_outliers(predict=False)
-    assert log_has_re(
-        "DBSCAN found eps of 2.36.",
-        caplog,
-    )
+    assert log_has_re(r"DBSCAN found eps of 2\.3\d\.", caplog)
 
 
 async def test_compute_distances(mocker, freqai_conf):

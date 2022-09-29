@@ -466,27 +466,6 @@ class FreqaiDataKitchen:
 
         return df
 
-    def remove_training_from_backtesting(
-        self
-    ) -> DataFrame:
-        """
-        Function which takes the backtesting time range and
-        remove training data from dataframe, keeping only the
-        startup_candle_count candles
-        """
-        startup_candle_count = self.config.get('startup_candle_count', 0)
-        tf = self.config['timeframe']
-        tr = self.config["timerange"]
-
-        backtesting_timerange = TimeRange.parse_timerange(tr)
-        if startup_candle_count > 0 and backtesting_timerange:
-            backtesting_timerange.subtract_start(timeframe_to_seconds(tf) * startup_candle_count)
-
-        start = datetime.fromtimestamp(backtesting_timerange.startts, tz=timezone.utc)
-        df = self.return_dataframe
-        df = df.loc[df["date"] >= start, :]
-        return df
-
     def principal_component_analysis(self) -> None:
         """
         Performs Principal Component Analysis on the data for dimensionality reduction
@@ -852,7 +831,7 @@ class FreqaiDataKitchen:
 
         inlier_metric = pd.DataFrame(
             data=inliers.sum(axis=1) / no_prev_pts,
-            columns=['inlier_metric'],
+            columns=['%-inlier_metric'],
             index=compute_df.index
         )
 
@@ -902,11 +881,14 @@ class FreqaiDataKitchen:
         """
         column_names = dataframe.columns
         features = [c for c in column_names if "%" in c]
-        labels = [c for c in column_names if "&" in c]
         if not features:
             raise OperationalException("Could not find any features!")
 
         self.training_features_list = features
+
+    def find_labels(self, dataframe: DataFrame) -> None:
+        column_names = dataframe.columns
+        labels = [c for c in column_names if "&" in c]
         self.label_list = labels
 
     def check_if_pred_in_training_spaces(self) -> None:
@@ -994,8 +976,6 @@ class FreqaiDataKitchen:
 
         to_keep = [col for col in dataframe.columns if not col.startswith("&")]
         self.return_dataframe = pd.concat([dataframe[to_keep], self.full_df], axis=1)
-
-        self.return_dataframe = self.remove_training_from_backtesting()
         self.full_df = DataFrame()
 
         return
@@ -1229,7 +1209,8 @@ class FreqaiDataKitchen:
 
     def get_unique_classes_from_labels(self, dataframe: DataFrame) -> None:
 
-        self.find_features(dataframe)
+        # self.find_features(dataframe)
+        self.find_labels(dataframe)
 
         for key in self.label_list:
             if dataframe[key].dtype == object:
