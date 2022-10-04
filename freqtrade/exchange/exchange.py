@@ -20,6 +20,7 @@ from ccxt import ROUND_DOWN, ROUND_UP, TICK_SIZE, TRUNCATE, decimal_to_precision
 from dateutil import parser
 from pandas import DataFrame, concat
 
+from freqtrade.configuration import TimeRange
 from freqtrade.constants import (DEFAULT_AMOUNT_RESERVE_PERCENT, NON_OPEN_EXCHANGE_STATES, BuySell,
                                  Config, EntryExit, ListPairsWithTimeframes, MakerTaker,
                                  PairWithTimeframe)
@@ -1869,17 +1870,19 @@ class Exchange:
             else:
                 from freqtrade.data.history.history_utils import load_pair_history
 
-                # TODO: Build realistic TimeRange
+                since = date_minus_candles(timeframe, self._startup_candle_count)
+                since_ms = int(since.timestamp() * 1000)
+                timerange = TimeRange('date', startts=since.timestamp())
                 data = load_pair_history(pair, timeframe,
                                          candle_type=candle_type,
                                          datadir=self._config["datadir"],
-                                         # timerange=timerange,
+                                         timerange=timerange,
                                          data_format=self._config.get("dataformat_ohlcv", "json"),
                                          )
                 if not data.empty:
                     logger.info("Loaded cached data for %s, %s, %s", pair, timeframe, candle_type)
                     self._klines[(pair, timeframe, candle_type)] = data
-                    since_ms = data.iloc[-1]['date'].timestamp() * 1000
+                    since_ms = int(data.iloc[-1]['date'].timestamp() * 1000)
 
         if (not since_ms and (self._ft_has["ohlcv_require_since"] or not_all_data)):
             # Multiple calls for one pair - to get more history
