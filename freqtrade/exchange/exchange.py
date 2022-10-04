@@ -1853,18 +1853,33 @@ class Exchange:
     def _build_coroutine(self, pair: str, timeframe: str, candle_type: CandleType,
                          since_ms: Optional[int], cache: bool) -> Coroutine:
         not_all_data = self.required_candle_call_count > 1
-        if cache and (pair, timeframe, candle_type) in self._klines:
-            candle_limit = self.ohlcv_candle_limit(timeframe, candle_type)
-            min_date = date_minus_candles(timeframe, candle_limit - 5).timestamp()
-            # Check if 1 call can get us updated candles without hole in the data.
-            if min_date < self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0):
-                # Cache can be used - do one-off call.
-                not_all_data = False
+        if cache:
+            if (pair, timeframe, candle_type) in self._klines:
+                candle_limit = self.ohlcv_candle_limit(timeframe, candle_type)
+                min_date = date_minus_candles(timeframe, candle_limit - 5).timestamp()
+                # Check if 1 call can get us updated candles without hole in the data.
+                if min_date < self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0):
+                    # Cache can be used - do one-off call.
+                    not_all_data = False
+                else:
+                    # Time jump detected, evict cache
+                    logger.info(
+                        f"Time jump detected. Evicting cache for {pair}, {timeframe}, {candle_type}")
+                    del self._klines[(pair, timeframe, candle_type)]
             else:
-                # Time jump detected, evict cache
-                logger.info(
-                    f"Time jump detected. Evicting cache for {pair}, {timeframe}, {candle_type}")
-                del self._klines[(pair, timeframe, candle_type)]
+                from freqtrade.data.history.history_utils import load_pair_history
+
+                # TODO: Build realistic TimeRange
+                data = load_pair_history(pair, timeframe,
+                                         candle_type=candle_type,
+                                         datadir=self._config["datadir"],
+                                         # timerange=timerange,
+                                         data_format=self._config.get("dataformat_ohlcv", "json"),
+                                         )
+                if not data.empty:
+                    logger.info("Loaded cached data for %s, %s, %s", pair, timeframe, candle_type)
+                    self._klines[(pair, timeframe, candle_type)] = data
+                    since_ms = data.iloc[-1]['date'].timestamp() * 1000
 
         if (not since_ms and (self._ft_has["ohlcv_require_since"] or not_all_data)):
             # Multiple calls for one pair - to get more history
