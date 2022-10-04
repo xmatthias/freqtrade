@@ -180,7 +180,7 @@ class Exchange:
             exchange_config, ccxt_async, ccxt_kwargs=ccxt_async_config)
 
         logger.info(f'Using Exchange "{self.name}"')
-
+        self._data_handler = None
         if validate:
             # Initial markets load
             self._load_markets()
@@ -1868,17 +1868,19 @@ class Exchange:
                         f"Time jump detected. Evicting cache for {pair}, {timeframe}, {candle_type}")
                     del self._klines[(pair, timeframe, candle_type)]
             else:
-                from freqtrade.data.history.history_utils import load_pair_history
-
-                since = date_minus_candles(timeframe, self._startup_candle_count)
+                # Load from disk ...
+                from freqtrade.data.history.idatahandler import get_datahandler
+                self._data_handler = get_datahandler(
+                    self._config["datadir"], self._config.get("dataformat_ohlcv", "json"),
+                    self._data_handler)
+                candle_limit = self.ohlcv_candle_limit(timeframe, candle_type, since_ms)
+                since = date_minus_candles(timeframe, candle_limit + self._startup_candle_count)
                 since_ms = int(since.timestamp() * 1000)
-                timerange = TimeRange('date', startts=since.timestamp())
-                data = load_pair_history(pair, timeframe,
-                                         candle_type=candle_type,
-                                         datadir=self._config["datadir"],
-                                         timerange=timerange,
-                                         data_format=self._config.get("dataformat_ohlcv", "json"),
-                                         )
+                timerange = TimeRange('date', startts=int(since.timestamp()))
+                data = self._data_handler.ohlcv_load(pair, timeframe, candle_type,
+                                                     timerange=timerange,
+                                                     warn_no_data=False,
+                                                     )
                 if not data.empty:
                     logger.info("Loaded cached data for %s, %s, %s", pair, timeframe, candle_type)
                     self._klines[(pair, timeframe, candle_type)] = data
