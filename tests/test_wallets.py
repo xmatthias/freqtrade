@@ -322,6 +322,7 @@ async def test_sync_wallet_futures_live(mocker, default_conf):
         fetch_positions=get_mock_coro(return_value=mock_result),
     )
     mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
+    mocker.patch('freqtrade.exchange.Binance.additional_exchange_init')
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 

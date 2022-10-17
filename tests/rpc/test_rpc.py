@@ -561,6 +561,7 @@ async def test_rpc_balance_handle(default_conf, mocker, tickers):
             side_effect=lambda a, b: f"{b}/{a}" if a == "USDT" else f"{a}/{b}")
     )
     mocker.patch('freqtrade.exchange.Binance.load_leverage_tiers', get_mock_coro({}))
+    mocker.patch('freqtrade.exchange.Binance.additional_exchange_init')
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = 'futures'
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)

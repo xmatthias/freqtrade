@@ -99,6 +99,7 @@ async def test_send_msg_telegram_error(mocker, default_conf, caplog) -> None:
 
 async def test_process_msg_queue(mocker, default_conf, caplog) -> None:
     telegram_mock = mocker.patch('freqtrade.rpc.telegram.Telegram.send_msg')
+    default_conf['telegram']['allow_custom_messages'] = True
     mocker.patch('freqtrade.rpc.telegram.Telegram._init')
 
     freqtradebot = await get_patched_freqtradebot(mocker, default_conf)
@@ -108,8 +109,8 @@ async def test_process_msg_queue(mocker, default_conf, caplog) -> None:
     queue.append('Test message 2')
     rpc_manager.process_msg_queue(queue)
 
-    assert log_has("Sending rpc message: {'type': strategy_msg, 'msg': 'Test message'}", caplog)
-    assert log_has("Sending rpc message: {'type': strategy_msg, 'msg': 'Test message 2'}", caplog)
+    assert log_has("Sending rpc strategy_msg: Test message", caplog)
+    assert log_has("Sending rpc strategy_msg: Test message 2", caplog)
     assert telegram_mock.call_count == 2
 
 

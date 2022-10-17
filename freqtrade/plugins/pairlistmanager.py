@@ -3,9 +3,10 @@ PairList manager class
 """
 import logging
 from functools import partial
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from freqtrade.constants import Config, ListPairsWithTimeframes
+from freqtrade.data.dataprovider import DataProvider
 from freqtrade.enums import CandleType
 from freqtrade.exceptions import OperationalException
 from freqtrade.mixins import LoggingMixin
@@ -19,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 class PairListManager(LoggingMixin):
 
-    def __init__(self, exchange, config: Config) -> None:
+    def __init__(self, exchange, config: Config, dataprovider: DataProvider = None) -> None:
         self._exchange = exchange
         self._config = config
         self._whitelist = self._config['exchange'].get('pair_whitelist')
         self._blacklist = self._config['exchange'].get('pair_blacklist', [])
         self._pairlist_handlers: List[IPairList] = []
         self._tickers_needed = False
+        self._dataprovider: Optional[DataProvider] = dataprovider
         for pairlist_handler_config in self._config.get('pairlists', []):
             pairlist_handler = PairListResolver.load_pairlist(
                 pairlist_handler_config['method'],
@@ -40,6 +42,15 @@ class PairListManager(LoggingMixin):
 
         if not self._pairlist_handlers:
             raise OperationalException("No Pairlist Handlers defined")
+
+        if self._tickers_needed and not self._exchange.exchange_has('fetchTickers'):
+            invalid = ". ".join([p.name for p in self._pairlist_handlers if p.needstickers])
+
+            raise OperationalException(
+                "Exchange does not support fetchTickers, therefore the following pairlists "
+                "cannot be used. Please edit your config and restart the bot.\n"
+                f"{invalid}."
+            )
 
         refresh_period = config.get('pairlist_refresh_period', 3600)
         LoggingMixin.__init__(self, logger, refresh_period)
@@ -89,6 +100,8 @@ class PairListManager(LoggingMixin):
         # Validation against blacklist happens after the chain of Pairlist Handlers
         # to ensure blacklist is respected.
         pairlist = self.verify_blacklist(pairlist, logger.warning)
+
+        self.log_once(f"Whitelist with {len(pairlist)} pairs: {pairlist}", logger.info)
 
         self._whitelist = pairlist
 

@@ -198,8 +198,6 @@ class ApiServer(RPCHandler):
                 logger.debug(f"Found message of type: {message.get('type')}")
                 # Broadcast it
                 await self._ws_channel_manager.broadcast(message)
-                # Sleep, make this configurable?
-                await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             pass
 
@@ -243,6 +241,7 @@ class ApiServer(RPCHandler):
                                   use_colors=False,
                                   log_config=None,
                                   access_log=True if verbosity != 'error' else False,
+                                  ws_ping_interval=None  # We do this explicitly ourselves
                                   )
         try:
             self._server = UvicornServer(uvconfig)
