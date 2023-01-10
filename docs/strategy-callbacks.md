@@ -159,6 +159,7 @@ The stoploss price can only ever move upwards - if the stoploss value returned f
 
 The method must return a stoploss value (float / number) as a percentage of the current price.
 E.g. If the `current_rate` is 200 USD, then returning `0.02` will set the stoploss price 2% lower, at 196 USD.
+During backtesting, `current_rate` (and `current_profit`) are provided against the candle's high (or low for short trades) - while the resulting stoploss is evaluated against the candle's low (or high for short trades).
 
 The absolute value of the return value is used (the sign is ignored), so returning `0.05` or `-0.05` have the same result, a stoploss 5% below the current price.
 
@@ -772,7 +773,7 @@ class DigDeeperStrategy(IStrategy):
     * Sell 100@10\$ -> Avg price: 8.5\$, realized profit 150\$, 17.65%
     * Buy 150@11\$ -> Avg price: 10\$, realized profit 150\$, 17.65%
     * Sell 100@12\$ -> Avg price: 10\$, total realized profit 350\$, 20%
-    * Sell 150@14\$ -> Avg price: 10\$, total realized profit 950\$, 40%
+    * Sell 150@14\$ -> Avg price: 10\$, total realized profit 950\$, 40%  <- *This will be the last "Exit" message*
 
     The total profit for this trade was 950$ on a 3350$ investment (`100@8$ + 100@9$ + 150@11$`). As such - the final relative profit is 28.35% (`950 / 3350`).
 

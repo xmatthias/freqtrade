@@ -1,13 +1,17 @@
 import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from freqtrade.configuration import TimeRange
+from freqtrade.data.dataprovider import DataProvider
 from freqtrade.exceptions import OperationalException
-from tests.conftest import log_has_re
-from tests.freqai.conftest import (get_patched_data_kitchen, make_data_dictionary,
-                                   make_unfiltered_dataframe)
+from freqtrade.freqai.data_kitchen import FreqaiDataKitchen
+from tests.conftest import get_patched_exchange, log_has_re
+from tests.freqai.conftest import (get_patched_data_kitchen, get_patched_freqai_strategy,
+                                   make_data_dictionary, make_unfiltered_dataframe)
 
 
 @pytest.mark.parametrize(
@@ -125,7 +129,8 @@ async def test_normalize_data(mocker, freqai_conf):
     freqai = await make_data_dictionary(mocker, freqai_conf)
     data_dict = freqai.dk.data_dictionary
     freqai.dk.normalize_data(data_dict)
-    assert len(freqai.dk.data) == 32
+    assert any('_max' in entry for entry in freqai.dk.data.keys())
+    assert any('_min' in entry for entry in freqai.dk.data.keys())
 
 
 async def test_filter_features(mocker, freqai_conf):
@@ -158,3 +163,33 @@ async def test_make_train_test_datasets(mocker, freqai_conf):
     assert data_dictionary
     assert len(data_dictionary) == 7
     assert len(data_dictionary['train_features'].index) == 1916
+
+
+@pytest.mark.parametrize('model', [
+    'LightGBMRegressor'
+    ])
+async def test_get_full_model_path(mocker, freqai_conf, model):
+    freqai_conf.update({"freqaimodel": model})
+    freqai_conf.update({"timerange": "20180110-20180130"})
+    freqai_conf.update({"strategy": "freqai_test_strat"})
+
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
+    strategy.dp = DataProvider(freqai_conf, exchange)
+    strategy.freqai_info = freqai_conf.get("freqai", {})
+    freqai = strategy.freqai
+    freqai.live = True
+    freqai.dk = FreqaiDataKitchen(freqai_conf)
+    timerange = TimeRange.parse_timerange("20180110-20180130")
+    freqai.dd.load_all_pair_histories(timerange, freqai.dk)
+
+    freqai.dd.pair_dict = MagicMock()
+
+    data_load_timerange = TimeRange.parse_timerange("20180110-20180130")
+    new_timerange = TimeRange.parse_timerange("20180120-20180130")
+
+    freqai.extract_data_and_train_model(
+        new_timerange, "ADA/BTC", strategy, freqai.dk, data_load_timerange)
+
+    model_path = freqai.dk.get_full_models_path(freqai_conf)
+    assert model_path.is_dir() is True

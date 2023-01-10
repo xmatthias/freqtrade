@@ -426,7 +426,7 @@ async def test_dca_order_adjust(default_conf_usdt, ticker_usdt, leverage, fee, m
     assert trade.open_order_id is None
     # Open rate is not adjusted yet
     assert trade.open_rate == 1.99
-    assert trade.stake_amount == 60
+    assert pytest.approx(trade.stake_amount) == 60
     assert trade.stop_loss_pct == -0.1
     assert pytest.approx(trade.stop_loss) == 1.99 * (1 - 0.1 / leverage)
     assert pytest.approx(trade.initial_stop_loss) == 1.99 * (1 - 0.1 / leverage)
@@ -452,7 +452,7 @@ async def test_dca_order_adjust(default_conf_usdt, ticker_usdt, leverage, fee, m
     assert len(trade.orders) == 4
     assert trade.open_order_id is not None
     assert trade.open_rate == 1.99
-    assert trade.stake_amount == 60
+    assert pytest.approx(trade.stake_amount) == 60
     assert trade.orders[-1].price == 1.95
     assert pytest.approx(trade.orders[-1].cost) == 120 * leverage
 

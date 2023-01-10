@@ -138,6 +138,10 @@ class Backtesting:
             self.fee = self.exchange.get_fee(symbol=self.pairlists.whitelist[0])
         self.precision_mode = self.exchange.precisionMode
 
+        if self.config.get('freqai_backtest_live_models', False):
+            from freqtrade.freqai.utils import get_timerange_backtest_live_models
+            self.config['timerange'] = get_timerange_backtest_live_models(self.config)
+
         self.timerange = TimeRange.parse_timerange(
             None if self.config.get('timerange') is None else str(self.config.get('timerange')))
 
@@ -156,6 +160,7 @@ class Backtesting:
         # strategies which define "can_short=True" will fail to load in Spot mode.
         self._can_short = self.trading_mode != TradingMode.SPOT
         self._position_stacking: bool = self.config.get('position_stacking', False)
+        self.enable_protections: bool = self.config.get('enable_protections', False)
 
         self.init_backtest()
 
@@ -165,7 +170,7 @@ class Backtesting:
         PairLocks.use_db = True
         Trade.use_db = True
 
-    def init_backtest_detail(self):
+    def init_backtest_detail(self) -> None:
         # Load detail timeframe if specified
         self.timeframe_detail = str(self.config.get('timeframe_detail', ''))
         if self.timeframe_detail:
@@ -696,10 +701,11 @@ class Backtesting:
         trade.orders.append(order)
         return trade
 
-    def _get_exit_trade_entry(self, trade: LocalTrade, row: Tuple) -> Optional[LocalTrade]:
+    def _get_exit_trade_entry(
+            self, trade: LocalTrade, row: Tuple, is_first: bool) -> Optional[LocalTrade]:
         exit_candle_time: datetime = row[DATE_IDX].to_pydatetime()
 
-        if self.trading_mode == TradingMode.FUTURES:
+        if is_first and self.trading_mode == TradingMode.FUTURES:
             trade.funding_fees = self.exchange.calculate_funding_fees(
                 self.futures_data[trade.pair],
                 amount=trade.amount,
@@ -708,32 +714,7 @@ class Backtesting:
                 close_date=exit_candle_time,
             )
 
-        if self.timeframe_detail and trade.pair in self.detail_data:
-            exit_candle_end = exit_candle_time + timedelta(minutes=self.timeframe_min)
-
-            detail_data = self.detail_data[trade.pair]
-            detail_data = detail_data.loc[
-                (detail_data['date'] >= exit_candle_time) &
-                (detail_data['date'] < exit_candle_end)
-            ].copy()
-            if len(detail_data) == 0:
-                # Fall back to "regular" data if no detail data was found for this candle
-                return self._get_exit_trade_entry_for_candle(trade, row)
-            detail_data.loc[:, 'enter_long'] = row[LONG_IDX]
-            detail_data.loc[:, 'exit_long'] = row[ELONG_IDX]
-            detail_data.loc[:, 'enter_short'] = row[SHORT_IDX]
-            detail_data.loc[:, 'exit_short'] = row[ESHORT_IDX]
-            detail_data.loc[:, 'enter_tag'] = row[ENTER_TAG_IDX]
-            detail_data.loc[:, 'exit_tag'] = row[EXIT_TAG_IDX]
-            for det_row in detail_data[HEADERS].values.tolist():
-                res = self._get_exit_trade_entry_for_candle(trade, det_row)
-                if res:
-                    return res
-
-            return None
-
-        else:
-            return self._get_exit_trade_entry_for_candle(trade, row)
+        return self._get_exit_trade_entry_for_candle(trade, row)
 
     def get_valid_price_and_stake(
         self, pair: str, row: Tuple, propose_rate: float, stake_amount: float,
@@ -799,6 +780,7 @@ class Backtesting:
             stake_amount=stake_amount,
             min_stake_amount=min_stake_amount,
             max_stake_amount=max_stake_amount,
+            trade_amount=trade.stake_amount if trade else None
         )
 
         return propose_rate, stake_amount_val, leverage, min_stake_amount
@@ -972,9 +954,8 @@ class Backtesting:
             return 'short'
         return None
 
-    def run_protections(
-            self, enable_protections, pair: str, current_time: datetime, side: LongShort):
-        if enable_protections:
+    def run_protections(self, pair: str, current_time: datetime, side: LongShort):
+        if self.enable_protections:
             self.protections.stop_per_pair(pair, current_time, side)
             self.protections.global_stop(current_time, side)
 
@@ -1082,8 +1063,8 @@ class Backtesting:
 
     def backtest_loop(
             self, row: Tuple, pair: str, current_time: datetime, end_date: datetime,
-            max_open_trades: int, enable_protections: bool,
-            open_trade_count_start: int) -> int:
+            max_open_trades: int, open_trade_count_start: int, trade_dir: Optional[LongShort],
+            is_first: bool = True) -> int:
         """
         NOTE: This method is used by Hyperopt at each iteration. Please keep it optimized.
 
@@ -1101,9 +1082,10 @@ class Backtesting:
         # without positionstacking, we can only have one open trade per pair.
         # max_open_trades must be respected
         # don't open on the last row
-        trade_dir = self.check_for_trade_entry(row)
+        # We only open trades on the main candle, not on detail candles
         if (
             (self._position_stacking or len(LocalTrade.bt_trades_open_pp[pair]) == 0)
+            and is_first
             and self.trade_slot_available(max_open_trades, open_trade_count_start)
             and current_time != end_date
             and trade_dir is not None
@@ -1129,7 +1111,7 @@ class Backtesting:
 
                 # 4. Create exit orders (if any)
             if not trade.open_order_id:
-                self._get_exit_trade_entry(trade, row)  # Place exit order if necessary
+                self._get_exit_trade_entry(trade, row, is_first)  # Place exit order if necessary
 
                 # 5. Process exit orders.
             order = trade.select_order(trade.exit_side, is_open=True)
@@ -1147,13 +1129,12 @@ class Backtesting:
                     # logger.debug(f"{pair} - Backtesting exit {trade}")
                     LocalTrade.close_bt_trade(trade)
                 self.wallets_update()
-                self.run_protections(enable_protections, pair, current_time, trade.trade_direction)
+                self.run_protections(pair, current_time, trade.trade_direction)
         return open_trade_count_start
 
     def backtest(self, processed: Dict,
                  start_date: datetime, end_date: datetime,
-                 max_open_trades: int = 0,
-                 enable_protections: bool = False) -> Dict[str, Any]:
+                 max_open_trades: int = 0) -> Dict[str, Any]:
         """
         Implement backtesting functionality
 
@@ -1166,10 +1147,9 @@ class Backtesting:
         :param start_date: backtesting timerange start datetime
         :param end_date: backtesting timerange end datetime
         :param max_open_trades: maximum number of concurrent trades, <= 0 means unlimited
-        :param enable_protections: Should protections be enabled?
         :return: DataFrame with trades (results of backtesting)
         """
-        self.prepare_backtest(enable_protections)
+        self.prepare_backtest(self.enable_protections)
         # Ensure wallets are uptodate (important for --strategy-list)
         self.wallets_update()
         # Use dict of lists with data for performance
@@ -1182,7 +1162,6 @@ class Backtesting:
 
         self.progress.init_step(BacktestState.BACKTEST, int(
             (end_date - start_date) / timedelta(minutes=self.timeframe_min)))
-
         # Loop timerange and get candle for each pair at that point in time
         while current_time <= end_date:
             open_trade_count_start = LocalTrade.bt_open_open_trade_count
@@ -1196,10 +1175,47 @@ class Backtesting:
                 row_index += 1
                 indexes[pair] = row_index
                 self.dataprovider._set_dataframe_max_index(row_index)
+                current_detail_time: datetime = row[DATE_IDX].to_pydatetime()
+                trade_dir: Optional[LongShort] = self.check_for_trade_entry(row)
 
-                open_trade_count_start = self.backtest_loop(
-                    row, pair, current_time, end_date, max_open_trades,
-                    enable_protections, open_trade_count_start)
+                if (
+                    (trade_dir is not None or len(LocalTrade.bt_trades_open_pp[pair]) > 0)
+                    and self.timeframe_detail and pair in self.detail_data
+                ):
+                    # Spread out into detail timeframe.
+                    # Should only happen when we are either in a trade for this pair
+                    # or when we got the signal for a new trade.
+                    exit_candle_end = current_detail_time + timedelta(minutes=self.timeframe_min)
+
+                    detail_data = self.detail_data[pair]
+                    detail_data = detail_data.loc[
+                        (detail_data['date'] >= current_detail_time) &
+                        (detail_data['date'] < exit_candle_end)
+                    ].copy()
+                    if len(detail_data) == 0:
+                        # Fall back to "regular" data if no detail data was found for this candle
+                        open_trade_count_start = self.backtest_loop(
+                            row, pair, current_time, end_date, max_open_trades,
+                            open_trade_count_start, trade_dir)
+                        continue
+                    detail_data.loc[:, 'enter_long'] = row[LONG_IDX]
+                    detail_data.loc[:, 'exit_long'] = row[ELONG_IDX]
+                    detail_data.loc[:, 'enter_short'] = row[SHORT_IDX]
+                    detail_data.loc[:, 'exit_short'] = row[ESHORT_IDX]
+                    detail_data.loc[:, 'enter_tag'] = row[ENTER_TAG_IDX]
+                    detail_data.loc[:, 'exit_tag'] = row[EXIT_TAG_IDX]
+                    is_first = True
+                    current_time_det = current_time
+                    for det_row in detail_data[HEADERS].values.tolist():
+                        open_trade_count_start = self.backtest_loop(
+                            det_row, pair, current_time_det, end_date, max_open_trades,
+                            open_trade_count_start, trade_dir, is_first)
+                        current_time_det += timedelta(minutes=self.timeframe_detail_min)
+                        is_first = False
+                else:
+                    open_trade_count_start = self.backtest_loop(
+                        row, pair, current_time, end_date, max_open_trades,
+                        open_trade_count_start, trade_dir)
 
             # Move time one configured time_interval ahead.
             self.progress.increment()
@@ -1261,7 +1277,6 @@ class Backtesting:
             start_date=min_date,
             end_date=max_date,
             max_open_trades=max_open_trades,
-            enable_protections=self.config.get('enable_protections', False),
         )
         backtest_end_time = datetime.now(timezone.utc)
         results.update({
@@ -1299,8 +1314,7 @@ class Backtesting:
     def _get_min_cached_backtest_date(self):
         min_backtest_date = None
         backtest_cache_age = self.config.get('backtest_cache', constants.BACKTEST_CACHE_DEFAULT)
-        if self.timerange.stopts == 0 or datetime.fromtimestamp(
-           self.timerange.stopts, tz=timezone.utc) > datetime.now(tz=timezone.utc):
+        if self.timerange.stopts == 0 or self.timerange.stopdt > datetime.now(tz=timezone.utc):
             logger.warning('Backtest result caching disabled due to use of open-ended timerange.')
         elif backtest_cache_age == 'day':
             min_backtest_date = datetime.now(tz=timezone.utc) - timedelta(days=1)

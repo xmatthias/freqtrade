@@ -18,6 +18,7 @@ from freqtrade.commands import (start_backtesting_show, start_convert_data, star
 from freqtrade.commands.db_commands import start_convert_db
 from freqtrade.commands.deploy_commands import (clean_ui_subdir, download_and_install_ui,
                                                 get_ui_download_url, read_ui_version)
+from freqtrade.commands.list_commands import start_list_freqAI_models
 from freqtrade.configuration import setup_utils_configuration
 from freqtrade.enums import RunMode
 from freqtrade.exceptions import OperationalException
@@ -764,9 +765,7 @@ async def test_download_data_no_exchange(mocker, caplog):
         await start_download_data(pargs)
 
 
-async def test_download_data_no_pairs(mocker, caplog):
-
-    mocker.patch.object(Path, "exists", MagicMock(return_value=False))
+async def test_download_data_no_pairs(mocker):
 
     mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
                  get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
@@ -787,8 +786,6 @@ async def test_download_data_no_pairs(mocker, caplog):
 
 
 async def test_download_data_all_pairs(mocker, markets):
-
-    mocker.patch.object(Path, "exists", MagicMock(return_value=False))
 
     dl_mock = mocker.patch('freqtrade.commands.data_commands.refresh_backtest_ohlcv_data',
                            get_mock_coro(return_value=["ETH/BTC", "XRP/BTC"]))
@@ -961,6 +958,34 @@ def test_start_list_strategies(capsys):
     assert "StrategyTestV2" in captured.out
     assert "TestStrategyNoImplements" in captured.out
     assert str(Path("broken_strats/broken_futures_strategies.py")) in captured.out
+
+
+def test_start_list_freqAI_models(capsys):
+
+    args = [
+        "list-freqaimodels",
+        "-1"
+    ]
+    pargs = get_args(args)
+    pargs['config'] = None
+    start_list_freqAI_models(pargs)
+    captured = capsys.readouterr()
+    assert "LightGBMClassifier" in captured.out
+    assert "LightGBMRegressor" in captured.out
+    assert "XGBoostRegressor" in captured.out
+    assert "<builtin>/LightGBMRegressor.py" not in captured.out
+
+    args = [
+        "list-freqaimodels",
+    ]
+    pargs = get_args(args)
+    pargs['config'] = None
+    start_list_freqAI_models(pargs)
+    captured = capsys.readouterr()
+    assert "LightGBMClassifier" in captured.out
+    assert "LightGBMRegressor" in captured.out
+    assert "XGBoostRegressor" in captured.out
+    assert "<builtin>/LightGBMRegressor.py" in captured.out
 
 
 async def test_start_test_pairlist(mocker, caplog, tickers, default_conf, capsys):
@@ -1261,7 +1286,7 @@ def test_hyperopt_list(mocker, capsys, caplog, saved_hyperopt_results, tmpdir):
     assert csv_file.is_file()
     line = csv_file.read_text()
     assert ('Best,1,2,-1.25%,-1.2222,-0.00125625,,-2.51,"3,930.0 m",0.43662' in line
-            or "Best,1,2,-1.25%,-1.2222,-0.00125625,,-2.51,2 days 17:30:00,0.43662" in line)
+            or "Best,1,2,-1.25%,-1.2222,-0.00125625,,-2.51,2 days 17:30:00,2,0,0.43662" in line)
     csv_file.unlink()
 
 
@@ -1519,7 +1544,7 @@ def test_backtesting_show(mocker, testdatadir, capsys):
     args = [
         "backtesting-show",
         "--export-filename",
-        f"{testdatadir / 'backtest_results/backtest-result_new.json'}",
+        f"{testdatadir / 'backtest_results/backtest-result.json'}",
         "--show-pair-list"
     ]
     pargs = get_args(args)

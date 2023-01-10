@@ -102,6 +102,11 @@ class IDataHandler(ABC):
         :return: (min, max)
         """
         data = self._ohlcv_load(pair, timeframe, None, candle_type)
+        if data.empty:
+            return (
+                datetime.fromtimestamp(0, tz=timezone.utc),
+                datetime.fromtimestamp(0, tz=timezone.utc)
+            )
         return data.iloc[0]['date'].to_pydatetime(), data.iloc[-1]['date'].to_pydatetime()
 
     @abstractmethod
@@ -303,7 +308,7 @@ class IDataHandler(ABC):
             timerange=timerange_startup,
             candle_type=candle_type
         )
-        if self._check_empty_df(pairdf, pair, timeframe, candle_type, warn_no_data):
+        if self._check_empty_df(pairdf, pair, timeframe, candle_type, warn_no_data, True):
             return pairdf
         else:
             enddate = pairdf.iloc[-1]['date']
@@ -323,8 +328,9 @@ class IDataHandler(ABC):
             self._check_empty_df(pairdf, pair, timeframe, candle_type, warn_no_data)
             return pairdf
 
-    def _check_empty_df(self, pairdf: DataFrame, pair: str, timeframe: str,
-                        candle_type: CandleType, warn_no_data: bool):
+    def _check_empty_df(
+            self, pairdf: DataFrame, pair: str, timeframe: str, candle_type: CandleType,
+            warn_no_data: bool, warn_price: bool = False) -> bool:
         """
         Warn on empty dataframe
         """
@@ -335,6 +341,20 @@ class IDataHandler(ABC):
                     "Use `freqtrade download-data` to download the data"
                 )
             return True
+        elif warn_price:
+            candle_price_gap = 0
+            if (candle_type in (CandleType.SPOT, CandleType.FUTURES) and
+                    not pairdf.empty
+                    and 'close' in pairdf.columns and 'open' in pairdf.columns):
+                # Detect gaps between prior close and open
+                gaps = ((pairdf['open'] - pairdf['close'].shift(1)) / pairdf['close'].shift(1))
+                gaps = gaps.dropna()
+                if len(gaps):
+                    candle_price_gap = max(abs(gaps))
+            if candle_price_gap > 0.1:
+                logger.info(f"Price jump in {pair}, {timeframe}, {candle_type} between two candles "
+                            f"of {candle_price_gap:.2%} detected.")
+
         return False
 
     def _validate_pairdata(self, pair, pairdata: DataFrame, timeframe: str,
@@ -346,13 +366,11 @@ class IDataHandler(ABC):
         """
 
         if timerange.starttype == 'date':
-            start = datetime.fromtimestamp(timerange.startts, tz=timezone.utc)
-            if pairdata.iloc[0]['date'] > start:
+            if pairdata.iloc[0]['date'] > timerange.startdt:
                 logger.warning(f"{pair}, {candle_type}, {timeframe}, "
                                f"data starts at {pairdata.iloc[0]['date']:%Y-%m-%d %H:%M:%S}")
         if timerange.stoptype == 'date':
-            stop = datetime.fromtimestamp(timerange.stopts, tz=timezone.utc)
-            if pairdata.iloc[-1]['date'] < stop:
+            if pairdata.iloc[-1]['date'] < timerange.stopdt:
                 logger.warning(f"{pair}, {candle_type}, {timeframe}, "
                                f"data ends at {pairdata.iloc[-1]['date']:%Y-%m-%d %H:%M:%S}")
 

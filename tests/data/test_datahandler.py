@@ -1,6 +1,7 @@
 # pragma pylint: disable=missing-docstring, protected-access, C0103
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -15,7 +16,7 @@ from freqtrade.data.history.idatahandler import IDataHandler, get_datahandler, g
 from freqtrade.data.history.jsondatahandler import JsonDataHandler, JsonGzDataHandler
 from freqtrade.data.history.parquetdatahandler import ParquetDataHandler
 from freqtrade.enums import CandleType, TradingMode
-from tests.conftest import log_has
+from tests.conftest import log_has, log_has_re
 
 
 def test_datahandler_ohlcv_get_pairs(testdatadir):
@@ -69,7 +70,7 @@ def test_datahandler_ohlcv_regex(filename, pair, timeframe, candletype):
     ('BTC_USDT_USDT', 'BTC/USDT:USDT'),  # Futures
     ('XRP_USDT_USDT', 'XRP/USDT:USDT'),  # futures
     ('BTC-PERP', 'BTC-PERP'),
-    ('BTC-PERP_USDT', 'BTC-PERP:USDT'),  # potential FTX case
+    ('BTC-PERP_USDT', 'BTC-PERP:USDT'),
     ('UNITTEST_USDT', 'UNITTEST/USDT'),
 ])
 def test_rebuild_pair_from_filename(input, expected):
@@ -152,6 +153,102 @@ def test_jsondatahandler_ohlcv_load(testdatadir, caplog):
     assert len(df1) == 0
     assert log_has("Could not load data for NOPAIR/XXX.", caplog)
     assert df.columns.equals(df1.columns)
+
+
+def test_datahandler_ohlcv_data_min_max(testdatadir):
+    dh = JsonDataHandler(testdatadir)
+    min_max = dh.ohlcv_data_min_max('UNITTEST/BTC', '5m', 'spot')
+    assert len(min_max) == 2
+
+    # Empty pair
+    min_max = dh.ohlcv_data_min_max('UNITTEST/BTC', '8m', 'spot')
+    assert len(min_max) == 2
+    assert min_max[0] == datetime.fromtimestamp(0, tz=timezone.utc)
+    assert min_max[0] == min_max[1]
+    # Empty pair2
+    min_max = dh.ohlcv_data_min_max('NOPAIR/XXX', '4m', 'spot')
+    assert len(min_max) == 2
+    assert min_max[0] == datetime.fromtimestamp(0, tz=timezone.utc)
+    assert min_max[0] == min_max[1]
+
+
+def test_datahandler__check_empty_df(testdatadir, caplog):
+    dh = JsonDataHandler(testdatadir)
+    expected_text = r"Price jump in UNITTEST/USDT, 1h, spot between"
+    df = DataFrame([
+        [
+            1511686200000,  # 8:50:00
+            8.794,  # open
+            8.948,  # high
+            8.794,  # low
+            8.88,  # close
+            2255,  # volume (in quote currency)
+        ],
+        [
+            1511686500000,  # 8:55:00
+            8.88,
+            8.942,
+            8.88,
+            8.893,
+            9911,
+        ],
+        [
+            1511687100000,  # 9:05:00
+            8.891,
+            8.893,
+            8.875,
+            8.877,
+            2251
+        ],
+        [
+            1511687400000,  # 9:10:00
+            8.877,
+            8.883,
+            8.895,
+            8.817,
+            123551
+        ]
+    ], columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+
+    dh._check_empty_df(df, 'UNITTEST/USDT', '1h', CandleType.SPOT, True, True)
+    assert not log_has_re(expected_text, caplog)
+    df = DataFrame([
+        [
+            1511686200000,  # 8:50:00
+            8.794,  # open
+            8.948,  # high
+            8.794,  # low
+            8.88,  # close
+            2255,  # volume (in quote currency)
+        ],
+        [
+            1511686500000,  # 8:55:00
+            8.88,
+            8.942,
+            8.88,
+            8.893,
+            9911,
+        ],
+        [
+            1511687100000,  # 9:05:00
+            889.1,   # Price jump by several decimals
+            889.3,
+            887.5,
+            887.7,
+            2251
+        ],
+        [
+            1511687400000,  # 9:10:00
+            8.877,
+            8.883,
+            8.895,
+            8.817,
+            123551
+        ]
+    ], columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+
+    dh._check_empty_df(df, 'UNITTEST/USDT', '1h', CandleType.SPOT, True, True)
+    assert log_has_re(expected_text, caplog)
 
 
 @pytest.mark.parametrize('datahandler', ['feather', 'parquet'])

@@ -89,6 +89,18 @@ async def test_bot_cleanup(mocker, default_conf_usdt, caplog) -> None:
     assert coo_mock.call_count == 1
 
 
+async def test_bot_cleanup_db_errors(mocker, default_conf_usdt, caplog) -> None:
+    mocker.patch('freqtrade.freqtradebot.Trade.commit',
+                 side_effect=OperationalException())
+    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.check_for_open_trades',
+                 side_effect=OperationalException())
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
+    freqtrade.emc = MagicMock()
+    freqtrade.emc.shutdown = MagicMock()
+    await freqtrade.cleanup()
+    assert freqtrade.emc.shutdown.call_count == 1
+
+
 @pytest.mark.parametrize('runmode', [
     RunMode.DRY_RUN,
     RunMode.LIVE
@@ -1191,6 +1203,8 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf_usdt, fee, caplo
         order_id='100',
         ft_pair=trade.pair,
         ft_is_open=True,
+        ft_amount=trade.amount,
+        ft_price=0.0,
     ))
     assert trade
 
@@ -1535,6 +1549,7 @@ async def test_handle_stoploss_on_exchange_trailing(
         })
     )
     assert await freqtrade.handle_trade(trade) is True
+    assert trade.stoploss_order_id is None
 
 
 @pytest.mark.parametrize("is_short", [False, True])
@@ -2409,7 +2424,7 @@ async def test_close_trade(
     trade.is_short = is_short
     assert trade
 
-    oobj = Order.parse_from_ccxt_object(enter_order, enter_order['symbol'], trade.enter_side)
+    oobj = Order.parse_from_ccxt_object(enter_order, enter_order['symbol'], trade.entry_side)
     trade.update_trade(oobj)
     oobj = Order.parse_from_ccxt_object(exit_order, exit_order['symbol'], trade.exit_side)
     trade.update_trade(oobj)
@@ -3094,7 +3109,7 @@ async def test_handle_cancel_enter(
 
 
 @pytest.mark.parametrize("is_short", [False, True])
-@pytest.mark.parametrize("limit_buy_order_canceled_empty", ['binance', 'ftx', 'kraken', 'bittrex'],
+@pytest.mark.parametrize("limit_buy_order_canceled_empty", ['binance', 'kraken', 'bittrex'],
                          indirect=['limit_buy_order_canceled_empty'])
 async def test_handle_cancel_enter_exchanges(mocker, caplog, default_conf_usdt, is_short, fee,
                                              limit_buy_order_canceled_empty) -> None:
@@ -4046,15 +4061,17 @@ async def test__safe_exit_amount(default_conf_usdt, fee, caplog, mocker, amount_
     patch_get_signal(freqtrade)
     if has_err:
         with pytest.raises(DependencyException, match=r"Not enough amount to exit trade."):
-            assert await freqtrade._safe_exit_amount(trade.pair, trade.amount)
+            assert await freqtrade._safe_exit_amount(trade, trade.pair, trade.amount)
     else:
         wallet_update.reset_mock()
-        assert await freqtrade._safe_exit_amount(trade.pair, trade.amount) == amount_wallet
+        assert trade.amount != amount_wallet
+        assert await freqtrade._safe_exit_amount(trade, trade.pair, trade.amount) == amount_wallet
         assert log_has_re(r'.*Falling back to wallet-amount.', caplog)
+        assert trade.amount == amount_wallet
         assert wallet_update.call_count == 1
         caplog.clear()
         wallet_update.reset_mock()
-        assert await freqtrade._safe_exit_amount(trade.pair, amount_wallet) == amount_wallet
+        assert await freqtrade._safe_exit_amount(trade, trade.pair, amount_wallet) == amount_wallet
         assert not log_has_re(r'.*Falling back to wallet-amount.', caplog)
         assert wallet_update.call_count == 1
 
@@ -4684,6 +4701,7 @@ async def test_get_real_amount_open_trade_usdt(default_conf_usdt, fee, mocker):
         'amount': amount,
         'status': 'open',
         'side': 'buy',
+        'price': 0.245441,
     }
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     order_obj = Order.parse_from_ccxt_object(order, 'LTC/ETH', 'buy')
@@ -5137,7 +5155,7 @@ async def test_startup_backpopulate_precision(mocker, default_conf_usdt, fee, ca
 
 @pytest.mark.usefixtures("init_persistence")
 @pytest.mark.parametrize("is_short", [False, True])
-async def test_update_closed_trades_without_assigned_fees(mocker, default_conf_usdt, fee, is_short):
+async def test_update_trades_without_assigned_fees(mocker, default_conf_usdt, fee, is_short):
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
 
     def patch_with_fee(order):
@@ -5166,7 +5184,7 @@ async def test_update_closed_trades_without_assigned_fees(mocker, default_conf_u
         assert trade.fee_close_cost is None
         assert trade.fee_close_currency is None
 
-    await freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_trades_without_assigned_fees()
 
     # Does nothing for dry-run
     trades = Trade.get_trades().all()
@@ -5180,7 +5198,7 @@ async def test_update_closed_trades_without_assigned_fees(mocker, default_conf_u
     freqtrade.config['dry_run'] = False
     mocker.patch('freqtrade.wallets.Wallets.update', get_mock_coro())
 
-    await freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_trades_without_assigned_fees()
 
     trades = Trade.get_trades().all()
     assert len(trades) == MOCK_TRADE_COUNT
@@ -5395,9 +5413,9 @@ def test_get_valid_price(mocker, default_conf_usdt) -> None:
     ('futures', 33, "2021-08-31 23:59:59", "2021-09-01 08:00:07"),
     ('futures', 33, "2021-08-31 23:59:58", "2021-09-01 08:00:07"),
 ])
-async def test_update_funding_fees_schedule(
-        mocker, default_conf, trading_mode, calls, time_machine, t1, t2):
-    time_machine.move_to(f"{t1} +00:00")
+async def test_update_funding_fees_schedule(mocker, default_conf, trading_mode, calls, time_machine,
+                                            t1, t2):
+    time_machine.move_to(f"{t1} +00:00", tick=False)
 
     patch_RPCManager(mocker)
     patch_exchange(mocker)
@@ -5406,7 +5424,7 @@ async def test_update_funding_fees_schedule(
     default_conf['margin_mode'] = 'isolated'
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
 
-    time_machine.move_to(f"{t2} +00:00")
+    time_machine.move_to(f"{t2} +00:00", tick=False)
     # Check schedule jobs in debugging with freqtrade._schedule.jobs
     await freqtrade._schedule.run_pending()
 
@@ -5647,7 +5665,7 @@ async def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
     assert trade.stake_amount == 110
 
     # Assume it does nothing since order is closed and trade is open
-    await freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_trades_without_assigned_fees()
 
     trade = Trade.query.first()
     assert trade
@@ -5718,7 +5736,7 @@ async def test_position_adjust(mocker, default_conf_usdt, fee) -> None:
     mocker.patch('freqtrade.exchange.Exchange.create_order', fetch_order_mm)
     mocker.patch('freqtrade.exchange.Exchange.fetch_order', fetch_order_mm)
     mocker.patch('freqtrade.exchange.Exchange.fetch_order_or_stoploss_order', fetch_order_mm)
-    await freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_trades_without_assigned_fees()
 
     orders = Order.query.all()
     assert orders
@@ -5935,7 +5953,7 @@ async def test_position_adjust2(mocker, default_conf_usdt, fee) -> None:
     assert trade.stake_amount == bid * amount
 
     # Assume it does nothing since order is closed and trade is open
-    await freqtrade.update_closed_trades_without_assigned_fees()
+    await freqtrade.update_trades_without_assigned_fees()
 
     trade = Trade.query.first()
     assert trade

@@ -27,7 +27,7 @@ from tests.conftest import (generate_test_data_raw, get_mock_coro, get_patched_e
 
 
 # Make sure to always keep one exchange here which is NOT subclassed!!
-EXCHANGES = ['bittrex', 'binance', 'kraken', 'ftx', 'gateio']
+EXCHANGES = ['bittrex', 'binance', 'kraken', 'gateio']
 
 get_entry_rate_data = [
     ('other', 20, 19, 10, 0.0, 20),  # Full ask side
@@ -1221,12 +1221,17 @@ async def test_create_dry_run_order_fees(
     assert order1['fee']['rate'] == fee
 
 
-@pytest.mark.parametrize("side,startprice,endprice", [
-    ("buy", 25.563, 25.566),
-    ("sell", 25.566, 25.563)
+@pytest.mark.parametrize("side,price,filled", [
+    # order_book_l2_usd spread:
+    # best ask: 25.566
+    # best bid: 25.563
+    ("buy", 25.563, False),
+    ("buy", 25.566, True),
+    ("sell", 25.566, False),
+    ("sell", 25.563, True),
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, startprice, endprice,
+async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, price, filled,
                                                exchange_name, order_book_l2_usd):
     default_conf['dry_run'] = True
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
@@ -1240,7 +1245,7 @@ async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, start
         ordertype='limit',
         side=side,
         amount=1,
-        rate=startprice,
+        rate=price,
         leverage=1.0
     )
     assert order_book_l2_usd.call_count == 1
@@ -1249,22 +1254,17 @@ async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, start
     assert order["side"] == side
     assert order["type"] == "limit"
     assert order["symbol"] == "LTC/USDT"
+    assert order["average"] == price
+    assert order['status'] == 'open' if not filled else 'closed'
     order_book_l2_usd.reset_mock()
 
+    # fetch order again...
     order_closed = await exchange.fetch_dry_run_order(order['id'])
-    assert order_book_l2_usd.call_count == 1
-    assert order_closed['status'] == 'open'
-    assert not order['fee']
-    assert order_closed['filled'] == 0
+    assert order_book_l2_usd.call_count == (1 if not filled else 0)
+    assert order_closed['status'] == ('open' if not filled else 'closed')
+    assert order_closed['filled'] == (0 if not filled else 1)
 
     order_book_l2_usd.reset_mock()
-    order_closed['price'] = endprice
-
-    order_closed = await exchange.fetch_dry_run_order(order['id'])
-    assert order_closed['status'] == 'closed'
-    assert order['fee']
-    assert order_closed['filled'] == 1
-    assert order_closed['filled'] == order_closed['amount']
 
     # Empty orderbook test
     mocker.patch('freqtrade.exchange.Exchange.fetch_l2_order_book',
@@ -2024,7 +2024,7 @@ async def test_get_historic_ohlcv(default_conf, mocker, caplog, exchange_name, c
     pair = 'ETH/BTC'
 
     async def mock_candle_hist(pair, timeframe, candle_type, since_ms):
-        return pair, timeframe, candle_type, ohlcv
+        return pair, timeframe, candle_type, ohlcv, True
 
     exchange._async_get_candle_history = Mock(wraps=mock_candle_hist)
     # one_call calculation * 1.8 should do 2 calls
@@ -2058,62 +2058,6 @@ async def test_get_historic_ohlcv(default_conf, mocker, caplog, exchange_name, c
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-@pytest.mark.parametrize('candle_type', ['mark', ''])
-async def test_get_historic_ohlcv_as_df(default_conf, mocker, exchange_name, candle_type):
-    exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
-    ohlcv = [
-        [
-            arrow.utcnow().int_timestamp * 1000,  # unix timestamp ms
-            1,  # open
-            2,  # high
-            3,  # low
-            4,  # close
-            5,  # volume (in quote currency)
-        ],
-        [
-            arrow.utcnow().shift(minutes=5).int_timestamp * 1000,  # unix timestamp ms
-            1,  # open
-            2,  # high
-            3,  # low
-            4,  # close
-            5,  # volume (in quote currency)
-        ],
-        [
-            arrow.utcnow().shift(minutes=10).int_timestamp * 1000,  # unix timestamp ms
-            1,  # open
-            2,  # high
-            3,  # low
-            4,  # close
-            5,  # volume (in quote currency)
-        ]
-    ]
-    pair = 'ETH/BTC'
-
-    async def mock_candle_hist(pair, timeframe, candle_type, since_ms):
-        return pair, timeframe, candle_type, ohlcv
-
-    exchange._async_get_candle_history = Mock(wraps=mock_candle_hist)
-    # one_call calculation * 1.8 should do 2 calls
-
-    since = 5 * 60 * exchange.ohlcv_candle_limit('5m', CandleType.SPOT) * 1.8
-    ret = await exchange.get_historic_ohlcv_as_df(
-        pair,
-        "5m",
-        int((arrow.utcnow().int_timestamp - since) * 1000),
-        candle_type=candle_type
-    )
-
-    assert exchange._async_get_candle_history.call_count == 2
-    # Returns twice the above OHLCV data
-    assert len(ret) == 2
-    assert isinstance(ret, DataFrame)
-    assert 'date' in ret.columns
-    assert 'open' in ret.columns
-    assert 'close' in ret.columns
-    assert 'high' in ret.columns
-
-
-@pytest.mark.parametrize("exchange_name", EXCHANGES)
 @pytest.mark.parametrize('candle_type', [CandleType.MARK, CandleType.SPOT])
 async def test__async_get_historic_ohlcv(default_conf, mocker, caplog, exchange_name, candle_type):
     ohlcv = [
@@ -2131,7 +2075,7 @@ async def test__async_get_historic_ohlcv(default_conf, mocker, caplog, exchange_
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
 
     pair = 'ETH/USDT'
-    respair, restf, _, res = await exchange._async_get_historic_ohlcv(
+    respair, restf, _, res, _ = await exchange._async_get_historic_ohlcv(
         pair, "5m", 1500000000000, candle_type=candle_type, is_new_pair=False)
     assert respair == pair
     assert restf == '5m'
@@ -2142,7 +2086,7 @@ async def test__async_get_historic_ohlcv(default_conf, mocker, caplog, exchange_
     exchange._api_async.fetch_ohlcv.reset_mock()
     end_ts = 1_500_500_000_000
     start_ts = 1_500_000_000_000
-    respair, restf, _, res = await exchange._async_get_historic_ohlcv(
+    respair, restf, _, res, _ = await exchange._async_get_historic_ohlcv(
         pair, "5m", since_ms=start_ts, candle_type=candle_type, is_new_pair=False,
         until_ms=end_ts
         )
@@ -2264,6 +2208,9 @@ async def test_refresh_latest_ohlcv_cache(mocker, default_conf, candle_type, tim
     time_machine.move_to(start + timedelta(hours=99, minutes=30))
 
     exchange = await get_patched_exchange(mocker, default_conf)
+    mocker.patch("freqtrade.exchange.Exchange.ohlcv_candle_limit", return_value=100)
+    assert exchange._startup_candle_count == 0
+
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
     pair1 = ('IOTA/ETH', '1h', candle_type)
     pair2 = ('XRP/ETH', '1h', candle_type)
@@ -2304,30 +2251,36 @@ async def test_refresh_latest_ohlcv_cache(mocker, default_conf, candle_type, tim
     assert len(res) == 2
     assert len(res[pair1]) == 99
     assert len(res[pair2]) == 99
+    assert res[pair2].at[0, 'open']
     assert exchange._pairs_last_refresh_time[pair1] == ohlcv[-1][0] // 1000
     refresh_pior = exchange._pairs_last_refresh_time[pair1]
 
-    # New candle on exchange - only return 50 candles (but one candle further)
-    new_startdate = (start + timedelta(hours=51)).strftime('%Y-%m-%d %H:%M')
-    ohlcv = generate_test_data_raw('1h', 50, new_startdate)
+    # New candle on exchange - return 100 candles - but skip one candle so we actually get 2 candles
+    # in one go
+    new_startdate = (start + timedelta(hours=2)).strftime('%Y-%m-%d %H:%M')
+    # mocker.patch("freqtrade.exchange.Exchange.ohlcv_candle_limit", return_value=100)
+    ohlcv = generate_test_data_raw('1h', 100, new_startdate)
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
     res = await exchange.refresh_latest_ohlcv(pairs)
     assert exchange._api_async.fetch_ohlcv.call_count == 2
     assert len(res) == 2
     assert len(res[pair1]) == 100
     assert len(res[pair2]) == 100
+    # Verify index starts at 0
+    assert res[pair2].at[0, 'open']
     assert refresh_pior != exchange._pairs_last_refresh_time[pair1]
 
     assert exchange._pairs_last_refresh_time[pair1] == ohlcv[-1][0] // 1000
     assert exchange._pairs_last_refresh_time[pair2] == ohlcv[-1][0] // 1000
     exchange._api_async.fetch_ohlcv.reset_mock()
 
-    # Retry same call - no action.
+    # Retry same call - from cache
     res = await exchange.refresh_latest_ohlcv(pairs)
     assert exchange._api_async.fetch_ohlcv.call_count == 0
     assert len(res) == 2
     assert len(res[pair1]) == 100
     assert len(res[pair2]) == 100
+    assert res[pair2].at[0, 'open']
 
     # Move to distant future (so a 1 call would cause a hole in the data)
     time_machine.move_to(start + timedelta(hours=2000))
@@ -2340,6 +2293,7 @@ async def test_refresh_latest_ohlcv_cache(mocker, default_conf, candle_type, tim
     # Cache eviction - new data.
     assert len(res[pair1]) == 99
     assert len(res[pair2]) == 99
+    assert res[pair2].at[0, 'open']
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
@@ -2363,7 +2317,7 @@ async def test__async_get_candle_history(default_conf, mocker, caplog, exchange_
     pair = 'ETH/BTC'
     res = await exchange._async_get_candle_history(pair, "5m", CandleType.SPOT)
     assert type(res) is tuple
-    assert len(res) == 4
+    assert len(res) == 5
     assert res[0] == pair
     assert res[1] == "5m"
     assert res[2] == CandleType.SPOT
@@ -2447,7 +2401,7 @@ async def test__async_get_candle_history_empty(default_conf, mocker, caplog):
     pair = 'ETH/BTC'
     res = await exchange._async_get_candle_history(pair, "5m", CandleType.SPOT)
     assert type(res) is tuple
-    assert len(res) == 4
+    assert len(res) == 5
     assert res[0] == pair
     assert res[1] == "5m"
     assert res[2] == CandleType.SPOT
@@ -3255,19 +3209,16 @@ async def test_cancel_stoploss_order(default_conf, mocker, exchange_name):
 async def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_name):
     default_conf['dry_run'] = False
     mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order', get_mock_coro({'for': 123}))
-    mocker.patch('freqtrade.exchange.Ftx.fetch_stoploss_order', get_mock_coro({'for': 123}))
     mocker.patch('freqtrade.exchange.Gateio.fetch_stoploss_order', get_mock_coro({'for': 123}))
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
 
     res = {'fee': {}, 'status': 'canceled', 'amount': 1234}
     mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order', get_mock_coro(res))
-    mocker.patch('freqtrade.exchange.Ftx.cancel_stoploss_order', get_mock_coro(res))
     mocker.patch('freqtrade.exchange.Gateio.cancel_stoploss_order', get_mock_coro(res))
     co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
     assert co == res
 
     mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order', get_mock_coro('canceled'))
-    mocker.patch('freqtrade.exchange.Ftx.cancel_stoploss_order', get_mock_coro('canceled'))
     mocker.patch('freqtrade.exchange.Gateio.cancel_stoploss_order', get_mock_coro('canceled'))
     # Fall back to fetch_stoploss_order
     co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
@@ -3275,7 +3226,6 @@ async def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_
 
     exc = InvalidOrderException("")
     mocker.patch('freqtrade.exchange.Exchange.fetch_stoploss_order', side_effect=exc)
-    mocker.patch('freqtrade.exchange.Ftx.fetch_stoploss_order', side_effect=exc)
     mocker.patch('freqtrade.exchange.Gateio.fetch_stoploss_order', side_effect=exc)
     co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
     assert co['amount'] == 555
@@ -3284,7 +3234,6 @@ async def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_
     with pytest.raises(InvalidOrderException):
         exc = InvalidOrderException("Did not find order")
         mocker.patch('freqtrade.exchange.Exchange.cancel_stoploss_order', side_effect=exc)
-        mocker.patch('freqtrade.exchange.Ftx.cancel_stoploss_order', side_effect=exc)
         mocker.patch('freqtrade.exchange.Gateio.cancel_stoploss_order', side_effect=exc)
         exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
         await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=123)
@@ -3348,9 +3297,6 @@ async def test_fetch_order(default_conf, mocker, exchange_name, caplog):
 @pytest.mark.usefixtures("init_persistence")
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test_fetch_stoploss_order(default_conf, mocker, exchange_name):
-    # Don't test FTX here - that needs a separate test
-    if exchange_name == 'ftx':
-        return
     default_conf['dry_run'] = True
     order = MagicMock()
     order.myid = 123
@@ -3798,16 +3744,6 @@ def test_date_minus_candles():
         # no darkpools
         ("BTC/EUR.d", 'BTC', 'EUR', "kraken", True, False, False, 'spot',
          {"darkpool": True}, False),
-        ("BTC/USD", 'BTC', 'USD', "ftx", True, False, False, 'spot', {}, True),
-        ("USD/BTC", 'USD', 'BTC', "ftx", True, False, False, 'spot', {}, True),
-        # Can only trade spot markets
-        ("BTC/USD", 'BTC', 'USD', "ftx", False, False, True, 'spot', {}, False),
-        ("BTC/USD", 'BTC', 'USD', "ftx", False, False, True, 'futures', {}, True),
-        # Can only trade spot markets
-        ("BTC-PERP", 'BTC', 'USD', "ftx", False, False, True, 'spot', {}, False),
-        ("BTC-PERP", 'BTC', 'USD', "ftx", False, False, True, 'margin', {}, False),
-        ("BTC-PERP", 'BTC', 'USD', "ftx", False, False, True, 'futures', {}, True),
-
         ("BTC/USDT:USDT", 'BTC', 'USD', "okx", False, False, True, 'spot', {}, False),
         ("BTC/USDT:USDT", 'BTC', 'USD', "okx", False, False, True, 'margin', {}, False),
         ("BTC/USDT:USDT", 'BTC', 'USD', "okx", False, False, True, 'futures', {}, True),
@@ -3941,7 +3877,7 @@ def test_calculate_backoff(retrycount, max_retries, expected):
     assert calculate_backoff(retrycount, max_retries) == expected
 
 
-@pytest.mark.parametrize("exchange_name", ['binance', 'ftx'])
+@pytest.mark.parametrize("exchange_name", ['binance'])
 async def test__get_funding_fees_from_exchange(default_conf, mocker, exchange_name):
     api_mock = MagicMock()
     api_mock.fetch_funding_history = get_mock_coro(return_value=[
@@ -4009,7 +3945,7 @@ async def test__get_funding_fees_from_exchange(default_conf, mocker, exchange_na
     )
 
 
-@pytest.mark.parametrize('exchange', ['binance', 'kraken', 'ftx'])
+@pytest.mark.parametrize('exchange', ['binance', 'kraken'])
 @pytest.mark.parametrize('stake_amount,leverage,min_stake_with_lev', [
     (9.0, 3.0, 3.0),
     (20.0, 5.0, 4.0),
@@ -4030,8 +3966,6 @@ async def test_get_stake_amount_considering_leverage(
 
 @pytest.mark.parametrize("exchange_name,trading_mode", [
     ("binance", TradingMode.FUTURES),
-    ("ftx", TradingMode.MARGIN),
-    ("ftx", TradingMode.FUTURES)
 ])
 async def test__set_leverage(mocker, default_conf, exchange_name, trading_mode):
 
@@ -4082,9 +4016,6 @@ async def test_set_margin_mode(mocker, default_conf, margin_mode):
     ("kraken", TradingMode.SPOT, None, False),
     ("kraken", TradingMode.MARGIN, MarginMode.ISOLATED, True),
     ("kraken", TradingMode.FUTURES, MarginMode.ISOLATED, True),
-    ("ftx", TradingMode.SPOT, None, False),
-    ("ftx", TradingMode.MARGIN, MarginMode.ISOLATED, True),
-    ("ftx", TradingMode.FUTURES, MarginMode.ISOLATED, True),
     ("bittrex", TradingMode.SPOT, None, False),
     ("bittrex", TradingMode.MARGIN, MarginMode.CROSS, True),
     ("bittrex", TradingMode.MARGIN, MarginMode.ISOLATED, True),
@@ -4105,8 +4036,6 @@ async def test_set_margin_mode(mocker, default_conf, margin_mode):
     ("binance", TradingMode.FUTURES, MarginMode.CROSS, True),
     ("kraken", TradingMode.MARGIN, MarginMode.CROSS, True),
     ("kraken", TradingMode.FUTURES, MarginMode.CROSS, True),
-    ("ftx", TradingMode.MARGIN, MarginMode.CROSS, True),
-    ("ftx", TradingMode.FUTURES, MarginMode.CROSS, True),
     ("gateio", TradingMode.MARGIN, MarginMode.CROSS, True),
     ("gateio", TradingMode.FUTURES, MarginMode.CROSS, True),
 
@@ -4115,8 +4044,6 @@ async def test_set_margin_mode(mocker, default_conf, margin_mode):
     # ("binance", TradingMode.FUTURES, MarginMode.CROSS, False),
     # ("kraken", TradingMode.MARGIN, MarginMode.CROSS, False),
     # ("kraken", TradingMode.FUTURES, MarginMode.CROSS, False),
-    # ("ftx", TradingMode.MARGIN, MarginMode.CROSS, False),
-    # ("ftx", TradingMode.FUTURES, MarginMode.CROSS, False),
     # ("gateio", TradingMode.MARGIN, MarginMode.CROSS, False),
     # ("gateio", TradingMode.FUTURES, MarginMode.CROSS, False),
 ])
@@ -4141,12 +4068,8 @@ async def test_validate_trading_mode_and_margin_mode(
     ("binance", "spot", {}),
     ("binance", "margin", {"options": {"defaultType": "margin"}}),
     ("binance", "futures", {"options": {"defaultType": "future"}}),
-    ("bibox", "spot", {"has": {"fetchCurrencies": False}}),
-    ("bibox", "margin", {"has": {"fetchCurrencies": False}, "options": {"defaultType": "margin"}}),
-    ("bibox", "futures", {"has": {"fetchCurrencies": False}, "options": {"defaultType": "swap"}}),
     ("bybit", "spot", {"options": {"defaultType": "spot"}}),
     ("bybit", "futures", {"options": {"defaultType": "linear"}}),
-    ("ftx", "futures", {"options": {"defaultType": "swap"}}),
     ("gateio", "futures", {"options": {"defaultType": "swap"}}),
     ("hitbtc", "futures", {"options": {"defaultType": "swap"}}),
     ("kraken", "futures", {"options": {"defaultType": "swap"}}),
@@ -4323,11 +4246,6 @@ async def test_combine_funding_and_mark(
     # ('kraken', "2021-09-01 00:00:00", "2021-09-01 07:59:59",  30.0, -0.0012443999999999999),
     # ('kraken', "2021-09-01 00:00:00", "2021-09-01 12:00:00", 30.0,  0.0045759),
     # ('kraken', "2021-09-01 00:00:01", "2021-09-01 08:00:00",  30.0, -0.0008289),
-    ('ftx', 0, 2, "2021-09-01 00:10:00", "2021-09-01 00:30:00",  30.0, 0.0),
-    ('ftx', 0, 9, "2021-09-01 00:00:00", "2021-09-01 08:00:00", 30.0,  0.0010008),
-    ('ftx', 0, 13, "2021-09-01 00:00:00", "2021-09-01 12:00:00", 30.0,  0.0146691),
-    ('ftx', 0, 9, "2021-09-01 00:00:00", "2021-09-01 08:00:00", 50.0,  0.001668),
-    ('ftx', 1, 9, "2021-09-01 00:00:01", "2021-09-01 08:00:00", 30.0,  0.0019932),
     ('gateio', 0, 2, "2021-09-01 00:10:00", "2021-09-01 04:00:00",  30.0, 0.0),
     ('gateio', 0, 2, "2021-09-01 00:00:00", "2021-09-01 08:00:00",  30.0, -0.0009140999),
     ('gateio', 0, 2, "2021-09-01 00:00:00", "2021-09-01 12:00:00",  30.0, -0.0009140999),
@@ -4389,7 +4307,6 @@ async def test__fetch_and_calculate_funding_fees(
     d2 = datetime.strptime(f"{d2} +0000", '%Y-%m-%d %H:%M:%S %z')
     funding_rate_history = {
         'binance': funding_rate_history_octohourly,
-        'ftx': funding_rate_history_hourly,
         'gateio': funding_rate_history_octohourly,
     }[exchange][rate_start:rate_end]
     api_mock = MagicMock()
@@ -5156,7 +5073,7 @@ async def test_get_max_leverage_futures(default_conf, mocker, leverage_tiers):
         exchange.get_max_leverage("BTC/USDT", 1000000000.01)
 
 
-@pytest.mark.parametrize("exchange_name", ['bittrex', 'binance', 'kraken', 'ftx', 'gateio', 'okx'])
+@pytest.mark.parametrize("exchange_name", ['bittrex', 'binance', 'kraken', 'gateio', 'okx'])
 async def test__get_params(mocker, default_conf, exchange_name):
     api_mock = MagicMock()
     mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)

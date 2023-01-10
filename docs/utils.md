@@ -169,6 +169,43 @@ Example: Search dedicated strategy path.
 freqtrade list-strategies --strategy-path ~/.freqtrade/strategies/
 ```
 
+## List freqAI models
+
+Use the `list-freqaimodels` subcommand to see all freqAI models available.
+
+This subcommand is useful for finding problems in your environment with loading freqAI models: modules with models that contain errors and failed to load are printed in red (LOAD FAILED), while models with duplicate names are printed in yellow (DUPLICATE NAME).
+
+```
+usage: freqtrade list-freqaimodels [-h] [-v] [--logfile FILE] [-V] [-c PATH]
+                                   [-d PATH] [--userdir PATH]
+                                   [--freqaimodel-path PATH] [-1] [--no-color]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --freqaimodel-path PATH
+                        Specify additional lookup path for freqaimodels.
+  -1, --one-column      Print output in one column.
+  --no-color            Disable colorization of hyperopt results. May be
+                        useful if you are redirecting output to a file.
+
+Common arguments:
+  -v, --verbose         Verbose mode (-vv for more, -vvv to get all messages).
+  --logfile FILE        Log to the file specified. Special values are:
+                        'syslog', 'journald'. See the documentation for more
+                        details.
+  -V, --version         show program's version number and exit
+  -c PATH, --config PATH
+                        Specify configuration file (default:
+                        `userdir/config.json` or `config.json` whichever
+                        exists). Multiple --config options may be used. Can be
+                        set to `-` to read config from stdin.
+  -d PATH, --datadir PATH, --data-dir PATH
+                        Path to directory with historical backtesting data.
+  --userdir PATH, --user-data-dir PATH
+                        Path to userdata directory.
+
+```
+
 ## List Exchanges
 
 Use the `list-exchanges` subcommand to see the exchanges available for the bot.
@@ -226,7 +263,6 @@ equos            True     missing opt: fetchTicker, fetchTickers
 eterbase         True
 fcoin            True     missing opt: fetchMyTrades, fetchTickers
 fcoinjp          True     missing opt: fetchMyTrades, fetchTickers
-ftx              True
 gateio           True
 gemini           True
 gopax            True
@@ -332,7 +368,6 @@ fcoin               True     missing opt: fetchMyTrades, fetchTickers
 fcoinjp             True     missing opt: fetchMyTrades, fetchTickers
 flowbtc             False    missing: fetchOrder, fetchOHLCV
 foxbit              False    missing: fetchOrder, fetchOHLCV
-ftx                 True
 gateio              True
 gemini              True
 gopax               True
@@ -617,7 +652,7 @@ Common arguments:
 
 You can also use webserver mode via docker.
 Starting a one-off container requires the configuration of the port explicitly, as ports are not exposed by default.
-You can use `docker-compose run --rm -p 127.0.0.1:8080:8080 freqtrade webserver` to start a one-off container that'll be removed once you stop it. This assumes that port 8080 is still available and no other bot is running on that port.
+You can use `docker compose run --rm -p 127.0.0.1:8080:8080 freqtrade webserver` to start a one-off container that'll be removed once you stop it. This assumes that port 8080 is still available and no other bot is running on that port.
 
 Alternatively, you can reconfigure the docker-compose file to have the command updated:
 
@@ -627,7 +662,7 @@ Alternatively, you can reconfigure the docker-compose file to have the command u
       --config /freqtrade/user_data/config.json
 ```
 
-You can now use `docker-compose up` to start the webserver.
+You can now use `docker compose up` to start the webserver.
 This assumes that the configuration has a webserver enabled and configured for docker (listening port = `0.0.0.0`).
 
 !!! Tip
@@ -687,6 +722,7 @@ usage: freqtrade backtesting-analysis [-h] [-v] [--logfile FILE] [-V]
                                       [--enter-reason-list ENTER_REASON_LIST [ENTER_REASON_LIST ...]]
                                       [--exit-reason-list EXIT_REASON_LIST [EXIT_REASON_LIST ...]]
                                       [--indicator-list INDICATOR_LIST [INDICATOR_LIST ...]]
+                                      [--timerange YYYYMMDD-[YYYYMMDD]]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -709,6 +745,10 @@ optional arguments:
   --indicator-list INDICATOR_LIST [INDICATOR_LIST ...]
                         Comma separated list of indicators to analyse. e.g.
                         'close,rsi,bb_lowerband,profit_abs'
+  --timerange YYYYMMDD-[YYYYMMDD]
+                        Timerange to filter trades for analysis, 
+                        start inclusive, end exclusive. e.g.
+                        20220101-20220201
 
 Common arguments:
   -v, --verbose         Verbose mode (-vv for more, -vvv to get all messages).

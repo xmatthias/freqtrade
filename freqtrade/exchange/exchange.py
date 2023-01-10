@@ -8,7 +8,6 @@ import inspect
 import logging
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-from math import ceil
 from threading import Lock
 from typing import Any, Coroutine, Dict, List, Literal, Optional, Tuple, Union
 
@@ -16,7 +15,7 @@ import arrow
 import ccxt
 import ccxt.async_support as ccxt_async
 from cachetools import TTLCache
-from ccxt import ROUND_DOWN, ROUND_UP, TICK_SIZE, TRUNCATE, decimal_to_precision
+from ccxt import TICK_SIZE
 from dateutil import parser
 from pandas import DataFrame, concat
 
@@ -28,17 +27,19 @@ from freqtrade.enums import OPTIMIZE_MODES, CandleType, MarginMode, TradingMode
 from freqtrade.exceptions import (DDosProtection, ExchangeError, InsufficientFundsError,
                                   InvalidOrderException, OperationalException, PricingError,
                                   RetryableOrderError, TemporaryError)
-from freqtrade.exchange.common import (API_FETCH_ORDER_RETRY_COUNT, BAD_EXCHANGES,
-                                       EXCHANGE_HAS_OPTIONAL, EXCHANGE_HAS_REQUIRED,
-                                       remove_credentials, retrier, retrier_async)
-from freqtrade.exchange.types import Ticker, Tickers
+from freqtrade.exchange.common import (API_FETCH_ORDER_RETRY_COUNT, remove_credentials, retrier,
+                                       retrier_async)
+from freqtrade.exchange.exchange_utils import (CcxtModuleType, amount_to_contract_precision,
+                                               amount_to_contracts, amount_to_precision,
+                                               contracts_to_amount, date_minus_candles,
+                                               is_exchange_known_ccxt, market_is_active,
+                                               price_to_precision, timeframe_to_minutes,
+                                               timeframe_to_msecs, timeframe_to_next_date,
+                                               timeframe_to_prev_date, timeframe_to_seconds)
+from freqtrade.exchange.types import OHLCVResponse, Ticker, Tickers
 from freqtrade.misc import (chunks, deep_merge_dicts, file_dump_json, file_load_json,
                             safe_value_fallback2)
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
-from freqtrade.util import FtPrecise
-
-
-CcxtModuleType = Any
 
 
 logger = logging.getLogger(__name__)
@@ -480,6 +481,7 @@ class Exchange:
     async def load_markets(self, reload: bool = False) -> None:
         """ Initialize markets """
         try:
+
             self._markets = await self._api_async.load_markets(reload=reload)
 
             self._last_markets_refresh = arrow.utcnow().int_timestamp
@@ -1071,7 +1073,14 @@ class Exchange:
         Verify stop_loss against stoploss-order value (limit or price)
         Returns True if adjustment is necessary.
         """
-        raise OperationalException(f"stoploss is not implemented for {self.name}.")
+        if not self._ft_has.get('stoploss_on_exchange'):
+            raise OperationalException(f"stoploss is not implemented for {self.name}.")
+
+        return (
+            order.get('stopPrice', None) is None
+            or ((side == "sell" and stop_loss > float(order['stopPrice'])) or
+                (side == "buy" and stop_loss < float(order['stopPrice'])))
+        )
 
     def _get_stop_order_type(self, user_order_type) -> Tuple[str, str]:
 
@@ -1101,7 +1110,7 @@ class Exchange:
                 'In stoploss limit order, stop price should be more than limit price')
         return limit_rate
 
-    def _get_stop_params(self, ordertype: str, stop_price: float) -> Dict:
+    def _get_stop_params(self, side: BuySell, ordertype: str, stop_price: float) -> Dict:
         params = self._params.copy()
         # Verify if stopPrice works for your exchange!
         params.update({'stopPrice': stop_price})
@@ -1150,7 +1159,8 @@ class Exchange:
             return dry_order
 
         try:
-            params = self._get_stop_params(ordertype=ordertype, stop_price=stop_price_norm)
+            params = self._get_stop_params(side=side, ordertype=ordertype,
+                                           stop_price=stop_price_norm)
             if self.trading_mode == TradingMode.FUTURES:
                 params['reduceOnly'] = True
 
@@ -1723,6 +1733,17 @@ class Exchange:
     @retrier
     def get_fee(self, symbol: str, type: str = '', side: str = '', amount: float = 1,
                 price: float = 1, taker_or_maker: MakerTaker = 'maker') -> float:
+        """
+        Retrieve fee from exchange
+        :param symbol: Pair
+        :param type: Type of order (market, limit, ...)
+        :param side: Side of order (buy, sell)
+        :param amount: Amount of order
+        :param price: Price of order
+        :param taker_or_maker: 'maker' or 'taker' (ignored if "type" is provided)
+        """
+        if type and type == 'market':
+            taker_or_maker = 'taker'
         try:
             if self._config['dry_run'] and self._config.get('fee', None) is not None:
                 return self._config['fee']
@@ -1833,32 +1854,17 @@ class Exchange:
         :param candle_type: '', mark, index, premiumIndex, or funding_rate
         :return: List with candle (OHLCV) data
         """
-        pair, _, _, data = await self._async_get_historic_ohlcv(
+        pair, _, _, data, _ = await self._async_get_historic_ohlcv(
             pair=pair, timeframe=timeframe, since_ms=since_ms, until_ms=until_ms,
             is_new_pair=is_new_pair, candle_type=candle_type)
         logger.info(f"Downloaded data for {pair} with length {len(data)}.")
         return data
 
-    async def get_historic_ohlcv_as_df(self, pair: str, timeframe: str,
-                                       since_ms: int, candle_type: CandleType) -> DataFrame:
-        """
-        Minimal wrapper around get_historic_ohlcv - converting the result into a dataframe
-        :param pair: Pair to download
-        :param timeframe: Timeframe to get data for
-        :param since_ms: Timestamp in milliseconds to get history from
-        :param candle_type: Any of the enum CandleType (must match trading mode!)
-        :return: OHLCV DataFrame
-        """
-        ticks = await self.get_historic_ohlcv(pair, timeframe, since_ms=since_ms,
-                                              candle_type=candle_type)
-        return ohlcv_to_dataframe(ticks, timeframe, pair=pair, fill_missing=True,
-                                  drop_incomplete=self._ohlcv_partial_candle)
-
     async def _async_get_historic_ohlcv(self, pair: str, timeframe: str,
                                         since_ms: int, candle_type: CandleType,
                                         is_new_pair: bool = False, raise_: bool = False,
                                         until_ms: Optional[int] = None
-                                        ) -> Tuple[str, str, str, List]:
+                                        ) -> OHLCVResponse:
         """
         Download historic ohlcv
         :param is_new_pair: used by binance subclass to allow "fast" new pair downloading
@@ -1889,15 +1895,16 @@ class Exchange:
                     continue
                 else:
                     # Deconstruct tuple if it's not an exception
-                    p, _, c, new_data = res
+                    p, _, c, new_data, _ = res
                     if p == pair and c == candle_type:
                         data.extend(new_data)
         # Sort data again after extending the result - above calls return in "async order"
         data = sorted(data, key=lambda x: x[0])
-        return pair, timeframe, candle_type, data
+        return pair, timeframe, candle_type, data, self._ohlcv_partial_candle
 
-    def _build_coroutine(self, pair: str, timeframe: str, candle_type: CandleType,
-                         since_ms: Optional[int], cache: bool) -> Coroutine:
+    def _build_coroutine(
+            self, pair: str, timeframe: str, candle_type: CandleType,
+            since_ms: Optional[int], cache: bool) -> Coroutine[Any, Any, OHLCVResponse]:
         not_all_data = cache and self.required_candle_call_count > 1
         if cache and (pair, timeframe, candle_type) in self._klines:
             candle_limit = self.ohlcv_candle_limit(timeframe, candle_type)
@@ -1934,7 +1941,7 @@ class Exchange:
         """
         Build Coroutines to execute as part of refresh_latest_ohlcv
         """
-        input_coroutines = []
+        input_coroutines: List[Coroutine[Any, Any, OHLCVResponse]] = []
         cached_pairs = []
         for pair, timeframe, candle_type in set(pair_list):
             if (timeframe not in self.timeframes
@@ -1976,6 +1983,7 @@ class Exchange:
                 candle_limit = self.ohlcv_candle_limit(timeframe, self._config['candle_type_def'])
                 # Age out old candles
                 ohlcv_df = ohlcv_df.tail(candle_limit + self._startup_candle_count)
+                ohlcv_df = ohlcv_df.reset_index(drop=True)
                 self._klines[(pair, timeframe, c_type)] = ohlcv_df
             else:
                 self._klines[(pair, timeframe, c_type)] = ohlcv_df
@@ -1997,7 +2005,6 @@ class Exchange:
         :return: Dict of [{(pair, timeframe): Dataframe}]
         """
         logger.debug("Refreshing candle (OHLCV) data for %d pairs", len(pair_list))
-        drop_incomplete = self._ohlcv_partial_candle if drop_incomplete is None else drop_incomplete
 
         # Gather coroutines to run
         input_coroutines, cached_pairs = self._build_ohlcv_dl_jobs(pair_list, since_ms, cache)
@@ -2012,8 +2019,9 @@ class Exchange:
                 if isinstance(res, Exception):
                     logger.warning(f"Async code raised an exception: {repr(res)}")
                     continue
-                # Deconstruct tuple (has 4 elements)
-                pair, timeframe, c_type, ticks = res
+                # Deconstruct tuple (has 5 elements)
+                pair, timeframe, c_type, ticks, drop_hint = res
+                drop_incomplete = drop_hint if drop_incomplete is None else drop_incomplete
                 ohlcv_df = self._process_ohlcv_df(
                     pair, timeframe, c_type, ticks, cache, drop_incomplete)
 
@@ -2031,11 +2039,8 @@ class Exchange:
     def _now_is_time_to_refresh(self, pair: str, timeframe: str, candle_type: CandleType) -> bool:
         # Timeframe in seconds
         interval_in_sec = timeframe_to_seconds(timeframe)
-
-        return not (
-            (self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0)
-             + interval_in_sec) >= arrow.utcnow().int_timestamp
-        )
+        plr = self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0) + interval_in_sec
+        return plr < arrow.utcnow().int_timestamp
 
     @retrier_async
     async def _async_get_candle_history(
@@ -2044,7 +2049,7 @@ class Exchange:
         timeframe: str,
         candle_type: CandleType,
         since_ms: Optional[int] = None,
-    ) -> Tuple[str, str, str, List]:
+    ) -> OHLCVResponse:
         """
         Asynchronously get candle history data using fetch_ohlcv
         :param candle_type: '', mark, index, premiumIndex, or funding_rate
@@ -2054,8 +2059,8 @@ class Exchange:
             # Fetch OHLCV asynchronously
             s = '(' + arrow.get(since_ms // 1000).isoformat() + ') ' if since_ms is not None else ''
             logger.debug(
-                "Fetching pair %s, interval %s, since %s %s...",
-                pair, timeframe, since_ms, s
+                "Fetching pair %s, %s, interval %s, since %s %s...",
+                pair, candle_type, timeframe, since_ms, s
             )
             params = deepcopy(self._ft_has.get('ohlcv_params', {}))
             candle_limit = self.ohlcv_candle_limit(
@@ -2069,11 +2074,12 @@ class Exchange:
                     limit=candle_limit, params=params)
             else:
                 # Funding rate
-                data = await self._api_async.fetch_funding_rate_history(
-                    pair, since=since_ms,
-                    limit=candle_limit)
-                # Convert funding rate to candle pattern
-                data = [[x['timestamp'], x['fundingRate'], 0, 0, 0, 0] for x in data]
+                data = await self._fetch_funding_rate_history(
+                    pair=pair,
+                    timeframe=timeframe,
+                    limit=candle_limit,
+                    since_ms=since_ms,
+                )
             # Some exchanges sort OHLCV in ASC order and others in DESC.
             # Ex: Bittrex returns the list of OHLCV in ASC order (oldest first, newest last)
             # while GDAX returns the list of OHLCV in DESC order (newest first, oldest last)
@@ -2083,9 +2089,9 @@ class Exchange:
                     data = sorted(data, key=lambda x: x[0])
             except IndexError:
                 logger.exception("Error loading %s. Result was %s.", pair, data)
-                return pair, timeframe, candle_type, []
+                return pair, timeframe, candle_type, [], self._ohlcv_partial_candle
             logger.debug("Done fetching pair %s, interval %s ...", pair, timeframe)
-            return pair, timeframe, candle_type, data
+            return pair, timeframe, candle_type, data, self._ohlcv_partial_candle
 
         except ccxt.NotSupported as e:
             raise OperationalException(
@@ -2100,6 +2106,24 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(f'Could not fetch historical candle (OHLCV) data '
                                        f'for pair {pair}. Message: {e}') from e
+
+    async def _fetch_funding_rate_history(
+        self,
+        pair: str,
+        timeframe: str,
+        limit: int,
+        since_ms: Optional[int] = None,
+    ) -> List[List]:
+        """
+        Fetch funding rate history - used to selectively override this by subclasses.
+        """
+        # Funding rate
+        data = await self._api_async.fetch_funding_rate_history(
+            pair, since=since_ms,
+            limit=limit)
+        # Convert funding rate to candle pattern
+        data = [[x['timestamp'], x['fundingRate'], 0, 0, 0, 0] for x in data]
+        return data
 
     # Fetch historic trades
 
@@ -2758,11 +2782,16 @@ class Exchange:
         """
         Important: Must be fetching data from cached values as this is used by backtesting!
         PERPETUAL:
-         gateio: https://www.gate.io/help/futures/perpetual/22160/calculation-of-liquidation-price
+         gateio: https://www.gate.io/help/futures/futures/27724/liquidation-price-bankruptcy-price
+         > Liquidation Price = (Entry Price ± Margin / Contract Multiplier / Size) /
+                                [ 1 ± (Maintenance Margin Ratio + Taker Rate)]
+            Wherein, "+" or "-" depends on whether the contract goes long or short:
+            "-" for long, and "+" for short.
+
          okex: https://www.okex.com/support/hc/en-us/articles/
             360053909592-VI-Introduction-to-the-isolated-mode-of-Single-Multi-currency-Portfolio-margin
 
-        :param exchange_name:
+        :param pair: Pair to calculate liquidation price for
         :param open_rate: Entry price of position
         :param is_short: True if the trade is a short, false otherwise
         :param amount: Absolute value of position size incl. leverage (in base currency)
@@ -2802,7 +2831,7 @@ class Exchange:
     def get_maintenance_ratio_and_amt(
         self,
         pair: str,
-        nominal_value: float = 0.0,
+        nominal_value: float,
     ) -> Tuple[float, Optional[float]]:
         """
         Important: Must be fetching data from cached values as this is used by backtesting!
@@ -2832,240 +2861,3 @@ class Exchange:
             # describes the min amt for a tier, and the lowest tier will always go down to 0
         else:
             raise OperationalException(f"Cannot get maintenance ratio using {self.name}")
-
-
-def is_exchange_known_ccxt(exchange_name: str, ccxt_module: CcxtModuleType = None) -> bool:
-    return exchange_name in ccxt_exchanges(ccxt_module)
-
-
-def ccxt_exchanges(ccxt_module: CcxtModuleType = None) -> List[str]:
-    """
-    Return the list of all exchanges known to ccxt
-    """
-    return ccxt_module.exchanges if ccxt_module is not None else ccxt.exchanges
-
-
-def available_exchanges(ccxt_module: CcxtModuleType = None) -> List[str]:
-    """
-    Return exchanges available to the bot, i.e. non-bad exchanges in the ccxt list
-    """
-    exchanges = ccxt_exchanges(ccxt_module)
-    return [x for x in exchanges if validate_exchange(x)[0]]
-
-
-def validate_exchange(exchange: str) -> Tuple[bool, str]:
-    ex_mod = getattr(ccxt, exchange.lower())()
-    if not ex_mod or not ex_mod.has:
-        return False, ''
-    missing = [k for k in EXCHANGE_HAS_REQUIRED if ex_mod.has.get(k) is not True]
-    if missing:
-        return False, f"missing: {', '.join(missing)}"
-
-    missing_opt = [k for k in EXCHANGE_HAS_OPTIONAL if not ex_mod.has.get(k)]
-
-    if exchange.lower() in BAD_EXCHANGES:
-        return False, BAD_EXCHANGES.get(exchange.lower(), '')
-    if missing_opt:
-        return True, f"missing opt: {', '.join(missing_opt)}"
-
-    return True, ''
-
-
-def validate_exchanges(all_exchanges: bool) -> List[Tuple[str, bool, str]]:
-    """
-    :return: List of tuples with exchangename, valid, reason.
-    """
-    exchanges = ccxt_exchanges() if all_exchanges else available_exchanges()
-    exchanges_valid = [
-        (e, *validate_exchange(e)) for e in exchanges
-    ]
-    return exchanges_valid
-
-
-def timeframe_to_seconds(timeframe: str) -> int:
-    """
-    Translates the timeframe interval value written in the human readable
-    form ('1m', '5m', '1h', '1d', '1w', etc.) to the number
-    of seconds for one timeframe interval.
-    """
-    return ccxt.Exchange.parse_timeframe(timeframe)
-
-
-def timeframe_to_minutes(timeframe: str) -> int:
-    """
-    Same as timeframe_to_seconds, but returns minutes.
-    """
-    return ccxt.Exchange.parse_timeframe(timeframe) // 60
-
-
-def timeframe_to_msecs(timeframe: str) -> int:
-    """
-    Same as timeframe_to_seconds, but returns milliseconds.
-    """
-    return ccxt.Exchange.parse_timeframe(timeframe) * 1000
-
-
-def timeframe_to_prev_date(timeframe: str, date: datetime = None) -> datetime:
-    """
-    Use Timeframe and determine the candle start date for this date.
-    Does not round when given a candle start date.
-    :param timeframe: timeframe in string format (e.g. "5m")
-    :param date: date to use. Defaults to now(utc)
-    :returns: date of previous candle (with utc timezone)
-    """
-    if not date:
-        date = datetime.now(timezone.utc)
-
-    new_timestamp = ccxt.Exchange.round_timeframe(timeframe, date.timestamp() * 1000,
-                                                  ROUND_DOWN) // 1000
-    return datetime.fromtimestamp(new_timestamp, tz=timezone.utc)
-
-
-def timeframe_to_next_date(timeframe: str, date: datetime = None) -> datetime:
-    """
-    Use Timeframe and determine next candle.
-    :param timeframe: timeframe in string format (e.g. "5m")
-    :param date: date to use. Defaults to now(utc)
-    :returns: date of next candle (with utc timezone)
-    """
-    if not date:
-        date = datetime.now(timezone.utc)
-    new_timestamp = ccxt.Exchange.round_timeframe(timeframe, date.timestamp() * 1000,
-                                                  ROUND_UP) // 1000
-    return datetime.fromtimestamp(new_timestamp, tz=timezone.utc)
-
-
-def date_minus_candles(
-        timeframe: str, candle_count: int, date: Optional[datetime] = None) -> datetime:
-    """
-    subtract X candles from a date.
-    :param timeframe: timeframe in string format (e.g. "5m")
-    :param candle_count: Amount of candles to subtract.
-    :param date: date to use. Defaults to now(utc)
-
-    """
-    if not date:
-        date = datetime.now(timezone.utc)
-
-    tf_min = timeframe_to_minutes(timeframe)
-    new_date = timeframe_to_prev_date(timeframe, date) - timedelta(minutes=tf_min * candle_count)
-    return new_date
-
-
-def market_is_active(market: Dict) -> bool:
-    """
-    Return True if the market is active.
-    """
-    # "It's active, if the active flag isn't explicitly set to false. If it's missing or
-    # true then it's true. If it's undefined, then it's most likely true, but not 100% )"
-    # See https://github.com/ccxt/ccxt/issues/4874,
-    # https://github.com/ccxt/ccxt/issues/4075#issuecomment-434760520
-    return market.get('active', True) is not False
-
-
-def amount_to_contracts(amount: float, contract_size: Optional[float]) -> float:
-    """
-    Convert amount to contracts.
-    :param amount: amount to convert
-    :param contract_size: contract size - taken from exchange.get_contract_size(pair)
-    :return: num-contracts
-    """
-    if contract_size and contract_size != 1:
-        return float(FtPrecise(amount) / FtPrecise(contract_size))
-    else:
-        return amount
-
-
-def contracts_to_amount(num_contracts: float, contract_size: Optional[float]) -> float:
-    """
-    Takes num-contracts and converts it to contract size
-    :param num_contracts: number of contracts
-    :param contract_size: contract size - taken from exchange.get_contract_size(pair)
-    :return: Amount
-    """
-
-    if contract_size and contract_size != 1:
-        return float(FtPrecise(num_contracts) * FtPrecise(contract_size))
-    else:
-        return num_contracts
-
-
-def amount_to_precision(amount: float, amount_precision: Optional[float],
-                        precisionMode: Optional[int]) -> float:
-    """
-    Returns the amount to buy or sell to a precision the Exchange accepts
-    Re-implementation of ccxt internal methods - ensuring we can test the result is correct
-    based on our definitions.
-    :param amount: amount to truncate
-    :param amount_precision: amount precision to use.
-                             should be retrieved from markets[pair]['precision']['amount']
-    :param precisionMode: precision mode to use. Should be used from precisionMode
-                          one of ccxt's DECIMAL_PLACES, SIGNIFICANT_DIGITS, or TICK_SIZE
-    :return: truncated amount
-    """
-    if amount_precision is not None and precisionMode is not None:
-        precision = int(amount_precision) if precisionMode != TICK_SIZE else amount_precision
-        # precision must be an int for non-ticksize inputs.
-        amount = float(decimal_to_precision(amount, rounding_mode=TRUNCATE,
-                                            precision=precision,
-                                            counting_mode=precisionMode,
-                                            ))
-
-    return amount
-
-
-def amount_to_contract_precision(
-        amount, amount_precision: Optional[float], precisionMode: Optional[int],
-        contract_size: Optional[float]) -> float:
-    """
-    Returns the amount to buy or sell to a precision the Exchange accepts
-    including calculation to and from contracts.
-    Re-implementation of ccxt internal methods - ensuring we can test the result is correct
-    based on our definitions.
-    :param amount: amount to truncate
-    :param amount_precision: amount precision to use.
-                             should be retrieved from markets[pair]['precision']['amount']
-    :param precisionMode: precision mode to use. Should be used from precisionMode
-                          one of ccxt's DECIMAL_PLACES, SIGNIFICANT_DIGITS, or TICK_SIZE
-    :param contract_size: contract size - taken from exchange.get_contract_size(pair)
-    :return: truncated amount
-    """
-    if amount_precision is not None and precisionMode is not None:
-        contracts = amount_to_contracts(amount, contract_size)
-        amount_p = amount_to_precision(contracts, amount_precision, precisionMode)
-        return contracts_to_amount(amount_p, contract_size)
-    return amount
-
-
-def price_to_precision(price: float, price_precision: Optional[float],
-                       precisionMode: Optional[int]) -> float:
-    """
-    Returns the price rounded up to the precision the Exchange accepts.
-    Partial Re-implementation of ccxt internal method decimal_to_precision(),
-    which does not support rounding up
-    TODO: If ccxt supports ROUND_UP for decimal_to_precision(), we could remove this and
-    align with amount_to_precision().
-    !!! Rounds up
-    :param price: price to convert
-    :param price_precision: price precision to use. Used from markets[pair]['precision']['price']
-    :param precisionMode: precision mode to use. Should be used from precisionMode
-                          one of ccxt's DECIMAL_PLACES, SIGNIFICANT_DIGITS, or TICK_SIZE
-    :return: price rounded up to the precision the Exchange accepts
-
-    """
-    if price_precision is not None and precisionMode is not None:
-        # price = float(decimal_to_precision(price, rounding_mode=ROUND,
-        #                                    precision=price_precision,
-        #                                    counting_mode=self.precisionMode,
-        #                                    ))
-        if precisionMode == TICK_SIZE:
-            precision = FtPrecise(price_precision)
-            price_str = FtPrecise(price)
-            missing = price_str % precision
-            if not missing == FtPrecise("0"):
-                price = round(float(str(price_str - missing + precision)), 14)
-        else:
-            symbol_prec = price_precision
-            big_price = price * pow(10, symbol_prec)
-            price = ceil(big_price) / pow(10, symbol_prec)
-    return price

@@ -50,6 +50,7 @@ def test_backtest_position_adjustment(default_conf, fee, mocker, testdatadir) ->
     expected = pd.DataFrame(
         {'pair': [pair, pair],
          'stake_amount': [500.0, 100.0],
+         'max_stake_amount': [500.0, 100],
          'amount': [4806.87657523, 970.63960782],
          'open_date': pd.to_datetime([Arrow(2018, 1, 29, 18, 40, 0).datetime,
                                       Arrow(2018, 1, 30, 3, 30, 0).datetime], utc=True
@@ -72,6 +73,7 @@ def test_backtest_position_adjustment(default_conf, fee, mocker, testdatadir) ->
          'max_rate': [0.10481985, 0.1038888],
          'is_open': [False, False],
          'enter_tag': [None, None],
+         'leverage': [1.0, 1.0],
          'is_short': [False, False],
          'open_timestamp': [1517251200000, 1517283000000],
          'close_timestamp': [1517265300000, 1517285400000],

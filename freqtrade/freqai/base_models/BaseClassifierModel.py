@@ -51,7 +51,7 @@ class BaseClassifierModel(IFreqaiModel):
                     f"{end_date} --------------------")
         # split data into train/test data.
         data_dictionary = dk.make_train_test_datasets(features_filtered, labels_filtered)
-        if not self.freqai_info.get("fit_live_predictions", 0) or not self.live:
+        if not self.freqai_info.get("fit_live_predictions_candles", 0) or not self.live:
             dk.fit_labels()
         # normalize all data based on train_dataset only
         data_dictionary = dk.normalize_data(data_dictionary)
@@ -95,9 +95,14 @@ class BaseClassifierModel(IFreqaiModel):
         self.data_cleaning_predict(dk)
 
         predictions = self.model.predict(dk.data_dictionary["prediction_features"])
+        if self.CONV_WIDTH == 1:
+            predictions = np.reshape(predictions, (-1, len(dk.label_list)))
+
         pred_df = DataFrame(predictions, columns=dk.label_list)
 
         predictions_prob = self.model.predict_proba(dk.data_dictionary["prediction_features"])
+        if self.CONV_WIDTH == 1:
+            predictions_prob = np.reshape(predictions_prob, (-1, len(self.model.classes_)))
         pred_df_prob = DataFrame(predictions_prob, columns=self.model.classes_)
 
         pred_df = pd.concat([pred_df, pred_df_prob], axis=1)

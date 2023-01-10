@@ -26,10 +26,7 @@ FreqAI is configured through the typical [Freqtrade config file](configuration.m
         },
         "data_split_parameters" : {
             "test_size": 0.25
-        },
-        "model_training_parameters" : {
-            "n_estimators": 100
-        },
+        }
     }
 ```
 
@@ -61,7 +58,7 @@ The FreqAI strategy requires including the following lines of code in the standa
         """
         Function designed to automatically generate, name and merge features
         from user indicated timeframes in the configuration file. User controls the indicators
-        passed to the training/prediction by prepending indicators with `'%-' + coin `
+        passed to the training/prediction by prepending indicators with `'%-' + pair `
         (see convention below). I.e. user should not prepend any supporting metrics
         (e.g. bb_lowerband below) with % unless they explicitly want to pass that metric to the
         model.
@@ -69,10 +66,7 @@ The FreqAI strategy requires including the following lines of code in the standa
         :param df: strategy dataframe which will receive merges from informatives
         :param tf: timeframe of the dataframe which will modify the feature names
         :param informative: the dataframe associated with the informative pair
-        :param coin: the name of the coin which will modify the feature names.
         """
-
-        coin = pair.split('/')[0]
 
         if informative is None:
             informative = self.dp.get_pair_dataframe(pair, tf)
@@ -80,9 +74,9 @@ The FreqAI strategy requires including the following lines of code in the standa
         # first loop is automatically duplicating indicators for time periods
         for t in self.freqai_info["feature_parameters"]["indicator_periods_candles"]:
             t = int(t)
-            informative[f"%-{coin}rsi-period_{t}"] = ta.RSI(informative, timeperiod=t)
-            informative[f"%-{coin}mfi-period_{t}"] = ta.MFI(informative, timeperiod=t)
-            informative[f"%-{coin}adx-period_{t}"] = ta.ADX(informative, window=t)
+            informative[f"%-{pair}rsi-period_{t}"] = ta.RSI(informative, timeperiod=t)
+            informative[f"%-{pair}mfi-period_{t}"] = ta.MFI(informative, timeperiod=t)
+            informative[f"%-{pair}adx-period_{t}"] = ta.ADX(informative, window=t)
 
         indicators = [col for col in informative if col.startswith("%")]
         # This loop duplicates and shifts all indicators to add a sense of recency to data
@@ -121,7 +115,7 @@ The FreqAI strategy requires including the following lines of code in the standa
 
 ```
 
-Notice how the `populate_any_indicators()` is where [features](freqai-feature-engineering.md#feature-engineering) and labels/targets are added. A full example strategy is available in `templates/FreqaiExampleStrategy.py`. 
+Notice how the `populate_any_indicators()` is where [features](freqai-feature-engineering.md#feature-engineering) and labels/targets are added. A full example strategy is available in `templates/FreqaiExampleStrategy.py`.
 
 Notice also the location of the labels under `if set_generalized_indicators:` at the bottom of the example. This is where single features and labels/targets should be added to the feature set to avoid duplication of them from various configuration parameters that multiply the feature set, such as `include_timeframes`.
 
@@ -134,7 +128,7 @@ Notice also the location of the labels under `if set_generalized_indicators:` at
     (as exemplified in `freqtrade/templates/FreqaiExampleStrategy.py`):
 
     ```python
-        def populate_any_indicators(self, metadata, pair, df, tf, informative=None, coin="", set_generalized_indicators=False):
+        def populate_any_indicators(self, pair, df, tf, informative=None, set_generalized_indicators=False):
 
             ...
 
@@ -185,18 +179,18 @@ The `startup_candle_count` in the FreqAI strategy needs to be set up in the same
 
 ## Creating a dynamic target threshold
 
-Deciding when to enter or exit a trade can be done in a dynamic way to reflect current market conditions. FreqAI allows you to return additional information from the training of a model (more info [here](freqai-feature-engineering.md#returning-additional-info-from-training)). For example, the `&*_std/mean` return values describe the statistical distribution of the target/label *during the most recent training*. Comparing a given prediction to these values allows you to know the rarity of the prediction. In `templates/FreqaiExampleStrategy.py`, the `target_roi` and  `sell_roi` are defined to be 1.25 z-scores away from the mean which causes predictions that are closer to the mean to be filtered out. 
+Deciding when to enter or exit a trade can be done in a dynamic way to reflect current market conditions. FreqAI allows you to return additional information from the training of a model (more info [here](freqai-feature-engineering.md#returning-additional-info-from-training)). For example, the `&*_std/mean` return values describe the statistical distribution of the target/label *during the most recent training*. Comparing a given prediction to these values allows you to know the rarity of the prediction. In `templates/FreqaiExampleStrategy.py`, the `target_roi` and  `sell_roi` are defined to be 1.25 z-scores away from the mean which causes predictions that are closer to the mean to be filtered out.
 
 ```python
 dataframe["target_roi"] = dataframe["&-s_close_mean"] + dataframe["&-s_close_std"] * 1.25
 dataframe["sell_roi"] = dataframe["&-s_close_mean"] - dataframe["&-s_close_std"] * 1.25
 ```
 
-To consider the population of *historical predictions* for creating the dynamic target instead of information from the training as discussed above, you would set `fit_live_prediction_candles` in the config to the number of historical prediction candles you wish to use to generate target statistics.
+To consider the population of *historical predictions* for creating the dynamic target instead of information from the training as discussed above, you would set `fit_live_predictions_candles` in the config to the number of historical prediction candles you wish to use to generate target statistics.
 
 ```json
     "freqai": {
-        "fit_live_prediction_candles": 300,
+        "fit_live_predictions_candles": 300,
     }
 ```
 
@@ -233,7 +227,7 @@ If you want to predict multiple targets, you need to define multiple labels usin
 
 #### Classifiers
 
-If you are using a classifier, you need to specify a target that has discrete values. FreqAI includes a variety of classifiers, such as the `CatboostClassifier` via the flag `--freqaimodel CatboostClassifier`. If you elects to use a classifier, the classes need to be set using strings. For example, if you want to predict if the price 100 candles into the future goes up or down you would set 
+If you are using a classifier, you need to specify a target that has discrete values. FreqAI includes a variety of classifiers, such as the `CatboostClassifier` via the flag `--freqaimodel CatboostClassifier`. If you elects to use a classifier, the classes need to be set using strings. For example, if you want to predict if the price 100 candles into the future goes up or down you would set
 
 ```python
 df['&s-up_or_down'] = np.where( df["close"].shift(-100) > df["close"], 'up', 'down')

@@ -1,15 +1,19 @@
 import asyncio
 import logging
-from threading import RLock
-from typing import Any, Dict, List, Optional, Type
+import time
+from collections import deque
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Deque, Dict, List, Optional, Type, Union
 from uuid import uuid4
 
-from fastapi import WebSocket as FastAPIWebSocket
+from fastapi import WebSocketDisconnect
+from websockets.exceptions import ConnectionClosed
 
 from freqtrade.rpc.api_server.ws.proxy import WebSocketProxy
 from freqtrade.rpc.api_server.ws.serializer import (HybridJSONWebSocketSerializer,
                                                     WebSocketSerializer)
 from freqtrade.rpc.api_server.ws.types import WebSocketType
+from freqtrade.rpc.api_server.ws_schemas import WSMessageSchemaType
 
 
 logger = logging.getLogger(__name__)
@@ -19,53 +23,97 @@ class WebSocketChannel:
     """
     Object to help facilitate managing a websocket connection
     """
-
     def __init__(
         self,
         websocket: WebSocketType,
         channel_id: Optional[str] = None,
-        serializer_cls: Type[WebSocketSerializer] = HybridJSONWebSocketSerializer
+        serializer_cls: Type[WebSocketSerializer] = HybridJSONWebSocketSerializer,
+        send_throttle: float = 0.01
     ):
-
         self.channel_id = channel_id if channel_id else uuid4().hex[:8]
-
-        # The WebSocket object
         self._websocket = WebSocketProxy(websocket)
-        # The Serializing class for the WebSocket object
-        self._serializer_cls = serializer_cls
-
-        self._subscriptions: List[str] = []
-        self.queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=32)
-        self._relay_task = asyncio.create_task(self.relay())
 
         # Internal event to signify a closed websocket
-        self._closed = False
+        self._closed = asyncio.Event()
+        # The async tasks created for the channel
+        self._channel_tasks: List[asyncio.Task] = []
+
+        # Deque for average send times
+        self._send_times: Deque[float] = deque([], maxlen=10)
+        # High limit defaults to 3 to start
+        self._send_high_limit = 3
+        self._send_throttle = send_throttle
+
+        # The subscribed message types
+        self._subscriptions: List[str] = []
 
         # Wrap the WebSocket in the Serializing class
-        self._wrapped_ws = self._serializer_cls(self._websocket)
+        self._wrapped_ws = serializer_cls(self._websocket)
 
     def __repr__(self):
         return f"WebSocketChannel({self.channel_id}, {self.remote_addr})"
 
     @property
+    def raw_websocket(self):
+        return self._websocket.raw_websocket
+
+    @property
     def remote_addr(self):
         return self._websocket.remote_addr
 
-    async def _send(self, data):
-        """
-        Send data on the wrapped websocket
-        """
-        await self._wrapped_ws.send(data)
+    @property
+    def avg_send_time(self):
+        return sum(self._send_times) / len(self._send_times)
 
-    async def send(self, data):
+    def _calc_send_limit(self):
         """
-        Add the data to the queue to be sent
+        Calculate the send high limit for this channel
         """
-        self.queue.put_nowait(data)
+
+        # Only update if we have enough data
+        if len(self._send_times) == self._send_times.maxlen:
+            # At least 1s or twice the average of send times, with a
+            # maximum of 3 seconds per message
+            self._send_high_limit = min(max(self.avg_send_time * 2, 1), 3)
+
+    async def send(
+        self,
+        message: Union[WSMessageSchemaType, Dict[str, Any]],
+        timeout: bool = False
+    ):
+        """
+        Send a message on the wrapped websocket. If the sending
+        takes too long, it will raise a TimeoutError and
+        disconnect the connection.
+
+        :param message: The message to send
+        :param timeout: Enforce send high limit, defaults to False
+        """
+        try:
+            _ = time.time()
+            # If the send times out, it will raise
+            # a TimeoutError and bubble up to the
+            # message_endpoint to close the connection
+            await asyncio.wait_for(
+                self._wrapped_ws.send(message),
+                timeout=self._send_high_limit if timeout else None
+            )
+            total_time = time.time() - _
+            self._send_times.append(total_time)
+
+            self._calc_send_limit()
+        except asyncio.TimeoutError:
+            logger.info(f"Connection for {self} timed out, disconnecting")
+            raise
+
+        # Explicitly give control back to event loop as
+        # websockets.send does not
+        # Also throttles how fast we send
+        await asyncio.sleep(self._send_throttle)
 
     async def recv(self):
         """
-        Receive data on the wrapped websocket
+        Receive a message on the wrapped websocket
         """
         return await self._wrapped_ws.recv()
 
@@ -75,19 +123,34 @@ class WebSocketChannel:
         """
         return await self._websocket.ping()
 
+    async def accept(self):
+        """
+        Accept the underlying websocket connection,
+        if the connection has been closed before we can
+        accept, just close the channel.
+        """
+        try:
+            return await self._websocket.accept()
+        except RuntimeError:
+            await self.close()
+
     async def close(self):
         """
         Close the WebSocketChannel
         """
 
-        self._closed = True
-        self._relay_task.cancel()
+        self._closed.set()
+
+        try:
+            await self._websocket.close()
+        except RuntimeError:
+            pass
 
     def is_closed(self) -> bool:
         """
         Closed flag
         """
-        return self._closed
+        return self._closed.is_set()
 
     def set_subscriptions(self, subscriptions: List[str] = []) -> None:
         """
@@ -105,104 +168,76 @@ class WebSocketChannel:
         """
         return message_type in self._subscriptions
 
-    async def relay(self):
+    async def run_channel_tasks(self, *tasks, **kwargs):
         """
-        Relay messages from the channel's queue and send them out. This is started
-        as a task.
+        Create and await on the channel tasks unless an exception
+        was raised, then cancel them all.
+
+        :params *tasks: All coros or tasks to be run concurrently
+        :param **kwargs: Any extra kwargs to pass to gather
         """
-        while True:
-            message = await self.queue.get()
+
+        if not self.is_closed():
+            # Wrap the coros into tasks if they aren't already
+            self._channel_tasks = [
+                task if isinstance(task, asyncio.Task) else asyncio.create_task(task)
+                for task in tasks
+            ]
+
             try:
-                await self._send(message)
-                self.queue.task_done()
+                return await asyncio.gather(*self._channel_tasks, **kwargs)
+            except Exception:
+                # If an exception occurred, cancel the rest of the tasks
+                await self.cancel_channel_tasks()
 
-                # Limit messages per sec.
-                # Could cause problems with queue size if too low, and
-                # problems with network traffik if too high.
-                # 0.001 = 1000/s
-                await asyncio.sleep(0.001)
-            except RuntimeError:
-                # The connection was closed, just exit the task
-                return
-
-
-class ChannelManager:
-    def __init__(self):
-        self.channels = dict()
-        self._lock = RLock()  # Re-entrant Lock
-
-    async def on_connect(self, websocket: WebSocketType):
+    async def cancel_channel_tasks(self):
         """
-        Wrap websocket connection into Channel and add to list
-
-        :param websocket: The WebSocket object to attach to the Channel
+        Cancel and wait on all channel tasks
         """
-        if isinstance(websocket, FastAPIWebSocket):
+        for task in self._channel_tasks:
+            task.cancel()
+
+            # Wait for tasks to finish cancelling
             try:
-                await websocket.accept()
-            except RuntimeError:
-                # The connection was closed before we could accept it
-                return
+                await task
+            except (
+                asyncio.CancelledError,
+                asyncio.TimeoutError,
+                WebSocketDisconnect,
+                ConnectionClosed,
+                RuntimeError
+            ):
+                pass
+            except Exception as e:
+                logger.info(f"Encountered unknown exception: {e}", exc_info=e)
 
-        ws_channel = WebSocketChannel(websocket)
+        self._channel_tasks = []
 
-        with self._lock:
-            self.channels[websocket] = ws_channel
-
-        return ws_channel
-
-    async def on_disconnect(self, websocket: WebSocketType):
+    async def __aiter__(self):
         """
-        Call close on the channel if it's not, and remove from channel list
-
-        :param websocket: The WebSocket objet attached to the Channel
+        Generator for received messages
         """
-        with self._lock:
-            channel = self.channels.get(websocket)
-            if channel:
-                if not channel.is_closed():
-                    await channel.close()
+        # We can not catch any errors here as websocket.recv is
+        # the first to catch any disconnects and bubble it up
+        # so the connection is garbage collected right away
+        while not self.is_closed():
+            yield await self.recv()
 
-                del self.channels[websocket]
 
-    async def disconnect_all(self):
-        """
-        Disconnect all Channels
-        """
-        with self._lock:
-            for websocket, channel in self.channels.copy().items():
-                if not channel.is_closed():
-                    await channel.close()
+@asynccontextmanager
+async def create_channel(
+    websocket: WebSocketType,
+    **kwargs
+) -> AsyncIterator[WebSocketChannel]:
+    """
+    Context manager for safely opening and closing a WebSocketChannel
+    """
+    channel = WebSocketChannel(websocket, **kwargs)
+    try:
+        await channel.accept()
+        logger.info(f"Connected to channel - {channel}")
 
-            self.channels = dict()
-
-    async def broadcast(self, data):
-        """
-        Broadcast data on all Channels
-
-        :param data: The data to send
-        """
-        with self._lock:
-            message_type = data.get('type')
-            for websocket, channel in self.channels.copy().items():
-                if channel.subscribed_to(message_type):
-                    if not channel.queue.full():
-                        await channel.send(data)
-                    else:
-                        logger.info(f"Channel {channel} is too far behind, disconnecting")
-                        await self.on_disconnect(websocket)
-
-    async def send_direct(self, channel, data):
-        """
-        Send data directly through direct_channel only
-
-        :param direct_channel: The WebSocketChannel object to send data through
-        :param data: The data to send
-        """
-        await channel.send(data)
-
-    def has_channels(self):
-        """
-        Flag for more than 0 channels
-        """
-        return len(self.channels) > 0
+        yield channel
+    finally:
+        await channel.close()
+        logger.info(f"Disconnected from channel - {channel}")

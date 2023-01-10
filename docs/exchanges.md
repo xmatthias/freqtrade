@@ -54,6 +54,9 @@ This configuration enables kraken, as well as rate-limiting to avoid bans from t
 
 ## Binance
 
+!!! Warning "Server location and geo-ip restrictions"
+    Please be aware that binance restrict api access regarding the server country. The currents and non exhaustive countries blocked are United States, Malaysia (Singapour), Ontario (Canada). Please go to [binance terms > b. Eligibility](https://www.binance.com/en/terms) to find up to date list.
+
 Binance supports [time_in_force](configuration.md#understand-order_time_in_force).
 
 !!! Tip "Stoploss on Exchange"
@@ -171,26 +174,6 @@ lm = ct.load_markets()
 
 res = [p for p, x in lm.items() if 'US' in x['info']['prohibitedIn']]
 print(res)
-```
-
-## FTX
-
-!!! Tip "Stoploss on Exchange"
-    FTX supports `stoploss_on_exchange` and can use both stop-loss-market and stop-loss-limit orders. It provides great advantages, so we recommend to benefit from it.
-    You can use either `"limit"` or `"market"` in the `order_types.stoploss` configuration setting to decide which type of stoploss shall be used.
-
-### Using subaccounts
-
-To use subaccounts with FTX, you need to edit the configuration and add the following:
-
-``` json
-"exchange": {
-    "ccxt_config": {
-        "headers": {
-            "FTX-SUBACCOUNT": "name"
-        }
-    },
-}
 ```
 
 ## Kucoin

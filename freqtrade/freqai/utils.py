@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from pathlib import Path
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+import rapidjson
 
 from freqtrade.configuration import TimeRange
 from freqtrade.constants import Config
@@ -12,6 +14,7 @@ from freqtrade.data.history.history_utils import refresh_backtest_ohlcv_data
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange import timeframe_to_seconds
 from freqtrade.exchange.exchange import market_is_active
+from freqtrade.freqai.data_drawer import FreqaiDataDrawer
 from freqtrade.freqai.data_kitchen import FreqaiDataKitchen
 from freqtrade.plugins.pairlist.pairlist_helpers import dynamic_expand_pairlist
 
@@ -191,3 +194,42 @@ def plot_feature_importance(model: Any, pair: str, dk: FreqaiDataKitchen,
         fig.update_layout(title_text=f"Best and worst features by importance {pair}")
         label = label.replace('&', '').replace('%', '')  # escape two FreqAI specific characters
         store_plot_file(fig, f"{dk.model_filename}-{label}.html", dk.data_path)
+
+
+def record_params(config: Dict[str, Any], full_path: Path) -> None:
+    """
+    Records run params in the full path for reproducibility
+    """
+    params_record_path = full_path / "run_params.json"
+
+    run_params = {
+        "freqai": config.get('freqai', {}),
+        "timeframe": config.get('timeframe'),
+        "stake_amount": config.get('stake_amount'),
+        "stake_currency": config.get('stake_currency'),
+        "max_open_trades": config.get('max_open_trades'),
+        "pairs": config.get('exchange', {}).get('pair_whitelist')
+    }
+
+    with open(params_record_path, "w") as handle:
+        rapidjson.dump(
+            run_params,
+            handle,
+            indent=4,
+            default=str,
+            number_mode=rapidjson.NM_NATIVE | rapidjson.NM_NAN
+        )
+
+
+def get_timerange_backtest_live_models(config: Config) -> str:
+    """
+    Returns a formated timerange for backtest live/ready models
+    :param config: Configuration dictionary
+
+    :return: a string timerange (format example: '20220801-20220822')
+    """
+    dk = FreqaiDataKitchen(config)
+    models_path = dk.get_full_models_path(config)
+    dd = FreqaiDataDrawer(models_path, config)
+    timerange = dd.get_timerange_from_live_historic_predictions()
+    return timerange.timerange_str

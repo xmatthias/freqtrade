@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 from pandas import DataFrame
 from pydantic import BaseModel
@@ -16,6 +16,12 @@ class BaseArbitraryModel(BaseModel):
 class WSRequestSchema(BaseArbitraryModel):
     type: RPCRequestType
     data: Optional[Any] = None
+
+
+class WSMessageSchemaType(TypedDict):
+    # Type for typing to avoid doing pydantic typechecks.
+    type: RPCMessageType
+    data: Optional[Dict[str, Any]]
 
 
 class WSMessageSchema(BaseArbitraryModel):
@@ -41,7 +47,7 @@ class WSWhitelistRequest(WSRequestSchema):
 
 class WSAnalyzedDFRequest(WSRequestSchema):
     type: RPCRequestType = RPCRequestType.ANALYZED_DF
-    data: Dict[str, Any] = {"limit": 1500}
+    data: Dict[str, Any] = {"limit": 1500, "pair": None}
 
 
 # ------------------------------ MESSAGE SCHEMAS ----------------------------

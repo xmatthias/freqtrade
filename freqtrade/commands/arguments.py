@@ -25,7 +25,8 @@ ARGS_COMMON_OPTIMIZE = ["timeframe", "timerange", "dataformat_ohlcv",
 ARGS_BACKTEST = ARGS_COMMON_OPTIMIZE + ["position_stacking", "use_max_market_positions",
                                         "enable_protections", "dry_run_wallet", "timeframe_detail",
                                         "strategy_list", "export", "exportfilename",
-                                        "backtest_breakdown", "backtest_cache"]
+                                        "backtest_breakdown", "backtest_cache",
+                                        "freqai_backtest_live_models"]
 
 ARGS_HYPEROPT = ARGS_COMMON_OPTIMIZE + ["hyperopt", "hyperopt_path",
                                         "position_stacking", "use_max_market_positions",
@@ -40,6 +41,8 @@ ARGS_EDGE = ARGS_COMMON_OPTIMIZE + ["stoploss_range"]
 
 ARGS_LIST_STRATEGIES = ["strategy_path", "print_one_column", "print_colorized",
                         "recursive_strategy_search"]
+
+ARGS_LIST_FREQAIMODELS = ["freqaimodel_path", "print_one_column", "print_colorized"]
 
 ARGS_LIST_HYPEROPTS = ["hyperopt_path", "print_one_column", "print_colorized"]
 
@@ -103,11 +106,11 @@ ARGS_HYPEROPT_SHOW = ["hyperopt_list_best", "hyperopt_list_profitable", "hyperop
                       "disableparamexport", "backtest_breakdown"]
 
 ARGS_ANALYZE_ENTRIES_EXITS = ["exportfilename", "analysis_groups", "enter_reason_list",
-                              "exit_reason_list", "indicator_list"]
+                              "exit_reason_list", "indicator_list", "timerange"]
 
 NO_CONF_REQURIED = ["convert-data", "convert-trade-data", "download-data", "list-timeframes",
-                    "list-markets", "list-pairs", "list-strategies", "list-data",
-                    "hyperopt-list", "hyperopt-show", "backtest-filter",
+                    "list-markets", "list-pairs", "list-strategies", "list-freqaimodels",
+                    "list-data", "hyperopt-list", "hyperopt-show", "backtest-filter",
                     "plot-dataframe", "plot-profit", "show-trades", "trades-to-ohlcv"]
 
 NO_CONF_ALLOWED = ["create-userdir", "list-exchanges", "new-strategy"]
@@ -192,10 +195,11 @@ class Arguments:
                                         start_create_userdir, start_download_data, start_edge,
                                         start_hyperopt, start_hyperopt_list, start_hyperopt_show,
                                         start_install_ui, start_list_data, start_list_exchanges,
-                                        start_list_markets, start_list_strategies,
-                                        start_list_timeframes, start_new_config, start_new_strategy,
-                                        start_plot_dataframe, start_plot_profit, start_show_trades,
-                                        start_test_pairlist, start_trading, start_webserver)
+                                        start_list_freqAI_models, start_list_markets,
+                                        start_list_strategies, start_list_timeframes,
+                                        start_new_config, start_new_strategy, start_plot_dataframe,
+                                        start_plot_profit, start_show_trades, start_test_pairlist,
+                                        start_trading, start_webserver)
 
         subparsers = self.parser.add_subparsers(dest='command',
                                                 # Use custom message when no subhandler is added
@@ -361,6 +365,15 @@ class Arguments:
         )
         list_strategies_cmd.set_defaults(func=start_list_strategies)
         self._build_args(optionlist=ARGS_LIST_STRATEGIES, parser=list_strategies_cmd)
+
+        # Add list-freqAI Models subcommand
+        list_freqaimodels_cmd = subparsers.add_parser(
+            'list-freqaimodels',
+            help='Print available freqAI models.',
+            parents=[_common_parser],
+        )
+        list_freqaimodels_cmd.set_defaults(func=start_list_freqAI_models)
+        self._build_args(optionlist=ARGS_LIST_FREQAIMODELS, parser=list_freqaimodels_cmd)
 
         # Add list-timeframes subcommand
         list_timeframes_cmd = subparsers.add_parser(

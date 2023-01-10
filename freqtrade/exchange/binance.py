@@ -11,7 +11,7 @@ from freqtrade.enums import CandleType, MarginMode, TradingMode
 from freqtrade.exceptions import DDosProtection, OperationalException, TemporaryError
 from freqtrade.exchange import Exchange
 from freqtrade.exchange.common import retrier_async
-from freqtrade.exchange.types import Tickers
+from freqtrade.exchange.types import OHLCVResponse, Tickers
 from freqtrade.misc import deep_merge_dicts, json_load
 
 
@@ -31,7 +31,7 @@ class Binance(Exchange):
         "ccxt_futures_name": "future"
     }
     _ft_has_futures: Dict = {
-        "stoploss_order_types": {"limit": "limit", "market": "market"},
+        "stoploss_order_types": {"limit": "stop", "market": "stop_market"},
         "tickers_have_price": False,
     }
 
@@ -41,24 +41,6 @@ class Binance(Exchange):
         # (TradingMode.FUTURES, MarginMode.CROSS),
         (TradingMode.FUTURES, MarginMode.ISOLATED)
     ]
-
-    def stoploss_adjust(self, stop_loss: float, order: Dict, side: str) -> bool:
-        """
-        Verify stop_loss against stoploss-order value (limit or price)
-        Returns True if adjustment is necessary.
-        :param side: "buy" or "sell"
-        """
-        order_types = ('stop_loss_limit', 'stop', 'stop_market')
-
-        return (
-            order.get('stopPrice', None) is None
-            or (
-                order['type'] in order_types
-                and (
-                    (side == "sell" and stop_loss > float(order['stopPrice'])) or
-                    (side == "buy" and stop_loss < float(order['stopPrice']))
-                )
-            ))
 
     async def get_tickers(
             self, symbols: Optional[List[str]] = None, cached: bool = False) -> Tickers:
@@ -131,7 +113,7 @@ class Binance(Exchange):
                                         since_ms: int, candle_type: CandleType,
                                         is_new_pair: bool = False, raise_: bool = False,
                                         until_ms: Optional[int] = None
-                                        ) -> Tuple[str, str, str, List]:
+                                        ) -> OHLCVResponse:
         """
         Overwrite to introduce "fast new pair" functionality by detecting the pair's listing date
         Does not work for other exchanges, which don't return the earliest data when called with "0"

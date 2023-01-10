@@ -11,6 +11,7 @@ from freqtrade.configuration.config_validation import validate_config_consistenc
 from freqtrade.data.btanalysis import get_backtest_resultlist, load_and_merge_backtest_result
 from freqtrade.enums import BacktestState
 from freqtrade.exceptions import DependencyException
+from freqtrade.misc import deep_merge_dicts
 from freqtrade.rpc.api_server.api_schemas import (BacktestHistoryEntry, BacktestRequest,
                                                   BacktestResponse)
 from freqtrade.rpc.api_server.deps import get_config, is_webserver_mode
@@ -37,10 +38,11 @@ async def api_start_backtest(bt_settings: BacktestRequest, background_tasks: Bac
 
     btconfig = deepcopy(config)
     settings = dict(bt_settings)
+    if settings.get('freqai', None) is not None:
+        settings['freqai'] = dict(settings['freqai'])
     # Pydantic models will contain all keys, but non-provided ones are None
-    for setting in settings.keys():
-        if settings[setting] is not None:
-            btconfig[setting] = settings[setting]
+
+    btconfig = deep_merge_dicts(settings, btconfig, allow_null_overrides=False)
     try:
         btconfig['stake_amount'] = float(btconfig['stake_amount'])
     except ValueError:
@@ -89,6 +91,7 @@ async def api_start_backtest(bt_settings: BacktestRequest, background_tasks: Bac
             lastconfig['enable_protections'] = btconfig.get('enable_protections')
             lastconfig['dry_run_wallet'] = btconfig.get('dry_run_wallet')
 
+            ApiServer._bt.enable_protections = btconfig.get('enable_protections', False)
             ApiServer._bt.strategylist = [strat]
             ApiServer._bt.results = {}
             ApiServer._bt.load_prior_backtest()

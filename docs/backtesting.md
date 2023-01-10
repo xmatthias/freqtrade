@@ -300,7 +300,11 @@ A backtesting result will look like that:
 | Absolute profit             | 0.00762792 BTC      |
 | Total profit %              | 76.2%               |
 | CAGR %                      | 460.87%             |
+| Sortino                     | 1.88                |
+| Sharpe                      | 2.97                |
+| Calmar                      | 6.29                |
 | Profit factor               | 1.11                |
+| Expectancy                  | -0.15               |
 | Avg. stake amount           | 0.001      BTC      |
 | Total trade volume          | 0.429      BTC      |
 |                             |                     |
@@ -400,7 +404,11 @@ It contains some useful key metrics about performance of your strategy on backte
 | Absolute profit             | 0.00762792 BTC      |
 | Total profit %              | 76.2%               |
 | CAGR %                      | 460.87%             |
+| Sortino                     | 1.88                |
+| Sharpe                      | 2.97                |
+| Calmar                      | 6.29                |
 | Profit factor               | 1.11                |
+| Expectancy                  | -0.15               |
 | Avg. stake amount           | 0.001      BTC      |
 | Total trade volume          | 0.429      BTC      |
 |                             |                     |
@@ -447,6 +455,9 @@ It contains some useful key metrics about performance of your strategy on backte
 - `Absolute profit`: Profit made in stake currency.
 - `Total profit %`: Total profit. Aligned to the `TOTAL` row's `Tot Profit %` from the first table. Calculated as `(End capital − Starting capital) / Starting capital`.
 - `CAGR %`: Compound annual growth rate.
+- `Sortino`: Annualized Sortino ratio.
+- `Sharpe`: Annualized Sharpe ratio.
+- `Calmar`: Annualized Calmar ratio.
 - `Profit factor`: profit / loss.
 - `Avg. stake amount`: Average stake amount, either `stake_amount` or the average when using dynamic stake amount.
 - `Total trade volume`: Volume generated on the exchange to reach the above profit.
@@ -522,13 +533,13 @@ Since backtesting lacks some detailed information about what happens within a ca
 - ROI
   - exits are compared to high - but the ROI value is used (e.g. ROI = 2%, high=5% - so the exit will be at 2%)
   - exits are never "below the candle", so a ROI of 2% may result in a exit at 2.4% if low was at 2.4% profit
-  - Forceexits caused by `<N>=-1` ROI entries use low as exit value, unless N falls on the candle open (e.g. `120: -1` for 1h candles)
+  - Force-exits caused by `<N>=-1` ROI entries use low as exit value, unless N falls on the candle open (e.g. `120: -1` for 1h candles)
 - Stoploss exits happen exactly at stoploss price, even if low was lower, but the loss will be `2 * fees` higher than the stoploss price
 - Stoploss is evaluated before ROI within one candle. So you can often see more trades with the `stoploss` exit reason comparing to the results obtained with the same strategy in the Dry Run/Live Trade modes
 - Low happens before high for stoploss, protecting capital first
 - Trailing stoploss
   - Trailing Stoploss is only adjusted if it's below the candle's low (otherwise it would be triggered)
-  - On trade entry candles that trigger trailing stoploss, the "minimum offset" (`stop_positive_offset`) is assumed (instead of high) - and the stop is calculated from this point
+  - On trade entry candles that trigger trailing stoploss, the "minimum offset" (`stop_positive_offset`) is assumed (instead of high) - and the stop is calculated from this point. This rule is NOT applicable to custom-stoploss scenarios, since there's no information about the stoploss logic available.
   - High happens first - adjusting stoploss
   - Low uses the adjusted stoploss (so exits with large high-low difference are backtested correctly)
   - ROI applies before trailing-stop, ensuring profits are "top-capped" at ROI if both ROI and trailing stop applies
@@ -546,8 +557,8 @@ In addition to the above assumptions, strategy authors should carefully read the
 
 ### Trading limits in backtesting
 
-Exchanges have certain trading limits, like minimum base currency, or minimum stake (quote) currency.
-These limits are usually listed in the exchange documentation as "trading rules" or similar.
+Exchanges have certain trading limits, like minimum (and maximum) base currency, or minimum/maximum stake (quote) currency.
+These limits are usually listed in the exchange documentation as "trading rules" or similar and can be quite different between different pairs.
 
 Backtesting (as well as live and dry-run) does honor these limits, and will ensure that a stoploss can be placed below this value - so the value will be slightly higher than what the exchange specifies.
 Freqtrade has however no information about historic limits.
@@ -583,7 +594,8 @@ To utilize this, you can append `--timeframe-detail 5m` to your regular backtest
 freqtrade backtesting --strategy AwesomeStrategy --timeframe 1h --timeframe-detail 5m
 ```
 
-This will load 1h data as well as 5m data for the timeframe. The strategy will be analyzed with the 1h timeframe - and for every "open trade candle" (candles where a trade is open) the 5m data will be used to simulate intra-candle movements.
+This will load 1h data as well as 5m data for the timeframe. The strategy will be analyzed with the 1h timeframe, and Entry orders will only be placed at the main timeframe, however Order fills and exit signals will be evaluated at the 5m candle, simulating intra-candle movements.
+
 All callback functions (`custom_exit()`, `custom_stoploss()`, ... ) will be running for each 5m candle once the trade is opened (so 12 times in the above example of 1h timeframe, and 5m detailed timeframe).
 
 `--timeframe-detail` must be smaller than the original timeframe, otherwise backtesting will fail to start.
