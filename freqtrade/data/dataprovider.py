@@ -36,8 +36,8 @@ class DataProvider:
         self,
         config: Config,
         exchange: Optional[Exchange],
-        loop: asyncio.AbstractEventLoop = None,
-        pairlists=None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        pairlists: Optional[Any] = None,
         rpc: Optional[RPCManager] = None
     ) -> None:
         self._config = config
@@ -284,7 +284,7 @@ class DataProvider:
     def historic_ohlcv(
         self,
         pair: str,
-        timeframe: str = None,
+        timeframe: Optional[str] = None,
         candle_type: str = ''
     ) -> DataFrame:
         """
@@ -336,7 +336,7 @@ class DataProvider:
     def get_pair_dataframe(
         self,
         pair: str,
-        timeframe: str = None,
+        timeframe: Optional[str] = None,
         candle_type: str = ''
     ) -> DataFrame:
         """
@@ -416,8 +416,9 @@ class DataProvider:
 
     # Exchange functions
 
-    async def refresh(self, pairlist: ListPairsWithTimeframes,
-                      helping_pairs: ListPairsWithTimeframes = None) -> None:
+    async def refresh(self,
+                      pairlist: ListPairsWithTimeframes,
+                      helping_pairs: Optional[ListPairsWithTimeframes] = None) -> None:
         """
         Refresh data, called with each cycle
         """
@@ -441,7 +442,7 @@ class DataProvider:
     def ohlcv(
         self,
         pair: str,
-        timeframe: str = None,
+        timeframe: Optional[str] = None,
         copy: bool = True,
         candle_type: str = ''
     ) -> DataFrame:

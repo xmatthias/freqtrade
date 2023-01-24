@@ -683,6 +683,7 @@ class RPC:
         if self._freqtrade.state == State.RUNNING:
             # Set 'max_open_trades' to 0
             self._freqtrade.config['max_open_trades'] = 0
+            self._freqtrade.strategy.max_open_trades = 0
 
         return {'status': 'No more entries will occur from now. Run /reload_config to reset.'}
 
@@ -988,7 +989,7 @@ class RPC:
         resp['errors'] = errors
         return resp
 
-    def _rpc_blacklist(self, add: List[str] = None) -> Dict:
+    def _rpc_blacklist(self, add: Optional[List[str]] = None) -> Dict:
         """ Returns the currently active blacklist"""
         errors = {}
         if add:
@@ -1170,12 +1171,12 @@ class RPC:
         return self._freqtrade.active_pair_whitelist
 
     @staticmethod
-    def _rpc_analysed_history_full(config, pair: str, timeframe: str,
+    def _rpc_analysed_history_full(config: Config, pair: str, timeframe: str,
                                    timerange: str, exchange) -> Dict[str, Any]:
         timerange_parsed = TimeRange.parse_timerange(timerange)
 
         _data = load_data(
-            datadir=config.get("datadir"),
+            datadir=config["datadir"],
             pairs=[pair],
             timeframe=timeframe,
             timerange=timerange_parsed,
@@ -1200,6 +1201,16 @@ class RPC:
                 'subplots' not in self._freqtrade.strategy.plot_config):
             self._freqtrade.strategy.plot_config['subplots'] = {}
         return self._freqtrade.strategy.plot_config
+
+    @staticmethod
+    def _rpc_plot_config_with_strategy(config: Config) -> Dict[str, Any]:
+
+        from freqtrade.resolvers.strategy_resolver import StrategyResolver
+        strategy = StrategyResolver.load_strategy(config)
+
+        if (strategy.plot_config and 'subplots' not in strategy.plot_config):
+            strategy.plot_config['subplots'] = {}
+        return strategy.plot_config
 
     @staticmethod
     def _rpc_sysinfo() -> Dict[str, Any]:
