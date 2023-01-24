@@ -291,7 +291,7 @@ class TestCCXTExchange():
         exch, exchangename = exchange
         pair = EXCHANGES[exchangename]['pair']
 
-        ticker = exchange.fetch_ticker_sync(pair)
+        ticker = exch.fetch_ticker_sync(pair)
         assert 'ask' in ticker
         assert ticker['ask'] is not None
         assert 'bid' in ticker

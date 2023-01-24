@@ -115,10 +115,10 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
         'freqtrade.exchange.Exchange',
         fetch_ticker=ticker,
         get_fee=fee,
-        _is_dry_limit_order_filled=MagicMock(side_effect=[False, True]),
+        _is_dry_limit_order_filled=get_mock_coro(side_effect=[False, True]),
     )
 
-    freqtradebot = await get_patched_freqtradebot(mocker, default_conf)
+    freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
 
@@ -178,9 +178,9 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
     Trade.commit()
 
     # Fill open order ...
-    freqtradebot.manage_open_orders()
+    await freqtradebot.manage_open_orders()
     trades = Trade.get_open_trades()
-    freqtradebot.exit_positions(trades)
+    await freqtradebot.exit_positions(trades)
 
     results = rpc._rpc_trade_status()
 
