@@ -1244,8 +1244,8 @@ async def test_create_dry_run_order_fees(
     ("sell", 21.563, True, True),
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, price, filled,
-                                               exchange_name, order_book_l2_usd):
+async def test_create_dry_run_order_limit_fill(default_conf, mocker, side, price, filled, caplog,
+                                               exchange_name, order_book_l2_usd, converted):
     default_conf['dry_run'] = True
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
     mocker.patch.multiple(EXMS,
