@@ -37,7 +37,7 @@ class Kucoin(Exchange):
             })
         return params
 
-    def create_order(
+    async def create_order(
             self,
             *,
             pair: str,
@@ -50,7 +50,7 @@ class Kucoin(Exchange):
             time_in_force: str = 'GTC',
             ) -> Dict:
 
-        res = super().create_order(
+        res = await super().create_order(
             pair=pair,
             ordertype=ordertype,
             side=side,

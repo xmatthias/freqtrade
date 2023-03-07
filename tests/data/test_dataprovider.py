@@ -282,7 +282,7 @@ async def test_market(mocker, default_conf, markets):
 
 async def test_ticker(mocker, default_conf, tickers_sync):
     ticker_mock = MagicMock(return_value=tickers_sync()['ETH/BTC'])
-    mocker.patch(f"{EXMS}.fetch_ticker", ticker_mock)
+    mocker.patch(f"{EXMS}.fetch_ticker_sync", ticker_mock)
     exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('ETH/BTC')
@@ -291,7 +291,7 @@ async def test_ticker(mocker, default_conf, tickers_sync):
     assert res['symbol'] == 'ETH/BTC'
 
     ticker_mock = MagicMock(side_effect=ExchangeError('Pair not found'))
-    mocker.patch(f"{EXMS}.fetch_ticker", ticker_mock)
+    mocker.patch(f"{EXMS}.fetch_ticker_sync", ticker_mock)
     exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('UNITTEST/BTC')

@@ -13,13 +13,13 @@ from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
 async def test_validate_order_types_gate(default_conf, mocker):
     default_conf['exchange']['name'] = 'gate'
     mocker.patch(f'{EXMS}._init_ccxt')
-    mocker.patch(f'{EXMS}._load_markets', return_value={})
+    # mocker.patch(f'{EXMS}._load_markets', return_value={})
     mocker.patch(f'{EXMS}.validate_pairs')
     mocker.patch(f'{EXMS}.validate_timeframes')
     mocker.patch(f'{EXMS}.validate_stakecurrency')
     mocker.patch(f'{EXMS}.validate_pricing')
     mocker.patch(f'{EXMS}.name', 'Gate')
-    exch = ExchangeResolver.load_exchange('gate', default_conf, True)
+    exch = await ExchangeResolver.load_exchange('gate', default_conf, load_markets=True)
     assert isinstance(exch, Gate)
 
     default_conf['order_types'] = {

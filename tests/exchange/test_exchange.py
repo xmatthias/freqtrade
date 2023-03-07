@@ -969,7 +969,7 @@ async def test_validate_pricing(default_conf, mocker):
     type(api_mock).has = PropertyMock(return_value=has)
     mocker.patch(f'{EXMS}._init_ccxt', get_mock_coro(return_value=api_mock))
     mocker.patch(f'{EXMS}.load_markets', get_mock_coro(return_value={}))
-    mocker.patch(f'{EXMS}.Exchange.validate_trading_mode_and_margin_mode')
+    mocker.patch(f'{EXMS}.validate_trading_mode_and_margin_mode')
     mocker.patch(f'{EXMS}.validate_pairs')
     mocker.patch(f'{EXMS}.validate_timeframes')
     mocker.patch(f'{EXMS}.validate_stakecurrency')
@@ -1057,14 +1057,15 @@ async def test_validate_ordertypes(default_conf, mocker):
     ('gate', 'mark', True),
     ('gate', 'index', True),
     ])
-def test_validate_ordertypes_stop_advanced(default_conf, mocker, exchange_name, stopadv, expected):
+async def test_validate_ordertypes_stop_advanced(
+        default_conf, mocker, exchange_name, stopadv, expected):
 
     api_mock = MagicMock()
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
     type(api_mock).has = PropertyMock(return_value={'createMarketOrder': True})
-    mocker.patch(f'{EXMS}._init_ccxt', MagicMock(return_value=api_mock))
-    mocker.patch(f'{EXMS}._load_markets', MagicMock(return_value={}))
+    mocker.patch(f'{EXMS}._init_ccxt', get_mock_coro(return_value=api_mock))
+    mocker.patch(f'{EXMS}.load_markets', get_mock_coro(return_value={}))
     mocker.patch(f'{EXMS}.validate_pairs')
     mocker.patch(f'{EXMS}.validate_timeframes')
     mocker.patch(f'{EXMS}.validate_stakecurrency')
@@ -1077,11 +1078,11 @@ def test_validate_ordertypes_stop_advanced(default_conf, mocker, exchange_name, 
         'stoploss_price_type': stopadv,
     }
     if expected:
-        ExchangeResolver.load_exchange(exchange_name, default_conf)
+        await ExchangeResolver.load_exchange(exchange_name, default_conf)
     else:
         with pytest.raises(OperationalException,
                            match=r'On exchange stoploss price type is not supported for .*'):
-            ExchangeResolver.load_exchange(exchange_name, default_conf)
+            await ExchangeResolver.load_exchange(exchange_name, default_conf)
 
 
 def test_validate_order_types_not_in_config(default_conf, mocker):
@@ -1781,7 +1782,7 @@ async def test_fetch_trading_fees(default_conf, mocker):
             'taker': 0.0005}
     }
     api_mock = MagicMock()
-    exchange_name = 'gateio'
+    exchange_name = 'gate'
     api_mock.load_markets = get_mock_coro()
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES

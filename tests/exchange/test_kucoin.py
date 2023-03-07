@@ -137,10 +137,10 @@ async def test_stoploss_adjust_kucoin(mocker, default_conf):
     ("limit", 200),
     ("stop_loss_limit", 200)
 ])
-def test_kucoin_create_order(default_conf, mocker, side, ordertype, rate):
+async def test_kucoin_create_order(default_conf, mocker, side, ordertype, rate):
     api_mock = MagicMock()
     order_id = 'test_prod_{}_{}'.format(side, randint(0, 10 ** 6))
-    api_mock.create_order = MagicMock(return_value={
+    api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
         'info': {
             'foo': 'bar'
@@ -151,11 +151,11 @@ def test_kucoin_create_order(default_conf, mocker, side, ordertype, rate):
     default_conf['dry_run'] = False
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
     mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y: y)
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id='kucoin')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='kucoin')
     exchange._set_leverage = MagicMock()
     exchange.set_margin_mode = MagicMock()
 
-    order = exchange.create_order(
+    order = await exchange.create_order(
         pair='XRP/USDT',
         ordertype=ordertype,
         side=side,
