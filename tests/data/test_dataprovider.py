@@ -9,7 +9,7 @@ from freqtrade.data.dataprovider import DataProvider
 from freqtrade.enums import CandleType, RunMode
 from freqtrade.exceptions import ExchangeError, OperationalException
 from freqtrade.plugins.pairlistmanager import PairListManager
-from tests.conftest import generate_test_data, get_mock_coro, get_patched_exchange
+from tests.conftest import EXMS, generate_test_data, get_mock_coro, get_patched_exchange
 
 
 @pytest.mark.parametrize('candle_type', [
@@ -224,7 +224,7 @@ def test_emit_df(mocker, default_conf, ohlcv_history):
 
 async def test_refresh(mocker, default_conf):
     refresh_mock = get_mock_coro()
-    mocker.patch("freqtrade.exchange.Exchange.refresh_latest_ohlcv", refresh_mock)
+    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", refresh_mock)
 
     exchange = await get_patched_exchange(mocker, default_conf, id="binance")
     timeframe = default_conf["timeframe"]
@@ -282,7 +282,7 @@ async def test_market(mocker, default_conf, markets):
 
 async def test_ticker(mocker, default_conf, tickers_sync):
     ticker_mock = MagicMock(return_value=tickers_sync()['ETH/BTC'])
-    mocker.patch("freqtrade.exchange.Exchange.fetch_ticker_sync", ticker_mock)
+    mocker.patch(f"{EXMS}.fetch_ticker", ticker_mock)
     exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('ETH/BTC')
@@ -291,7 +291,7 @@ async def test_ticker(mocker, default_conf, tickers_sync):
     assert res['symbol'] == 'ETH/BTC'
 
     ticker_mock = MagicMock(side_effect=ExchangeError('Pair not found'))
-    mocker.patch("freqtrade.exchange.Exchange.fetch_ticker_sync", ticker_mock)
+    mocker.patch(f"{EXMS}.fetch_ticker", ticker_mock)
     exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('UNITTEST/BTC')
@@ -302,7 +302,7 @@ async def test_current_whitelist(mocker, default_conf, tickers):
     # patch default conf to volumepairlist
     default_conf['pairlists'][0] = {'method': 'VolumePairList', "number_assets": 5}
 
-    mocker.patch.multiple('freqtrade.exchange.Exchange',
+    mocker.patch.multiple(EXMS,
                           exchange_has=MagicMock(return_value=True),
                           get_tickers=tickers)
     exchange = await get_patched_exchange(mocker, default_conf)
@@ -438,6 +438,7 @@ def test_dp__add_external_df(default_conf_usdt):
     # Add the same dataframe again - dataframe size shall not change.
     res = dp._add_external_df('ETH/USDT', df, last_analyzed, timeframe, CandleType.SPOT)
     assert res[0] is True
+    assert isinstance(res[1], int)
     assert res[1] == 0
     df, _ = dp.get_producer_df('ETH/USDT', timeframe, CandleType.SPOT)
     assert len(df) == 24
@@ -447,6 +448,7 @@ def test_dp__add_external_df(default_conf_usdt):
 
     res = dp._add_external_df('ETH/USDT', df2, last_analyzed, timeframe, CandleType.SPOT)
     assert res[0] is True
+    assert isinstance(res[1], int)
     assert res[1] == 0
     df, _ = dp.get_producer_df('ETH/USDT', timeframe, CandleType.SPOT)
     assert len(df) == 48
@@ -456,6 +458,7 @@ def test_dp__add_external_df(default_conf_usdt):
 
     res = dp._add_external_df('ETH/USDT', df3, last_analyzed, timeframe, CandleType.SPOT)
     assert res[0] is True
+    assert isinstance(res[1], int)
     assert res[1] == 0
     df, _ = dp.get_producer_df('ETH/USDT', timeframe, CandleType.SPOT)
     # New length = 48 + 12 (since we have a 12 hour offset).
@@ -479,6 +482,7 @@ def test_dp__add_external_df(default_conf_usdt):
     res = dp._add_external_df('ETH/USDT', df4, last_analyzed, timeframe, CandleType.SPOT)
     assert res[0] is False
     # 36 hours - from 2022-01-03 12:00:00+00:00 to 2022-01-05 00:00:00+00:00
+    assert isinstance(res[1], int)
     assert res[1] == 36
     df, _ = dp.get_producer_df('ETH/USDT', timeframe, CandleType.SPOT)
     # New length = 61 + 1
@@ -489,4 +493,5 @@ def test_dp__add_external_df(default_conf_usdt):
     res = dp._add_external_df('ETH/USDT', df4, last_analyzed, timeframe, CandleType.SPOT)
     assert res[0] is False
     # 36 hours - from 2022-01-03 12:00:00+00:00 to 2022-01-05 00:00:00+00:00
+    assert isinstance(res[1], int)
     assert res[1] == 0

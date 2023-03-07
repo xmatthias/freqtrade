@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tests.conftest import get_mock_coro, get_patched_exchange
+from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
 
 
 @pytest.mark.asyncio
@@ -12,7 +12,7 @@ async def test_get_trades_for_order(default_conf, mocker):
     order_id = 'ABCD-ABCD'
     since = datetime(2018, 5, 5, 0, 0, 0)
     default_conf["dry_run"] = False
-    mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
+    mocker.patch(f'{EXMS}.exchange_has', return_value=True)
     api_mock = MagicMock()
 
     api_mock.fetch_my_trades = get_mock_coro(return_value=[{

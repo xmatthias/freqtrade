@@ -5,13 +5,14 @@ import pytest
 
 from freqtrade.constants import UNLIMITED_STAKE_AMOUNT
 from freqtrade.exceptions import DependencyException
-from tests.conftest import create_mock_trades, get_mock_coro, get_patched_freqtradebot, patch_wallet
+from tests.conftest import (EXMS, create_mock_trades, get_mock_coro, get_patched_freqtradebot,
+                            patch_wallet)
 
 
 async def test_sync_wallet_at_boot(mocker, default_conf):
     default_conf['dry_run'] = False
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=get_mock_coro(return_value={
             "BNT": {
                 "free": 1.0,
@@ -45,7 +46,7 @@ async def test_sync_wallet_at_boot(mocker, default_conf):
     assert 'USDT' in freqtrade.wallets._wallets
     assert freqtrade.wallets._last_wallet_refresh > 0
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=get_mock_coro(return_value={
             "BNT": {
                 "free": 1.2,
@@ -87,7 +88,7 @@ async def test_sync_wallet_at_boot(mocker, default_conf):
 async def test_sync_wallet_missing_data(mocker, default_conf):
     default_conf['dry_run'] = False
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=get_mock_coro(return_value={
             "BNT": {
                 "free": 1.0,
@@ -137,7 +138,7 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
                                                        result1, result2, limit_buy_order_open,
                                                        fee, mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         create_order=get_mock_coro(return_value=limit_buy_order_open),
         get_fee=fee
@@ -313,7 +314,7 @@ async def test_sync_wallet_futures_live(mocker, default_conf):
         }
     ]
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=get_mock_coro(return_value={
             "USDT": {
                 "free": 900,

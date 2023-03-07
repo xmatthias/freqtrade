@@ -5,22 +5,22 @@ import pytest
 
 from freqtrade.enums import MarginMode, TradingMode
 from freqtrade.exceptions import OperationalException
-from freqtrade.exchange import Gateio
+from freqtrade.exchange import Gate
 from freqtrade.resolvers.exchange_resolver import ExchangeResolver
-from tests.conftest import get_mock_coro, get_patched_exchange
+from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
 
 
-async def test_validate_order_types_gateio(default_conf, mocker):
-    default_conf['exchange']['name'] = 'gateio'
-    mocker.patch('freqtrade.exchange.Exchange._init_ccxt')
-    mocker.patch('freqtrade.exchange.Exchange.load_markets', get_mock_coro({}))
-    mocker.patch('freqtrade.exchange.Exchange.validate_pairs')
-    mocker.patch('freqtrade.exchange.Exchange.validate_timeframes')
-    mocker.patch('freqtrade.exchange.Exchange.validate_stakecurrency')
-    mocker.patch('freqtrade.exchange.Exchange.validate_pricing')
-    mocker.patch('freqtrade.exchange.Exchange.name', 'Gateio')
-    exch = await ExchangeResolver.load_exchange('gateio', default_conf, load_markets=True)
-    assert isinstance(exch, Gateio)
+async def test_validate_order_types_gate(default_conf, mocker):
+    default_conf['exchange']['name'] = 'gate'
+    mocker.patch(f'{EXMS}._init_ccxt')
+    mocker.patch(f'{EXMS}._load_markets', return_value={})
+    mocker.patch(f'{EXMS}.validate_pairs')
+    mocker.patch(f'{EXMS}.validate_timeframes')
+    mocker.patch(f'{EXMS}.validate_stakecurrency')
+    mocker.patch(f'{EXMS}.validate_pricing')
+    mocker.patch(f'{EXMS}.name', 'Gate')
+    exch = ExchangeResolver.load_exchange('gate', default_conf, True)
+    assert isinstance(exch, Gate)
 
     default_conf['order_types'] = {
         'entry': 'market',
@@ -31,18 +31,18 @@ async def test_validate_order_types_gateio(default_conf, mocker):
 
     with pytest.raises(OperationalException,
                        match=r'Exchange .* does not support market orders.'):
-        await ExchangeResolver.load_exchange('gateio', default_conf, load_markets=True)
+        await ExchangeResolver.load_exchange('gate', default_conf, load_markets=True)
 
     # market-orders supported on futures markets.
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
-    ex = await ExchangeResolver.load_exchange('gateio', default_conf, load_markets=True)
+    ex = await ExchangeResolver.load_exchange('gate', default_conf, load_markets=True)
     assert ex
 
 
 @pytest.mark.usefixtures("init_persistence")
-async def test_fetch_stoploss_order_gateio(default_conf, mocker):
-    exchange = await get_patched_exchange(mocker, default_conf, id='gateio')
+async def test_fetch_stoploss_order_gate(default_conf, mocker):
+    exchange = await get_patched_exchange(mocker, default_conf, id='gate')
 
     fetch_order_mock = get_mock_coro()
     exchange.fetch_order = fetch_order_mock
@@ -56,7 +56,7 @@ async def test_fetch_stoploss_order_gateio(default_conf, mocker):
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
 
-    exchange = await get_patched_exchange(mocker, default_conf, id='gateio')
+    exchange = await get_patched_exchange(mocker, default_conf, id='gate')
 
     exchange.fetch_order = get_mock_coro(return_value={
         'status': 'closed',
@@ -73,8 +73,8 @@ async def test_fetch_stoploss_order_gateio(default_conf, mocker):
     assert exchange.fetch_order.call_args_list[1][1]['order_id'] == '222555'
 
 
-async def test_cancel_stoploss_order_gateio(default_conf, mocker):
-    exchange = await get_patched_exchange(mocker, default_conf, id='gateio')
+async def test_cancel_stoploss_order_gate(default_conf, mocker):
+    exchange = await get_patched_exchange(mocker, default_conf, id='gate')
 
     cancel_order_mock = get_mock_coro()
     exchange.cancel_order = cancel_order_mock
@@ -90,8 +90,8 @@ async def test_cancel_stoploss_order_gateio(default_conf, mocker):
     (1501, 1499, 1501, "sell"),
     (1499, 1501, 1499, "buy")
 ])
-async def test_stoploss_adjust_gateio(mocker, default_conf, sl1, sl2, sl3, side):
-    exchange = await get_patched_exchange(mocker, default_conf, id='gateio')
+async def test_stoploss_adjust_gate(mocker, default_conf, sl1, sl2, sl3, side):
+    exchange = await get_patched_exchange(mocker, default_conf, id='gate')
     order = {
         'price': 1500,
         'stopPrice': 1500,
@@ -104,9 +104,9 @@ async def test_stoploss_adjust_gateio(mocker, default_conf, sl1, sl2, sl3, side)
     ('taker', 0.0005, 0.0001554325),
     ('maker', 0.0, 0.0),
 ])
-async def test_fetch_my_trades_gateio(mocker, default_conf, takerormaker, rate, cost):
-    mocker.patch('freqtrade.exchange.Exchange.exchange_has', return_value=True)
-    mocker.patch('freqtrade.exchange.Exchange.fill_leverage_tiers')
+async def test_fetch_my_trades_gate(mocker, default_conf, takerormaker, rate, cost):
+    mocker.patch(f'{EXMS}.exchange_has', return_value=True)
+    mocker.patch(f'{EXMS}.fill_leverage_tiers')
     tick = {'ETH/USDT:USDT': {
         'info': {'user_id': '',
                  'taker_fee': '0.0018',
@@ -135,7 +135,7 @@ async def test_fetch_my_trades_gateio(mocker, default_conf, takerormaker, rate, 
         'takerOrMaker': takerormaker,
         'amount': 1,  # 1 contract
     }])
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock=api_mock, id='gateio')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock=api_mock, id='gate')
     exchange._trading_fees = tick
     trades = await exchange.get_trades_for_order(
         '22255', 'ETH/USDT:USDT', datetime.now(timezone.utc))
