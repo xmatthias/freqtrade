@@ -2410,8 +2410,8 @@ async def test__send_msg_keyboard(default_conf, mocker, caplog) -> None:
                    "'/start', '/reload_config', '/help']]", caplog)
 
 
-def test_change_market_direction(default_conf, mocker, update) -> None:
-    telegram, _, msg_mock = get_telegram_testobject(mocker, default_conf)
+async def test_change_market_direction(default_conf, mocker, update) -> None:
+    telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
     assert telegram._rpc._freqtrade.strategy.market_direction == MarketDirection.NONE
     context = MagicMock()
     context.args = ["long"]

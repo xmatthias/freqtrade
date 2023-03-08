@@ -1210,7 +1210,7 @@ async def test_create_dry_run_order_fees(
      f'{EXMS}.get_fee',
      side_effect=lambda symbol, taker_or_maker: 2.0 if taker_or_maker == 'taker' else 1.0
     )
-    mocker.patch(f'{EXMS}._is_dry_limit_order_filled', return_value=price_side == 'other')
+    mocker.patch(f'{EXMS}._dry_is_price_crossed', return_value=price_side == 'other')
     exchange = await get_patched_exchange(mocker, default_conf)
 
     order = await exchange.create_dry_run_order(
@@ -1227,7 +1227,7 @@ async def test_create_dry_run_order_fees(
     else:
         assert order['fee'] is None
 
-    mocker.patch(f'{EXMS}._is_dry_limit_order_filled', get_mock_coro(price_side != 'other'))
+    mocker.patch(f'{EXMS}._dry_is_price_crossed', get_mock_coro(price_side != 'other'))
 
     order1 = await exchange.fetch_dry_run_order(order['id'])
     assert order1['fee']['rate'] == fee

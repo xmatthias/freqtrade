@@ -9,7 +9,7 @@ from freqtrade.constants import BuySell
 from freqtrade.enums import MarginMode, PriceType, TradingMode
 from freqtrade.exceptions import DDosProtection, OperationalException, TemporaryError
 from freqtrade.exchange import Exchange
-from freqtrade.exchange.common import retrier
+from freqtrade.exchange.common import retrier_async
 from freqtrade.exchange.exchange_utils import timeframe_to_msecs
 
 
@@ -71,8 +71,8 @@ class Bybit(Exchange):
             main and market['settle'] == 'USDT'
         )
 
-    @retrier
-    def additional_exchange_init(self) -> None:
+    @retrier_async
+    async def additional_exchange_init(self) -> None:
         """
         Additional exchange initialization logic.
         .api will be available at this point.
@@ -80,7 +80,7 @@ class Bybit(Exchange):
         """
         try:
             if self.trading_mode == TradingMode.FUTURES and not self._config['dry_run']:
-                position_mode = self._api.set_position_mode(False)
+                position_mode = self._api_async.set_position_mode(False)
                 self._log_exchange_response('set_position_mode', position_mode)
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -201,7 +201,7 @@ class Bybit(Exchange):
             raise OperationalException(
                 "Freqtrade only supports isolated futures for leverage trading")
 
-    def get_funding_fees(
+    async def get_funding_fees(
             self, pair: str, amount: float, is_short: bool, open_date: datetime) -> float:
         """
         Fetch funding fees, either from the exchange (live) or calculates them
@@ -215,6 +215,6 @@ class Bybit(Exchange):
         """
         # Bybit does not provide "applied" funding fees per position.
         if self.trading_mode == TradingMode.FUTURES:
-            return self._fetch_and_calculate_funding_fees(
+            return await self._fetch_and_calculate_funding_fees(
                     pair, amount, is_short, open_date)
         return 0.0

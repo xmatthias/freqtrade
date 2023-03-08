@@ -998,7 +998,7 @@ async def test_agefilter_caching(mocker, markets, whitelist_conf_agefilter, tick
             ('LTC/BTC', '1d', CandleType.SPOT): ohlcv_history,
             ('XRP/BTC', '1d', CandleType.SPOT): ohlcv_history.iloc[[0]],
         }
-        mocker.patch(f'{EXMS}.refresh_latest_ohlcv', return_value=ohlcv_data)
+        mocker.patch(f'{EXMS}.refresh_latest_ohlcv', get_mock_coro(ohlcv_data))
         await freqtrade.pairlists.refresh_pairlist()
         assert len(freqtrade.pairlists.whitelist) == 3
         assert freqtrade.exchange.refresh_latest_ohlcv.call_count == 1

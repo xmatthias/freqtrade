@@ -899,7 +899,7 @@ def test_in_strategy_auto_hyperopt(mocker, hyperopt_conf, tmpdir, fee) -> None:
 def test_in_strategy_auto_hyperopt_with_parallel(mocker, hyperopt_conf, tmpdir, fee) -> None:
     mocker.patch(f'{EXMS}.validate_config', MagicMock())
     mocker.patch(f'{EXMS}.get_fee', fee)
-    mocker.patch(f'{EXMS}._load_markets')
+    mocker.patch(f'{EXMS}.load_markets')
     mocker.patch(f'{EXMS}.markets',
                  PropertyMock(return_value=get_markets()))
     (Path(tmpdir) / 'hyperopt_results').mkdir(parents=True)
