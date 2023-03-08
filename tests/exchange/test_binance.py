@@ -505,7 +505,7 @@ async def test_fill_leverage_tiers_binance_dryrun(default_conf, mocker, leverage
 
 
 async def test_additional_exchange_init_binance(default_conf, mocker):
-    mocker.patch('freqtrade.exchange.Binance.fill_leverage_tiers')
+    mocker.patch('freqtrade.exchange.binance.Binance.fill_leverage_tiers')
     api_mock = MagicMock()
     api_mock.fapiPrivateGetPositionsideDual = get_mock_coro(return_value={"dualSidePosition": True})
     api_mock.fapiPrivateGetMultiAssetsMargin = get_mock_coro(
@@ -527,14 +527,16 @@ async def test_additional_exchange_init_binance(default_conf, mocker):
 
 
 async def test__set_leverage_binance(mocker, default_conf):
+    mocker.patch('freqtrade.exchange.binance.Binance.fill_leverage_tiers')
+    mocker.patch('freqtrade.exchange.binance.Binance.additional_exchange_init')
 
     api_mock = MagicMock()
-    api_mock.set_leverage = MagicMock()
+    api_mock.set_leverage = get_mock_coro()
     type(api_mock).has = PropertyMock(return_value={'setLeverage': True})
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
-    exchange = await get_patched_exchange(mocker, default_conf, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="binance")
     await exchange._set_leverage(3.2, 'BTC/USDT:USDT')
 
     assert api_mock.set_leverage.call_count == 1
