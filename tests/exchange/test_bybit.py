@@ -5,19 +5,19 @@ from freqtrade.enums.marginmode import MarginMode
 from freqtrade.enums.tradingmode import TradingMode
 from freqtrade.exchange.exchange_utils import timeframe_to_msecs
 from tests.conftest import get_mock_coro, get_patched_exchange
-from tests.exchange.test_exchange import ccxt_exceptionhandlers
+from tests.exchange.test_exchange import async_ccxt_exception
 
 
-def test_additional_exchange_init_bybit(default_conf, mocker):
+async def test_additional_exchange_init_bybit(default_conf, mocker):
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
     api_mock = MagicMock()
-    api_mock.set_position_mode = MagicMock(return_value={"dualSidePosition": False})
-    get_patched_exchange(mocker, default_conf, id="bybit", api_mock=api_mock)
+    api_mock.set_position_mode = get_mock_coro(return_value={"dualSidePosition": False})
+    await get_patched_exchange(mocker, default_conf, id="bybit", api_mock=api_mock)
     assert api_mock.set_position_mode.call_count == 1
-    ccxt_exceptionhandlers(mocker, default_conf, api_mock, 'bybit',
-                           "additional_exchange_init", "set_position_mode")
+    async_ccxt_exception(mocker, default_conf, api_mock, 'bybit',
+                         "additional_exchange_init", "set_position_mode")
 
 
 async def test_bybit_fetch_funding_rate(default_conf, mocker):
@@ -25,7 +25,7 @@ async def test_bybit_fetch_funding_rate(default_conf, mocker):
     default_conf['margin_mode'] = 'isolated'
     api_mock = MagicMock()
     api_mock.fetch_funding_rate_history = get_mock_coro(return_value=[])
-    exchange = get_patched_exchange(mocker, default_conf, id='bybit', api_mock=api_mock)
+    exchange = await get_patched_exchange(mocker, default_conf, id='bybit', api_mock=api_mock)
     limit = 200
     # Test fetch_funding_rate_history (current data)
     await exchange._fetch_funding_rate_history(
@@ -58,17 +58,17 @@ async def test_bybit_fetch_funding_rate(default_conf, mocker):
     assert kwargs['since'] == since_ms
 
 
-def test_bybit_get_funding_fees(default_conf, mocker):
+async def test_bybit_get_funding_fees(default_conf, mocker):
     now = datetime.now(timezone.utc)
-    exchange = get_patched_exchange(mocker, default_conf, id='bybit')
-    exchange._fetch_and_calculate_funding_fees = MagicMock()
-    exchange.get_funding_fees('BTC/USDT:USDT', 1, False, now)
+    exchange = await get_patched_exchange(mocker, default_conf, id='bybit')
+    exchange._fetch_and_calculate_funding_fees = get_mock_coro()
+    await exchange.get_funding_fees('BTC/USDT:USDT', 1, False, now)
     assert exchange._fetch_and_calculate_funding_fees.call_count == 0
 
     default_conf['trading_mode'] = 'futures'
     default_conf['margin_mode'] = 'isolated'
-    exchange = get_patched_exchange(mocker, default_conf, id='bybit')
-    exchange._fetch_and_calculate_funding_fees = MagicMock()
-    exchange.get_funding_fees('BTC/USDT:USDT', 1, False, now)
+    exchange = await get_patched_exchange(mocker, default_conf, id='bybit')
+    exchange._fetch_and_calculate_funding_fees = get_mock_coro()
+    await exchange.get_funding_fees('BTC/USDT:USDT', 1, False, now)
 
     assert exchange._fetch_and_calculate_funding_fees.call_count == 1
