@@ -1877,7 +1877,7 @@ async def test_get_tickers(default_conf, mocker, exchange_name):
     }
     }
     mocker.patch(f'{EXMS}.fill_leverage_tiers')
-    mocker.patch(f'{EXMS}.Exchange.exchange_has', return_value=True)
+    mocker.patch(f'{EXMS}.exchange_has', return_value=True)
     api_mock.fetch_tickers = get_mock_coro(return_value=tick)
     api_mock.fetch_bids_asks = get_mock_coro(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
@@ -1929,7 +1929,7 @@ async def test_get_tickers(default_conf, mocker, exchange_name):
 
     api_mock.fetch_tickers.reset_mock()
     api_mock.fetch_bids_asks.reset_mock()
-    mocker.patch(f'{EXMS}.Exchange.exchange_has', return_value=False)
+    mocker.patch(f'{EXMS}.exchange_has', return_value=False)
     assert await exchange.get_tickers() == {}
 
 
@@ -2807,7 +2807,7 @@ async def test___async_get_candle_history_sort(default_conf, mocker, exchange_na
     ]
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
-    sort_mock = mocker.patch(f'{EXMS}.sorted', MagicMock(side_effect=sort_data))
+    sort_mock = mocker.patch('freqtrade.exchange.exchange.sorted', MagicMock(side_effect=sort_data))
     # Test the OHLCV data sort
     res = await exchange._async_get_candle_history(
         'ETH/BTC', default_conf['timeframe'], CandleType.SPOT)
@@ -3246,7 +3246,7 @@ async def test_cancel_stoploss_order_with_result(default_conf, mocker, exchange_
 
     exc = InvalidOrderException("")
     mocker.patch(f'{EXMS}.fetch_stoploss_order', side_effect=exc)
-    mocker.patch('freqtrade.exchange.Gateio.fetch_stoploss_order', side_effect=exc)
+    mocker.patch('freqtrade.exchange.gate.Gate.fetch_stoploss_order', side_effect=exc)
     co = await exchange.cancel_stoploss_order_with_result(order_id='_', pair='TKN/BTC', amount=555)
     assert co['amount'] == 555
     assert co == {'fee': {}, 'status': 'canceled', 'amount': 555, 'info': {}}
@@ -4867,7 +4867,7 @@ async def test_load_leverage_tiers(mocker, default_conf, leverage_tiers, exchang
     api_mock = MagicMock()
     type(api_mock).has = PropertyMock(return_value={'fetchLeverageTiers': True})
     default_conf['dry_run'] = False
-    mocker.patch(f'{EXMS}.Exchange.validate_trading_mode_and_margin_mode')
+    mocker.patch(f'{EXMS}.validate_trading_mode_and_margin_mode')
     mocker.patch('freqtrade.exchange.binance.Binance.additional_exchange_init')
 
     api_mock.fetch_leverage_tiers = get_mock_coro(return_value={
