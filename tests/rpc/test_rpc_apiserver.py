@@ -716,8 +716,8 @@ def test_api_delete_trade(botclient, mocker, fee, markets, is_short):
 def test_api_delete_open_order(botclient, mocker, fee, markets, ticker, is_short):
     ftbot, client = botclient
     patch_get_signal(ftbot, enter_long=not is_short, enter_short=is_short)
-    stoploss_mock = MagicMock()
-    cancel_mock = MagicMock()
+    stoploss_mock = get_mock_coro()
+    cancel_mock = get_mock_coro()
     mocker.patch.multiple(
         EXMS,
         markets=PropertyMock(return_value=markets),
@@ -743,7 +743,7 @@ def test_api_delete_open_order(botclient, mocker, fee, markets, ticker, is_short
     assert 'Order not found.' in rc.json()['error']
 
     trade = Trade.get_trades([Trade.id == 6]).first()
-    mocker.patch(f'{EXMS}.fetch_order', return_value=trade.orders[-1].to_ccxt_object())
+    mocker.patch(f'{EXMS}.fetch_order', get_mock_coro(trade.orders[-1].to_ccxt_object()))
 
     rc = client_delete(client, f"{BASE_URI}/trades/6/open-order")
     assert_response(rc)

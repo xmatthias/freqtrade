@@ -868,6 +868,10 @@ class RPC:
                 raise RPCException(f'Failed to enter position for {pair}.')
 
     def _rpc_cancel_open_order(self, trade_id: int):
+        self._run_async(self.__rpc_cancel_open_order(trade_id))
+
+    async def __rpc_cancel_open_order(self, trade_id: int):
+
         if self._freqtrade.state != State.RUNNING:
             raise RPCException('trader is not running')
         with self._freqtrade._exit_lock:
@@ -883,11 +887,11 @@ class RPC:
                 raise RPCException('No open order for trade_id.')
 
             try:
-                order = self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
+                order = await self._freqtrade.exchange.fetch_order(trade.open_order_id, trade.pair)
             except ExchangeError as e:
                 logger.info(f"Cannot query order for {trade} due to {e}.", exc_info=True)
                 raise RPCException("Order not found.")
-            self._freqtrade.handle_cancel_order(order, trade, CANCEL_REASON['USER_CANCEL'])
+            await self._freqtrade.handle_cancel_order(order, trade, CANCEL_REASON['USER_CANCEL'])
             Trade.commit()
 
     def _rpc_delete(self, trade_id: int) -> Dict[str, Union[str, int]]:
