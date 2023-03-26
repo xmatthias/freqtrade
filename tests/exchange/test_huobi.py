@@ -4,9 +4,9 @@ from unittest.mock import MagicMock
 import ccxt
 import pytest
 
-from freqtrade.exceptions import DependencyException, InvalidOrderException, OperationalException
+from freqtrade.exceptions import DependencyException, InvalidOrderException
 from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
-from tests.exchange.test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
+from tests.exchange.test_exchange import async_ccxt_exception
 
 
 @pytest.mark.parametrize('limitratio,expected,side', [

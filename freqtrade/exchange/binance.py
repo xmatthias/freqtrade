@@ -69,7 +69,8 @@ class Binance(Exchange):
 
         return params
 
-    async def get_tickers(self, symbols: Optional[List[str]] = None, cached: bool = False) -> Tickers:
+    async def get_tickers(
+            self, symbols: Optional[List[str]] = None, cached: bool = False) -> Tickers:
         tickers = await super().get_tickers(symbols=symbols, cached=cached)
         if self.trading_mode == TradingMode.FUTURES:
             # Binance's future result has no bid/ask values.
