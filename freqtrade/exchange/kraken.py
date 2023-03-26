@@ -160,7 +160,6 @@ class Kraken(Exchange):
         self,
         leverage: float,
         pair: Optional[str] = None,
-        trading_mode: Optional[TradingMode] = None,
         accept_fail: bool = False,
     ):
         """

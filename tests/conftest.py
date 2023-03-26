@@ -327,7 +327,7 @@ def create_mock_trades(fee, is_short: Optional[bool] = False, use_db: bool = Tru
     """
     def add_trade(trade):
         if use_db:
-            Trade.query.session.add(trade)
+            Trade.session.add(trade)
         else:
             LocalTrade.add_bt_trade(trade)
     is_short1 = is_short if is_short is not None else True
@@ -360,11 +360,11 @@ def create_mock_trades_with_leverage(fee, use_db: bool = True):
     Create some fake trades ...
     """
     if use_db:
-        Trade.query.session.rollback()
+        Trade.session.rollback()
 
     def add_trade(trade):
         if use_db:
-            Trade.query.session.add(trade)
+            Trade.session.add(trade)
         else:
             LocalTrade.add_bt_trade(trade)
 
@@ -394,7 +394,7 @@ def create_mock_trades_with_leverage(fee, use_db: bool = True):
     add_trade(trade)
 
     if use_db:
-        Trade.query.session.flush()
+        Trade.session.flush()
 
 
 def create_mock_trades_usdt(fee, is_short: Optional[bool] = False, use_db: bool = True):
@@ -403,7 +403,7 @@ def create_mock_trades_usdt(fee, is_short: Optional[bool] = False, use_db: bool 
     """
     def add_trade(trade):
         if use_db:
-            Trade.query.session.add(trade)
+            Trade.session.add(trade)
         else:
             LocalTrade.add_bt_trade(trade)
 

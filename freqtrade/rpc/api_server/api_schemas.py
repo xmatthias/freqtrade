@@ -276,6 +276,10 @@ class TradeSchema(BaseModel):
     funding_fees: Optional[float]
     trading_mode: Optional[TradingMode]
 
+    amount_precision: Optional[float]
+    price_precision: Optional[float]
+    precision_mode: Optional[int]
+
 
 class OpenTradeSchema(TradeSchema):
     stoploss_current_dist: Optional[float]
@@ -311,7 +315,7 @@ class LockModel(BaseModel):
     lock_timestamp: int
     pair: str
     side: str
-    reason: str
+    reason: Optional[str]
 
 
 class Locks(BaseModel):

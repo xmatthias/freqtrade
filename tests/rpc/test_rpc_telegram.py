@@ -14,6 +14,7 @@ import arrow
 import pytest
 import time_machine
 from pandas import DataFrame
+from sqlalchemy import select
 from telegram import Chat, Message, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, NetworkError, TelegramError
 
@@ -308,8 +309,7 @@ async def test_telegram_status_closed_trade(default_conf, update, mocker, fee) -
     telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
 
     create_mock_trades(fee)
-    trades = Trade.get_trades([Trade.is_open.is_(False)])
-    trade = trades[0]
+    trade = Trade.get_trades([Trade.is_open.is_(False)]).first()
     context = MagicMock()
     context.args = [str(trade.id)]
     telegram._status(update=update, context=context)
@@ -658,7 +658,7 @@ async def test_monthly_handle(default_conf_usdt, update, ticker, fee, mocker, ti
 
     # The one-digit months should contain a zero, Eg: September 2021 = "2021-09"
     # Since we loaded the last 12 months, any month should appear
-    assert str('-09') in msg_mock.call_args_list[0][0][0]
+    assert '-09' in msg_mock.call_args_list[0][0][0]
 
     # Try invalid data
     msg_mock.reset_mock()
@@ -677,11 +677,12 @@ async def test_monthly_handle(default_conf_usdt, update, ticker, fee, mocker, ti
     context = MagicMock()
     context.args = ["february"]
     telegram._monthly(update=update, context=context)
-    assert str('Monthly Profit over the last 6 months</b>:') in msg_mock.call_args_list[0][0][0]
+    assert 'Monthly Profit over the last 6 months</b>:' in msg_mock.call_args_list[0][0][0]
 
 
-async def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell_up, fee,
-                             limit_sell_order_usdt, mocker) -> None:
+async def test_telegram_profit_handle(
+        default_conf_usdt, update, ticker_usdt, ticker_sell_up, fee,
+        limit_sell_order_usdt, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=1.1)
     mocker.patch.multiple(
         EXMS,
@@ -699,7 +700,7 @@ async def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell
 
     # Create some test data
     await freqtradebot.enter_positions()
-    trade = Trade.query.first()
+    trade = Trade.session.scalars(select(Trade)).first()
 
     context = MagicMock()
     # Test with invalid 2nd argument (should silently pass)
@@ -716,6 +717,7 @@ async def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell
     # Update the ticker with a market going up
     mocker.patch(f'{EXMS}.fetch_ticker', ticker_sell_up)
     # Simulate fulfilled LIMIT_SELL order for trade
+    trade = Trade.session.scalars(select(Trade)).first()
     oobj = Order.parse_from_ccxt_object(
         limit_sell_order_usdt, limit_sell_order_usdt['symbol'], 'sell')
     trade.orders.append(oobj)
@@ -955,7 +957,7 @@ async def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
     # Create some test data
     await freqtradebot.enter_positions()
 
-    trade = Trade.query.first()
+    trade = Trade.session.scalars(select(Trade)).first()
     assert trade
 
     # Increase the price and sell it
@@ -1032,7 +1034,7 @@ async def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee
         fetch_ticker=ticker_sell_down
     )
 
-    trade = Trade.query.first()
+    trade = Trade.session.scalars(select(Trade)).first()
     assert trade
 
     # /forceexit 1
@@ -1740,14 +1742,14 @@ async def test_version_handle(default_conf, update, mocker) -> None:
 
     telegram._version(update=update, context=MagicMock())
     assert msg_mock.call_count == 1
-    assert '*Version:* `{}`'.format(__version__) in msg_mock.call_args_list[0][0][0]
+    assert f'*Version:* `{__version__}`' in msg_mock.call_args_list[0][0][0]
 
     msg_mock.reset_mock()
     freqtradebot.strategy.version = lambda: '1.1.1'
 
     telegram._version(update=update, context=MagicMock())
     assert msg_mock.call_count == 1
-    assert '*Version:* `{}`'.format(__version__) in msg_mock.call_args_list[0][0][0]
+    assert f'*Version:* `{__version__}`' in msg_mock.call_args_list[0][0][0]
     assert '*Strategy version: * `1.1.1`' in msg_mock.call_args_list[0][0][0]
 
 

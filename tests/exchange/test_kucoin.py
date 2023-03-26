@@ -6,7 +6,7 @@ import pytest
 
 from freqtrade.exceptions import DependencyException, InvalidOrderException, OperationalException
 from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
-from tests.exchange.test_exchange import async_ccxt_exception
+from tests.exchange.test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
 
 
 @pytest.mark.parametrize('order_type', ['market', 'limit'])
@@ -32,7 +32,7 @@ async def test_create_stoploss_order_kucoin(
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'kucoin')
     if order_type == 'limit':
-        with pytest.raises(OperationalException):
+        with pytest.raises(InvalidOrderException):
             order = await exchange.create_stoploss(
                 pair='ETH/BTC', amount=1, stop_price=190,
                 order_types={
@@ -94,11 +94,11 @@ async def test_stoploss_order_dry_run_kucoin(default_conf, mocker):
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'kucoin')
 
-    with pytest.raises(OperationalException):
+    with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
             pair='ETH/BTC', amount=1, stop_price=190,
             order_types={'stoploss': 'limit',
-                         'stoploss_on_exchange_limit_ratio': 1.05},
+                        'stoploss_on_exchange_limit_ratio': 1.05},
             side='sell', leverage=1.0)
 
     api_mock.create_order.reset_mock()

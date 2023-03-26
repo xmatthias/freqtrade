@@ -11,6 +11,19 @@ from tests.conftest import EXMS, get_mock_coro, get_patched_exchange, log_has_re
 from tests.exchange.test_exchange import async_ccxt_exception
 
 
+@pytest.mark.parametrize('side,type,time_in_force,expected', [
+    ('buy', 'limit', 'gtc', {'timeInForce': 'GTC'}),
+    ('buy', 'limit', 'IOC', {'timeInForce': 'IOC'}),
+    ('buy', 'market', 'IOC', {}),
+    ('buy', 'limit', 'PO', {'postOnly': True}),
+    ('sell', 'limit', 'PO', {'postOnly': True}),
+    ('sell', 'market', 'PO', {}),
+    ])
+def test__get_params_binance(default_conf, mocker, side, type, time_in_force, expected):
+    exchange = get_patched_exchange(mocker, default_conf, id='binance')
+    assert exchange._get_params(side, type, 1, False, time_in_force) == expected
+
+
 @pytest.mark.parametrize('trademode', [TradingMode.FUTURES, TradingMode.SPOT])
 @pytest.mark.parametrize('limitratio,expected,side', [
     (None, 220 * 0.99, "sell"),
@@ -43,7 +56,7 @@ async def test_create_stoploss_order_binance(
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
-    with pytest.raises(OperationalException):
+    with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
             pair='ETH/BTC',
             amount=1,
@@ -122,7 +135,7 @@ async def test_stoploss_order_dry_run_binance(default_conf, mocker):
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
-    with pytest.raises(OperationalException):
+    with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
             pair='ETH/BTC',
             amount=1,
@@ -553,7 +566,6 @@ async def test__set_leverage_binance(mocker, default_conf):
         "set_leverage",
         pair="XRP/USDT",
         leverage=5.0,
-        trading_mode=TradingMode.FUTURES
     )
 
 

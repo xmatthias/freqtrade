@@ -16,6 +16,7 @@ from fastapi import FastAPI, WebSocketDisconnect
 from fastapi.exceptions import HTTPException
 from fastapi.testclient import TestClient
 from requests.auth import _basic_auth_str
+from sqlalchemy import select
 
 from freqtrade.__init__ import __version__
 from freqtrade.enums import CandleType, RunMode, State, TradingMode
@@ -630,7 +631,7 @@ def test_api_trades(botclient, mocker, fee, markets, is_short):
     assert rc.json()['offset'] == 0
 
     create_mock_trades(fee, is_short=is_short)
-    Trade.query.session.flush()
+    Trade.session.flush()
 
     rc = client_get(client, f"{BASE_URI}/trades")
     assert_response(rc)
@@ -658,7 +659,7 @@ def test_api_trade_single(botclient, mocker, fee, ticker, markets, is_short):
     assert_response(rc, 404)
     assert rc.json()['detail'] == 'Trade not found.'
 
-    Trade.query.session.rollback()
+    Trade.rollback()
     create_mock_trades(fee, is_short=is_short)
 
     rc = client_get(client, f"{BASE_URI}/trade/3")
@@ -683,7 +684,7 @@ def test_api_delete_trade(botclient, mocker, fee, markets, is_short):
     create_mock_trades(fee, is_short=is_short)
 
     ftbot.strategy.order_types['stoploss_on_exchange'] = True
-    trades = Trade.query.all()
+    trades = Trade.session.scalars(select(Trade)).all()
     trades[1].stoploss_order_id = '1234'
     Trade.commit()
     assert len(trades) > 2
@@ -691,7 +692,7 @@ def test_api_delete_trade(botclient, mocker, fee, markets, is_short):
     rc = client_delete(client, f"{BASE_URI}/trades/1")
     assert_response(rc)
     assert rc.json()['result_msg'] == 'Deleted trade 1. Closed 1 open orders.'
-    assert len(trades) - 1 == len(Trade.query.all())
+    assert len(trades) - 1 == len(Trade.session.scalars(select(Trade)).all())
     assert cancel_mock.call_count == 1
 
     cancel_mock.reset_mock()
@@ -700,11 +701,11 @@ def test_api_delete_trade(botclient, mocker, fee, markets, is_short):
     assert_response(rc, 502)
     assert cancel_mock.call_count == 0
 
-    assert len(trades) - 1 == len(Trade.query.all())
+    assert len(trades) - 1 == len(Trade.session.scalars(select(Trade)).all())
     rc = client_delete(client, f"{BASE_URI}/trades/2")
     assert_response(rc)
     assert rc.json()['result_msg'] == 'Deleted trade 2. Closed 2 open orders.'
-    assert len(trades) - 2 == len(Trade.query.all())
+    assert len(trades) - 2 == len(Trade.session.scalars(select(Trade)).all())
     assert stoploss_mock.call_count == 1
 
     rc = client_delete(client, f"{BASE_URI}/trades/502")
@@ -949,7 +950,7 @@ def test_api_performance(botclient, fee):
     )
     trade.close_profit = trade.calc_profit_ratio(trade.close_rate)
     trade.close_profit_abs = trade.calc_profit(trade.close_rate)
-    Trade.query.session.add(trade)
+    Trade.session.add(trade)
 
     trade = Trade(
         pair='XRP/ETH',
@@ -966,7 +967,7 @@ def test_api_performance(botclient, fee):
     trade.close_profit = trade.calc_profit_ratio(trade.close_rate)
     trade.close_profit_abs = trade.calc_profit(trade.close_rate)
 
-    Trade.query.session.add(trade)
+    Trade.session.add(trade)
     Trade.commit()
 
     rc = client_get(client, f"{BASE_URI}/performance")
@@ -1071,6 +1072,9 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'liquidation_price': None,
         'funding_fees': None,
         'trading_mode': ANY,
+        'amount_precision': None,
+        'price_precision': None,
+        'precision_mode': None,
         'orders': [ANY],
     }
 
@@ -1276,6 +1280,9 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
         'liquidation_price': None,
         'funding_fees': None,
         'trading_mode': 'spot',
+        'amount_precision': None,
+        'price_precision': None,
+        'precision_mode': None,
         'orders': [],
     }
 

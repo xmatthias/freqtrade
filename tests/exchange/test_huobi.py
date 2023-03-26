@@ -6,7 +6,7 @@ import pytest
 
 from freqtrade.exceptions import DependencyException, InvalidOrderException, OperationalException
 from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
-from tests.exchange.test_exchange import async_ccxt_exception
+from tests.exchange.test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
 
 
 @pytest.mark.parametrize('limitratio,expected,side', [
@@ -31,11 +31,12 @@ async def test_create_stoploss_order_huobi(default_conf, mocker, limitratio, exp
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
 
-    with pytest.raises(OperationalException):
+    with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
             pair='ETH/BTC', amount=1, stop_price=190,
             order_types={'stoploss_on_exchange_limit_ratio': 1.05},
-            side=side, leverage=1.0)
+            side=side,
+            leverage=1.0)
 
     api_mock.create_order.reset_mock()
     order_types = {} if limitratio is None else {'stoploss_on_exchange_limit_ratio': limitratio}
@@ -84,7 +85,7 @@ async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
 
-    with pytest.raises(OperationalException):
+    with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
             pair='ETH/BTC', amount=1, stop_price=190,
             order_types={'stoploss_on_exchange_limit_ratio': 1.05},
