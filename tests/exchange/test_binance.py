@@ -19,8 +19,8 @@ from tests.exchange.test_exchange import async_ccxt_exception
     ('sell', 'limit', 'PO', {'postOnly': True}),
     ('sell', 'market', 'PO', {}),
     ])
-def test__get_params_binance(default_conf, mocker, side, type, time_in_force, expected):
-    exchange = get_patched_exchange(mocker, default_conf, id='binance')
+async def test__get_params_binance(default_conf, mocker, side, type, time_in_force, expected):
+    exchange = await get_patched_exchange(mocker, default_conf, id='binance')
     assert exchange._get_params(side, type, 1, False, time_in_force) == expected
 
 

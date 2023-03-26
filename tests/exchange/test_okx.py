@@ -9,7 +9,7 @@ from freqtrade.enums import CandleType, MarginMode, TradingMode
 from freqtrade.exceptions import RetryableOrderError
 from freqtrade.exchange.exchange import timeframe_to_minutes
 from tests.conftest import EXMS, get_mock_coro, get_patched_exchange, log_has
-from tests.exchange.test_exchange import ccxt_exceptionhandlers
+from tests.exchange.test_exchange import async_ccxt_exception, ccxt_exceptionhandlers
 
 
 async def test_okx_ohlcv_candle_limit(default_conf, mocker):
@@ -481,17 +481,18 @@ async def test_load_leverage_tiers_okx(default_conf, mocker, markets, tmpdir, ca
     assert log_has(logmsg, caplog)
 
 
-def test__set_leverage_okx(mocker, default_conf):
+async def test__set_leverage_okx(mocker, default_conf):
 
     api_mock = MagicMock()
-    api_mock.set_leverage = MagicMock()
+    api_mock.set_leverage = get_mock_coro()
     type(api_mock).has = PropertyMock(return_value={'setLeverage': True})
     default_conf['dry_run'] = False
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
+    mocker.patch('freqtrade.exchange.okx.Okx.additional_exchange_init')
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id="okx")
-    exchange._lev_prep('BTC/USDT:USDT', 3.2, 'buy')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="okx")
+    await exchange._lev_prep('BTC/USDT:USDT', 3.2, 'buy')
     assert api_mock.set_leverage.call_count == 1
     # Leverage is rounded to 3.
     assert api_mock.set_leverage.call_args_list[0][1]['leverage'] == 3.2
@@ -500,7 +501,7 @@ def test__set_leverage_okx(mocker, default_conf):
         'mgnMode': 'isolated',
         'posSide': 'net'}
 
-    ccxt_exceptionhandlers(
+    async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,
@@ -514,26 +515,26 @@ def test__set_leverage_okx(mocker, default_conf):
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_fetch_stoploss_order_okx(default_conf, mocker):
+async def test_fetch_stoploss_order_okx(default_conf, mocker):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.fetch_order = MagicMock()
+    api_mock.fetch_order = get_mock_coro()
 
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id='okx')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='okx')
 
-    exchange.fetch_stoploss_order('1234', 'ETH/BTC')
+    await exchange.fetch_stoploss_order('1234', 'ETH/BTC')
     assert api_mock.fetch_order.call_count == 1
     assert api_mock.fetch_order.call_args_list[0][0][0] == '1234'
     assert api_mock.fetch_order.call_args_list[0][0][1] == 'ETH/BTC'
     assert api_mock.fetch_order.call_args_list[0][1]['params'] == {'stop': True}
 
-    api_mock.fetch_order = MagicMock(side_effect=ccxt.OrderNotFound)
-    api_mock.fetch_open_orders = MagicMock(return_value=[])
-    api_mock.fetch_closed_orders = MagicMock(return_value=[])
-    api_mock.fetch_canceled_orders = MagicMock(creturn_value=[])
+    api_mock.fetch_order = get_mock_coro(side_effect=ccxt.OrderNotFound())
+    api_mock.fetch_open_orders = get_mock_coro(return_value=[])
+    api_mock.fetch_closed_orders = get_mock_coro(return_value=[])
+    api_mock.fetch_canceled_orders = get_mock_coro(return_value=[])
 
     with pytest.raises(RetryableOrderError):
-        exchange.fetch_stoploss_order('1234', 'ETH/BTC')
+        await exchange.fetch_stoploss_order('1234', 'ETH/BTC')
     assert api_mock.fetch_order.call_count == 1
     assert api_mock.fetch_open_orders.call_count == 1
     assert api_mock.fetch_closed_orders.call_count == 1
@@ -544,15 +545,15 @@ def test_fetch_stoploss_order_okx(default_conf, mocker):
     api_mock.fetch_closed_orders.reset_mock()
     api_mock.fetch_canceled_orders.reset_mock()
 
-    api_mock.fetch_closed_orders = MagicMock(return_value=[
+    api_mock.fetch_closed_orders = get_mock_coro(return_value=[
         {
             'id': '1234',
             'status': 'closed',
             'info': {'ordId': '123455'}
         }
     ])
-    mocker.patch(f"{EXMS}.fetch_order", MagicMock(return_value={'id': '123455'}))
-    resp = exchange.fetch_stoploss_order('1234', 'ETH/BTC')
+    mocker.patch(f"{EXMS}.fetch_order", get_mock_coro(return_value={'id': '123455'}))
+    resp = await exchange.fetch_stoploss_order('1234', 'ETH/BTC')
     assert api_mock.fetch_order.call_count == 1
     assert api_mock.fetch_open_orders.call_count == 1
     assert api_mock.fetch_closed_orders.call_count == 1
@@ -563,14 +564,15 @@ def test_fetch_stoploss_order_okx(default_conf, mocker):
     assert resp['type'] == 'stoploss'
 
     default_conf['dry_run'] = True
-    exchange = get_patched_exchange(mocker, default_conf, api_mock, id='okx')
-    dro_mock = mocker.patch(f"{EXMS}.fetch_dry_run_order", MagicMock(return_value={'id': '123455'}))
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='okx')
+    dro_mock = mocker.patch(f"{EXMS}.fetch_dry_run_order",
+                            get_mock_coro(return_value={'id': '123455'}))
 
     api_mock.fetch_order.reset_mock()
     api_mock.fetch_open_orders.reset_mock()
     api_mock.fetch_closed_orders.reset_mock()
     api_mock.fetch_canceled_orders.reset_mock()
-    resp = exchange.fetch_stoploss_order('1234', 'ETH/BTC')
+    resp = await exchange.fetch_stoploss_order('1234', 'ETH/BTC')
 
     assert api_mock.fetch_order.call_count == 0
     assert api_mock.fetch_open_orders.call_count == 0
@@ -583,8 +585,8 @@ def test_fetch_stoploss_order_okx(default_conf, mocker):
     (1501, 1499, 1501, "sell"),
     (1499, 1501, 1499, "buy")
 ])
-def test_stoploss_adjust_okx(mocker, default_conf, sl1, sl2, sl3, side):
-    exchange = get_patched_exchange(mocker, default_conf, id='okx')
+async def test_stoploss_adjust_okx(mocker, default_conf, sl1, sl2, sl3, side):
+    exchange = await get_patched_exchange(mocker, default_conf, id='okx')
     order = {
         'type': 'stoploss',
         'price': 1500,

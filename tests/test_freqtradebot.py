@@ -1507,7 +1507,7 @@ async def test_handle_stoploss_on_exchange_trailing(
     )
 
     cancel_order_mock = get_mock_coro()
-    stoploss_order_mock = MagicMget_mock_coroock(return_value={'id': 'so1'})
+    stoploss_order_mock = get_mock_coro(return_value={'id': 'so1'})
     mocker.patch(f'{EXMS}.cancel_stoploss_order', cancel_order_mock)
     mocker.patch(f'{EXMS}.create_stoploss', stoploss_order_mock)
 
