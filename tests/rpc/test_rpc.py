@@ -741,7 +741,7 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
     rpc._rpc_force_exit('3')
     Trade.commit()
     assert cancel_order_mock.call_count == 1
-    trade = Trade.query.filter(Trade.id == '3').first()
+    trade = Trade.session.scalars(select(Trade).filter(Trade.id == '3')).first()
     assert pytest.approx(trade.amount) == filled_amount
 
     mocker.patch(

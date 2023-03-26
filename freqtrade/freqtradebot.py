@@ -1048,7 +1048,7 @@ class FreqtradeBot(LoggingMixin):
                 if (self.strategy.order_types.get('stoploss_on_exchange') and
                         await self.handle_stoploss_on_exchange(trade)):
                     Trade.commit()
-                    return 0
+                    return 1
             except InvalidOrderException as exception:
                 logger.warning(
                     f'Unable to handle stoploss on exchange for {trade.pair}: {exception}')
