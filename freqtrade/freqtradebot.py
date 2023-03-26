@@ -73,7 +73,7 @@ class FreqtradeBot(LoggingMixin):
         # Check config consistency here since strategies can set certain options
         validate_config_consistency(self.config)
 
-    async def init_bot(self):
+    async def init_bot(self) -> None:
         self.exchange = await ExchangeResolver.load_exchange(
             self.config['exchange']['name'], self.config, load_leverage_tiers=True)
 
