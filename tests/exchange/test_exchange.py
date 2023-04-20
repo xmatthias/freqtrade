@@ -114,21 +114,18 @@ async def async_ccxt_exception(mocker, default_conf, api_mock, exchange_name,
             exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
             await getattr(exchange, fun)(**kwargs)
         assert api_mock.__dict__[mock_ccxt_fun].call_count == retries
-    exchange.close()
 
     with pytest.raises(TemporaryError):
         api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.NetworkError("DeadBeef"))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await getattr(exchange, fun)(**kwargs)
     assert api_mock.__dict__[mock_ccxt_fun].call_count == retries
-    exchange.close()
 
     with pytest.raises(OperationalException):
         api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.BaseError("DeadBeef"))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await getattr(exchange, fun)(**kwargs)
     assert api_mock.__dict__[mock_ccxt_fun].call_count == 1
-    exchange.close()
 
 
 async def test_init(default_conf, mocker, caplog):
@@ -5458,8 +5455,8 @@ async def test_stoploss_contract_size(mocker, default_conf, contract_size, order
     assert order['remaining'] == 100
 
 
-def test_price_to_precision_with_default_conf(default_conf, mocker):
+async def test_price_to_precision_with_default_conf(default_conf, mocker):
     conf = copy.deepcopy(default_conf)
-    patched_ex = get_patched_exchange(mocker, conf)
+    patched_ex = await get_patched_exchange(mocker, conf)
     prec_price = patched_ex.price_to_precision("XRP/USDT", 1.0000000101)
     assert prec_price == 1.00000001
