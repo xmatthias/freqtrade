@@ -27,7 +27,7 @@ async def test_create_stoploss_order_huobi(default_conf, mocker, limitratio, exp
     })
     default_conf['dry_run'] = False
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
-    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y: y)
+    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y, **kwargs: y)
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
 
@@ -81,7 +81,7 @@ async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
     order_type = 'stop-limit'
     default_conf['dry_run'] = True
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
-    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y: y)
+    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y, **kwargs: y)
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
 

@@ -1,7 +1,6 @@
 """
 Unit test file for rpc/api_server.py
 """
-
 import asyncio
 import logging
 import time
@@ -303,10 +302,6 @@ def test_api_UvicornServer(mocker):
     s = UvicornServer(uvicorn.Config(MagicMock(), port=8080, host='127.0.0.1'))
     assert thread_mock.call_count == 0
 
-    s.install_signal_handlers()
-    # Original implementation starts a thread - make sure that's not the case
-    assert thread_mock.call_count == 0
-
     # Fake started to avoid sleeping forever
     s.started = True
     s.run_in_thread()
@@ -322,10 +317,6 @@ def test_api_UvicornServer_run(mocker):
     s = UvicornServer(uvicorn.Config(MagicMock(), port=8080, host='127.0.0.1'))
     assert serve_mock.call_count == 0
 
-    s.install_signal_handlers()
-    # Original implementation starts a thread - make sure that's not the case
-    assert serve_mock.call_count == 0
-
     # Fake started to avoid sleeping forever
     s.started = True
     s.run()
@@ -335,11 +326,8 @@ def test_api_UvicornServer_run(mocker):
 def test_api_UvicornServer_run_no_uvloop(mocker, import_fails):
     serve_mock = mocker.patch('freqtrade.rpc.api_server.uvicorn_threaded.UvicornServer.serve',
                               get_mock_coro(None))
+    asyncio.set_event_loop(asyncio.new_event_loop())
     s = UvicornServer(uvicorn.Config(MagicMock(), port=8080, host='127.0.0.1'))
-    assert serve_mock.call_count == 0
-
-    s.install_signal_handlers()
-    # Original implementation starts a thread - make sure that's not the case
     assert serve_mock.call_count == 0
 
     # Fake started to avoid sleeping forever
@@ -899,6 +887,8 @@ def test_api_profit(botclient, mocker, ticker, fee, markets, is_short, expected)
         'max_drawdown': ANY,
         'max_drawdown_abs': ANY,
         'trading_volume': expected['trading_volume'],
+        'bot_start_timestamp': 0,
+        'bot_start_date': '',
     }
 
 
@@ -1419,10 +1409,10 @@ def test_api_pair_candles(botclient, ohlcv_history):
              ])
 
 
-def test_api_pair_history(botclient, ohlcv_history):
+def test_api_pair_history(botclient, mocker):
     ftbot, client = botclient
     timeframe = '5m'
-
+    lfm = mocker.patch('freqtrade.strategy.interface.IStrategy.load_freqAI_model')
     # No pair
     rc = client_get(client,
                     f"{BASE_URI}/pair_history?timeframe={timeframe}"
@@ -1456,6 +1446,7 @@ def test_api_pair_history(botclient, ohlcv_history):
     assert len(rc.json()['data']) == rc.json()['length']
     assert 'columns' in rc.json()
     assert 'data' in rc.json()
+    assert lfm.call_count == 1
     assert rc.json()['pair'] == 'UNITTEST/BTC'
     assert rc.json()['strategy'] == CURRENT_TEST_STRATEGY
     assert rc.json()['data_start'] == '2018-01-11 00:00:00+00:00'

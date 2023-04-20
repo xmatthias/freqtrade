@@ -15,8 +15,8 @@ from tests.exchange.test_exchange import async_ccxt_exception
     ('buy', 'limit', 'gtc', {'timeInForce': 'GTC'}),
     ('buy', 'limit', 'IOC', {'timeInForce': 'IOC'}),
     ('buy', 'market', 'IOC', {}),
-    ('buy', 'limit', 'PO', {'postOnly': True}),
-    ('sell', 'limit', 'PO', {'postOnly': True}),
+    ('buy', 'limit', 'PO', {'timeInForce': 'PO'}),
+    ('sell', 'limit', 'PO', {'timeInForce': 'PO'}),
     ('sell', 'market', 'PO', {}),
     ])
 async def test__get_params_binance(default_conf, mocker, side, type, time_in_force, expected):
@@ -50,7 +50,7 @@ async def test_create_stoploss_order_binance(
     default_conf['trading_mode'] = trademode
     mocker.patch('freqtrade.exchange.binance.Binance.additional_exchange_init')
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
-    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y: y)
+    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y, **kwargs: y)
     mocker.patch('freqtrade.exchange.binance.Binance._set_leverage', get_mock_coro())
     mocker.patch(f'{EXMS}.fill_leverage_tiers')
 
@@ -131,7 +131,7 @@ async def test_stoploss_order_dry_run_binance(default_conf, mocker):
     order_type = 'stop_loss_limit'
     default_conf['dry_run'] = True
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
-    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y: y)
+    mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y, **kwargs: y)
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'binance')
 
