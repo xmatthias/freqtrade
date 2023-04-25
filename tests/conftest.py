@@ -5,7 +5,7 @@ import logging
 import re
 import threading
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 from unittest.mock import MagicMock, Mock, PropertyMock
@@ -14,7 +14,6 @@ import arrow
 import numpy as np
 import pandas as pd
 import pytest
-from telegram import Chat, Message, Update
 
 from freqtrade import constants
 from freqtrade.commands import Arguments
@@ -576,13 +575,6 @@ def get_default_conf_usdt(testdatadir):
         },
     })
     return configuration
-
-
-@pytest.fixture
-def update():
-    _update = Update(0)
-    _update.message = Message(0, datetime.utcnow(), Chat(0, 0))
-    return _update
 
 
 @pytest.fixture

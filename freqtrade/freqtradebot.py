@@ -1455,7 +1455,7 @@ class FreqtradeBot(LoggingMixin):
             corder = order
             reason = constants.CANCEL_REASON['CANCELLED_ON_EXCHANGE']
 
-        logger.info('%s order %s for %s.', side, reason, trade)
+        logger.info(f'{side} order {reason} for {trade}.')
 
         # Using filled to determine the filled amount
         filled_amount = safe_value_fallback2(corder, order, 'filled', 'filled')
@@ -1537,7 +1537,7 @@ class FreqtradeBot(LoggingMixin):
             trade.exit_reason = None
             trade.open_order_id = None
 
-        await self.update_trade_state(trade, trade.open_order_id, order)
+        await self.update_trade_state(trade, order['id'], order)
 
         logger.info(f'{trade.exit_side.capitalize()} order {reason} for {trade}.')
         trade.close_rate = None
