@@ -112,13 +112,17 @@ async def test_telegram__init__(default_conf, mocker) -> None:
     assert telegram._config == default_conf
 
 
-async def test_telegram_init(default_conf, mocker, caplog) -> None:
+def test_telegram_init(default_conf, mocker, caplog) -> None:
     app_mock = MagicMock()
-    mocker.patch('freqtrade.rpc.telegram.Telegram._start_thread', MagicMock())
-    mocker.patch('freqtrade.rpc.telegram.Telegram._init_telegram_app', return_value=app_mock)
-    mocker.patch('freqtrade.rpc.telegram.Telegram._startup_telegram', AsyncMock())
+    mocker.patch.multiple('freqtrade.rpc.telegram.Telegram',
+                          _start_thread=MagicMock(),
+                          _init_telegram_app=MagicMock(return_value=app_mock),
+                          _startup_telegram=AsyncMock())
+    mocker.patch('freqtrade.exchange.exchange.Exchange._init_async_loop')
 
-    telegram, _, _ = await get_telegram_testobject(mocker, default_conf, mock=False)
+    rpc = RPC(MagicMock())
+    telegram = Telegram(rpc, default_conf)
+    telegram._loop = MagicMock()
     telegram._init()
     assert app_mock.call_count == 0
 
