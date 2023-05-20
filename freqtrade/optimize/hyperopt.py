@@ -4,7 +4,6 @@
 This module contains the hyperopt logic
 """
 
-import asyncio
 import logging
 import random
 import sys
@@ -554,7 +553,6 @@ class Hyperopt:
         self.prepare_hyperopt_data()
 
         # We don't need exchange instance anymore while running hyperopt
-        asyncio.get_event_loop().run_until_complete(self.backtesting.exchange.close())
         self.backtesting.exchange._api = None
         self.backtesting.exchange._api_async = None
         self.backtesting.exchange.loop = None  # type: ignore

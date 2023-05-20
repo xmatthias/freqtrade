@@ -5,7 +5,7 @@ import logging
 import time
 from copy import deepcopy
 from typing import List
-from unittest.mock import ANY, MagicMock, PropertyMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, PropertyMock, patch
 
 import arrow
 import pytest
@@ -157,7 +157,7 @@ async def test_get_trade_stake_amount(default_conf_usdt, ticker, mocker) -> None
     RunMode.DRY_RUN,
     RunMode.LIVE
 ])
-def test_load_strategy_no_keys(default_conf_usdt, mocker, runmode, caplog) -> None:
+async def test_load_strategy_no_keys(default_conf_usdt, mocker, runmode, caplog) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     conf = deepcopy(default_conf_usdt)
@@ -165,6 +165,8 @@ def test_load_strategy_no_keys(default_conf_usdt, mocker, runmode, caplog) -> No
     erm = mocker.patch('freqtrade.freqtradebot.ExchangeResolver.load_exchange')
 
     freqtrade = FreqtradeBot(conf)
+    freqtrade._refresh_active_whitelist = AsyncMock()
+    await freqtrade.init_bot()
     strategy_config = freqtrade.strategy.config
     assert id(strategy_config['exchange']) == id(conf['exchange'])
     # Keys have been removed and are not passed to the exchange
