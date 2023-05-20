@@ -58,6 +58,7 @@ def update():
 
     return _update
 
+
 class DummyCls(Telegram):
     """
     Dummy class for testing the Telegram @authorized_only decorator
@@ -1764,7 +1765,7 @@ async def test_telegram_delete_trade(mocker, update, default_conf, fee, is_short
 @pytest.mark.parametrize('is_short', [True, False])
 async def test_telegram_reload_trade_from_exchange(mocker, update, default_conf, fee, is_short):
 
-    telegram, _, msg_mock = get_telegram_testobject(mocker, default_conf)
+    telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
     context = MagicMock()
     context.args = []
 

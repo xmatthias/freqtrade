@@ -761,12 +761,12 @@ class RPC:
         await self._freqtrade.handle_onexchange_order(trade)
         return {'status': 'Reloaded from orders from exchange'}
 
-    async def _rpc_reload_trade_from_exchange(self, trade_id: int) -> Dict[str, str]:
+    def _rpc_reload_trade_from_exchange(self, trade_id: int) -> Dict[str, str]:
         """
         Handler for reload_trade_from_exchange.
         Reloads a trade from it's orders, should manual interaction have happened.
         """
-        self._run_async(self.__rpc_reload_trade_from_exchange(trade_id))
+        return self._run_async(self.__rpc_reload_trade_from_exchange(trade_id))
 
     async def __exec_force_exit(self, trade: Trade, ordertype: Optional[str],
                                 amount: Optional[float] = None) -> None:

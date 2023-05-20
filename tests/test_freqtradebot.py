@@ -5678,8 +5678,8 @@ async def test_handle_insufficient_funds(mocker, default_conf_usdt, fee, is_shor
 
 @pytest.mark.usefixtures("init_persistence")
 @pytest.mark.parametrize("is_short", [False, True])
-def test_handle_onexchange_order(mocker, default_conf_usdt, limit_order, is_short, caplog):
-    freqtrade = get_patched_freqtradebot(mocker, default_conf_usdt)
+async def test_handle_onexchange_order(mocker, default_conf_usdt, limit_order, is_short, caplog):
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     mock_uts = mocker.spy(freqtrade, 'update_trade_state')
 
     entry_order = limit_order[entry_side(is_short)]
@@ -5709,7 +5709,7 @@ def test_handle_onexchange_order(mocker, default_conf_usdt, limit_order, is_shor
         entry_order, 'ADA/USDT', entry_side(is_short))
     )
     Trade.session.add(trade)
-    freqtrade.handle_onexchange_order(trade)
+    await freqtrade.handle_onexchange_order(trade)
     assert log_has_re(r"Found previously unknown order .*", caplog)
     assert mock_uts.call_count == 1
     assert mock_fo.call_count == 1

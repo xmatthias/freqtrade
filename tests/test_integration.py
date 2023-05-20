@@ -11,7 +11,6 @@ from tests.conftest import (EXMS, get_mock_coro, get_patched_freqtradebot,
                             get_patched_freqtradebot_thread, log_has_re, patch_get_signal)
 
 
-@pytest.mark.asyncio
 async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker, fee,
                                                            limit_buy_order, mocker) -> None:
     """
@@ -106,6 +105,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
         trade.orders.append(oobj)
         trade.stoploss_order_id = f"stop{idx}"
         trade.open_order_id = None
+    Trade.commit()
 
     n = await freqtrade.exit_positions(trades)
     assert n == 2
