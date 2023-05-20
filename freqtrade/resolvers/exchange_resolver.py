@@ -2,9 +2,10 @@
 This module loads custom exchanges
 """
 import logging
+from typing import Optional
 
 import freqtrade.exchange as exchanges
-from freqtrade.constants import Config
+from freqtrade.constants import Config, ExchangeConfig
 from freqtrade.exchange import MAP_EXCHANGE_CHILDCLASS, Exchange
 from freqtrade.resolvers import IResolver
 
@@ -19,25 +20,30 @@ class ExchangeResolver(IResolver):
     object_type = Exchange
 
     @staticmethod
-    async def load_exchange(exchange_name: str, config: Config, *, load_markets: bool = True,
+    async def load_exchange(config: Config, *, exchange_config: Optional[ExchangeConfig] = None,
+                            load_markets: bool = True,
                             validate: bool = True, load_leverage_tiers: bool = False) -> Exchange:
         """
         Load the custom class from config parameter
         :param exchange_name: name of the Exchange to load
         :param config: configuration dictionary
         """
+        exchange_name: str = config['exchange']['name']
         # Map exchange name to avoid duplicate classes for identical exchanges
         exchange_name = MAP_EXCHANGE_CHILDCLASS.get(exchange_name, exchange_name)
         exchange_name = exchange_name.title()
         exchange = None
         try:
             exchange = ExchangeResolver._load_exchange(exchange_name,
-                                                       kwargs={'config': config})
+                                                       kwargs={
+                                                              'config': config,
+                                                              'exchange_config': exchange_config,
+                                                              })
         except ImportError:
             logger.info(
                 f"No {exchange_name} specific subclass found. Using the generic class instead.")
         if not exchange:
-            exchange = Exchange(config)
+            exchange = Exchange(config, exchange_config=exchange_config)
         await exchange.init_exchange(
             load_markets=load_markets, validate=validate, load_leverage_tiers=load_leverage_tiers)
         return exchange

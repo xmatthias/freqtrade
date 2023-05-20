@@ -16,7 +16,7 @@ from freqtrade.optimize.backtesting import Backtesting
 from freqtrade.persistence import Trade
 from freqtrade.plugins.pairlistmanager import PairListManager
 from tests.conftest import EXMS, create_mock_trades, get_mock_coro, get_patched_exchange, log_has_re
-from tests.freqai.conftest import (get_patched_freqai_strategy, make_rl_config,
+from tests.freqai.conftest import (get_patched_freqai_strategy, is_mac, make_rl_config,
                                    mock_pytorch_mlp_model_training_parameters)
 
 
@@ -29,21 +29,13 @@ def is_arm() -> bool:
     return "arm" in machine or "aarch64" in machine
 
 
-def is_mac() -> bool:
-    machine = platform.system()
-    return "Darwin" in machine
-
-
 def can_run_model(model: str) -> None:
-    if (is_arm() or is_py11()) and "Catboost" in model:
+    if is_arm() and "Catboost" in model:
         pytest.skip("CatBoost is not supported on ARM.")
 
     is_pytorch_model = 'Reinforcement' in model or 'PyTorch' in model
     if is_pytorch_model and is_mac() and not is_arm():
         pytest.skip("Reinforcement learning / PyTorch module not available on intel based Mac OS.")
-
-    if is_pytorch_model and is_py11():
-        pytest.skip("Reinforcement learning / PyTorch currently not available on python 3.11.")
 
 
 @pytest.mark.parametrize('model, pca, dbscan, float32, can_short, shuffle, buffer', [
@@ -51,7 +43,8 @@ def can_run_model(model: str) -> None:
     ('XGBoostRegressor', False, True, False, True, False, 10),
     ('XGBoostRFRegressor', False, False, False, True, False, 0),
     ('CatboostRegressor', False, False, False, True, True, 0),
-    ('PyTorchMLPRegressor', False, False, False, True, False, 0),
+    ('PyTorchMLPRegressor', False, False, False, False, False, 0),
+    ('PyTorchTransformerRegressor', False, False, False, False, False, 0),
     ('ReinforcementLearner', False, True, False, True, False, 0),
     ('ReinforcementLearner_multiproc', False, False, False, True, False, 0),
     ('ReinforcementLearner_test_3ac', False, False, False, False, False, 0),
@@ -62,6 +55,11 @@ async def test_extract_data_and_train_model_Standard(mocker, freqai_conf, model,
                                                      dbscan, float32, can_short, shuffle, buffer):
 
     can_run_model(model)
+
+    test_tb = True
+    if is_mac():
+        test_tb = False
+
     model_save_ext = 'joblib'
     freqai_conf.update({"freqaimodel": model})
     freqai_conf.update({"timerange": "20180110-20180130"})
@@ -83,10 +81,13 @@ async def test_extract_data_and_train_model_Standard(mocker, freqai_conf, model,
         freqai_conf["freqaimodel_path"] = str(Path(__file__).parents[1] / "freqai" / "test_models")
         freqai_conf["freqai"]["rl_config"]["drop_ohlc_from_features"] = True
 
-    if 'PyTorchMLPRegressor' in model:
+    if 'PyTorch' in model:
         model_save_ext = 'zip'
         pytorch_mlp_mtp = mock_pytorch_mlp_model_training_parameters()
         freqai_conf['freqai']['model_training_parameters'].update(pytorch_mlp_mtp)
+        if 'Transformer' in model:
+            # transformer model takes a window, unlike the MLP regressor
+            freqai_conf.update({"conv_width": 10})
 
     strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
     exchange = await get_patched_exchange(mocker, freqai_conf)
@@ -94,6 +95,7 @@ async def test_extract_data_and_train_model_Standard(mocker, freqai_conf, model,
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
     freqai.live = True
+    freqai.activate_tensorboard = test_tb
     freqai.can_short = can_short
     freqai.dk = FreqaiDataKitchen(freqai_conf)
     freqai.dk.live = True
@@ -229,6 +231,7 @@ async def test_extract_data_and_train_model_Classifiers(mocker, freqai_conf, mod
         ("XGBoostRegressor", 2, "freqai_test_strat"),
         ("CatboostRegressor", 2, "freqai_test_strat"),
         ("PyTorchMLPRegressor", 2, "freqai_test_strat"),
+        ("PyTorchTransformerRegressor", 2, "freqai_test_strat"),
         ("ReinforcementLearner", 3, "freqai_rl_test_strat"),
         ("XGBoostClassifier", 2, "freqai_test_classifier"),
         ("LightGBMClassifier", 2, "freqai_test_classifier"),
@@ -238,6 +241,9 @@ async def test_extract_data_and_train_model_Classifiers(mocker, freqai_conf, mod
     )
 async def test_start_backtesting(mocker, freqai_conf, model, num_files, strat, caplog):
     can_run_model(model)
+    test_tb = True
+    if is_mac():
+        test_tb = False
 
     freqai_conf.get("freqai", {}).update({"save_backtest_models": True})
     freqai_conf['runmode'] = RunMode.BACKTEST
@@ -254,9 +260,12 @@ async def test_start_backtesting(mocker, freqai_conf, model, num_files, strat, c
     if 'test_4ac' in model:
         freqai_conf["freqaimodel_path"] = str(Path(__file__).parents[1] / "freqai" / "test_models")
 
-    if 'PyTorchMLP' in model:
+    if 'PyTorch' in model:
         pytorch_mlp_mtp = mock_pytorch_mlp_model_training_parameters()
         freqai_conf['freqai']['model_training_parameters'].update(pytorch_mlp_mtp)
+        if 'Transformer' in model:
+            # transformer model takes a window, unlike the MLP regressor
+            freqai_conf.update({"conv_width": 10})
 
     freqai_conf.get("freqai", {}).get("feature_parameters", {}).update(
         {"indicator_periods_candles": [2]})
@@ -267,6 +276,7 @@ async def test_start_backtesting(mocker, freqai_conf, model, num_files, strat, c
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
     freqai.live = False
+    freqai.activate_tensorboard = test_tb
     freqai.dk = FreqaiDataKitchen(freqai_conf)
     timerange = TimeRange.parse_timerange("20180110-20180130")
     freqai.dd.load_all_pair_histories(timerange, freqai.dk)
@@ -278,6 +288,7 @@ async def test_start_backtesting(mocker, freqai_conf, model, num_files, strat, c
         df[f'%-constant_{i}'] = i
 
     metadata = {"pair": "LTC/BTC"}
+    freqai.dk.set_paths('LTC/BTC', None)
     freqai.start_backtesting(df, metadata, freqai.dk, strategy)
     model_folders = [x for x in freqai.dd.full_path.iterdir() if x.is_dir()]
 
@@ -435,6 +446,7 @@ async def test_principal_component_analysis(mocker, freqai_conf):
 
     data_load_timerange = TimeRange.parse_timerange("20180110-20180130")
     new_timerange = TimeRange.parse_timerange("20180120-20180130")
+    freqai.dk.set_paths('ADA/BTC', None)
 
     freqai.extract_data_and_train_model(
         new_timerange, "ADA/BTC", strategy, freqai.dk, data_load_timerange)
@@ -468,6 +480,7 @@ async def test_plot_feature_importance(mocker, freqai_conf):
 
     data_load_timerange = TimeRange.parse_timerange("20180110-20180130")
     new_timerange = TimeRange.parse_timerange("20180120-20180130")
+    freqai.dk.set_paths('ADA/BTC', None)
 
     freqai.extract_data_and_train_model(
         new_timerange, "ADA/BTC", strategy, freqai.dk, data_load_timerange)

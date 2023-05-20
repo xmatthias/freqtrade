@@ -35,9 +35,7 @@ class EdgeCli:
         self.config['stake_amount'] = constants.UNLIMITED_STAKE_AMOUNT
 
     async def init_async(self):
-
-        self.exchange = await ExchangeResolver.load_exchange(self.config['exchange']['name'],
-                                                             self.config)
+        self.exchange = await ExchangeResolver.load_exchange(self.config)
         self.strategy = StrategyResolver.load_strategy(self.config)
         self.strategy.dp = DataProvider(self.config, self.exchange, asyncio.get_event_loop())
 

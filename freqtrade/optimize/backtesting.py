@@ -10,7 +10,6 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
 from numpy import nan
 from pandas import DataFrame
 
@@ -29,8 +28,10 @@ from freqtrade.exchange import (amount_to_contract_precision, price_to_precision
 from freqtrade.mixins import LoggingMixin
 from freqtrade.optimize.backtest_caching import get_strategy_run_id
 from freqtrade.optimize.bt_progress import BTProgress
-from freqtrade.optimize.optimize_reports import (generate_backtest_stats, show_backtest_results,
-                                                 store_backtest_signal_candles,
+from freqtrade.optimize.optimize_reports import (generate_backtest_stats, generate_rejected_signals,
+                                                 generate_trade_signal_candles,
+                                                 show_backtest_results,
+                                                 store_backtest_analysis_results,
                                                  store_backtest_stats)
 from freqtrade.persistence import LocalTrade, Order, PairLocks, Trade
 from freqtrade.plugins.pairlistmanager import PairListManager
@@ -87,11 +88,13 @@ class Backtesting:
         self.loop = asyncio.get_event_loop()
         # TODO: asyncio: FIXME
         self.processed_dfs: Dict[str, Dict] = {}
+        self.rejected_dict: Dict[str, List] = {}
+        self.rejected_df: Dict[str, Dict] = {}
 
         self._exchange_name = self.config['exchange']['name']
         self.exchange = self.loop.run_until_complete(
             ExchangeResolver.load_exchange(
-                self._exchange_name, self.config, load_leverage_tiers=True))
+                self.config, load_leverage_tiers=True))
         self.dataprovider = DataProvider(self.config, self.exchange, loop=self.loop)
 
         if self.config.get('strategy_list'):
@@ -1068,6 +1071,18 @@ class Backtesting:
             return None
         return row
 
+    def _collate_rejected(self, pair, row):
+        """
+        Temporarily store rejected signal information for downstream use in backtesting_analysis
+        """
+        # It could be fun to enable hyperopt mode to write
+        # a loss function to reduce rejected signals
+        if (self.config.get('export', 'none') == 'signals' and
+                self.dataprovider.runmode == RunMode.BACKTEST):
+            if pair not in self.rejected_dict:
+                self.rejected_dict[pair] = []
+            self.rejected_dict[pair].append([row[DATE_IDX], row[ENTER_TAG_IDX]])
+
     def backtest_loop(
             self, row: Tuple, pair: str, current_time: datetime, end_date: datetime,
             open_trade_count_start: int, trade_dir: Optional[LongShort],
@@ -1093,20 +1108,22 @@ class Backtesting:
         if (
             (self._position_stacking or len(LocalTrade.bt_trades_open_pp[pair]) == 0)
             and is_first
-            and self.trade_slot_available(open_trade_count_start)
             and current_time != end_date
             and trade_dir is not None
             and not PairLocks.is_pair_locked(pair, row[DATE_IDX], trade_dir)
         ):
-            trade = self._enter_trade(pair, row, trade_dir)
-            if trade:
-                # TODO: hacky workaround to avoid opening > max_open_trades
-                # This emulates previous behavior - not sure if this is correct
-                # Prevents entering if the trade-slot was freed in this candle
-                open_trade_count_start += 1
-                # logger.debug(f"{pair} - Emulate creation of new trade: {trade}.")
-                LocalTrade.add_bt_trade(trade)
-                self.wallets_update()
+            if (self.trade_slot_available(open_trade_count_start)):
+                trade = self._enter_trade(pair, row, trade_dir)
+                if trade:
+                    # TODO: hacky workaround to avoid opening > max_open_trades
+                    # This emulates previous behavior - not sure if this is correct
+                    # Prevents entering if the trade-slot was freed in this candle
+                    open_trade_count_start += 1
+                    # logger.debug(f"{pair} - Emulate creation of new trade: {trade}.")
+                    LocalTrade.add_bt_trade(trade)
+                    self.wallets_update()
+            else:
+                self._collate_rejected(pair, row)
 
         for trade in list(LocalTrade.bt_trades_open_pp[pair]):
             # 3. Process entry orders.
@@ -1248,8 +1265,8 @@ class Backtesting:
     def backtest_one_strategy(self, strat: IStrategy, data: Dict[str, DataFrame],
                               timerange: TimeRange):
         self.progress.init_step(BacktestState.ANALYZE, 0)
-
-        logger.info(f"Running backtesting for Strategy {strat.get_strategy_name()}")
+        strategy_name = strat.get_strategy_name()
+        logger.info(f"Running backtesting for Strategy {strategy_name}")
         backtest_start_time = datetime.now(timezone.utc)
         self._set_strategy(strat)
 
@@ -1284,36 +1301,20 @@ class Backtesting:
         )
         backtest_end_time = datetime.now(timezone.utc)
         results.update({
-            'run_id': self.run_ids.get(strat.get_strategy_name(), ''),
+            'run_id': self.run_ids.get(strategy_name, ''),
             'backtest_start_time': int(backtest_start_time.timestamp()),
             'backtest_end_time': int(backtest_end_time.timestamp()),
         })
-        self.all_results[self.strategy.get_strategy_name()] = results
+        self.all_results[strategy_name] = results
 
         if (self.config.get('export', 'none') == 'signals' and
                 self.dataprovider.runmode == RunMode.BACKTEST):
-            self._generate_trade_signal_candles(preprocessed_tmp, results)
+            self.processed_dfs[strategy_name] = generate_trade_signal_candles(
+                preprocessed_tmp, results)
+            self.rejected_df[strategy_name] = generate_rejected_signals(
+                preprocessed_tmp, self.rejected_dict)
 
         return min_date, max_date
-
-    def _generate_trade_signal_candles(self, preprocessed_df, bt_results):
-        signal_candles_only = {}
-        for pair in preprocessed_df.keys():
-            signal_candles_only_df = DataFrame()
-
-            pairdf = preprocessed_df[pair]
-            resdf = bt_results['results']
-            pairresults = resdf.loc[(resdf["pair"] == pair)]
-
-            if pairdf.shape[0] > 0:
-                for t, v in pairresults.open_date.items():
-                    allinds = pairdf.loc[(pairdf['date'] < v)]
-                    signal_inds = allinds.iloc[[-1]]
-                    signal_candles_only_df = pd.concat([signal_candles_only_df, signal_inds])
-
-                signal_candles_only[pair] = signal_candles_only_df
-
-        self.processed_dfs[self.strategy.get_strategy_name()] = signal_candles_only
 
     def _get_min_cached_backtest_date(self):
         min_backtest_date = None
@@ -1377,8 +1378,9 @@ class Backtesting:
 
             if (self.config.get('export', 'none') == 'signals' and
                     self.dataprovider.runmode == RunMode.BACKTEST):
-                store_backtest_signal_candles(
-                    self.config['exportfilename'], self.processed_dfs, dt_appendix)
+                store_backtest_analysis_results(
+                    self.config['exportfilename'], self.processed_dfs, self.rejected_df,
+                    dt_appendix)
 
         # Results may be mixed up now. Sort them so they follow --strategy-list order.
         if 'strategy_list' in self.config and len(self.results) > 0:

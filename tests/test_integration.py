@@ -76,8 +76,10 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
         _notify_exit=get_mock_coro(),
     )
     mocker.patch("freqtrade.strategy.interface.IStrategy.should_exit", should_sell_mock)
-    wallets_mock = mocker.patch("freqtrade.wallets.Wallets.update", get_mock_coro())
-    mocker.patch("freqtrade.wallets.Wallets.get_free", MagicMock(return_value=1000))
+    # wallets_mock = mocker.patch("freqtrade.wallets.Wallets.update", get_mock_coro())
+    wallets_mock = mocker.patch("freqtrade.wallets.Wallets.update")
+    mocker.patch("freqtrade.wallets.Wallets.get_free", return_value=1000)
+    mocker.patch("freqtrade.wallets.Wallets.check_exit_amount", return_value=True)
 
     freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True

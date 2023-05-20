@@ -1,16 +1,19 @@
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
+import numpy as np
+import numpy.typing as npt
+import pandas as pd
 import torch
 
 from freqtrade.freqai.base_models.BasePyTorchRegressor import BasePyTorchRegressor
 from freqtrade.freqai.data_kitchen import FreqaiDataKitchen
 from freqtrade.freqai.torch.PyTorchDataConvertor import (DefaultPyTorchDataConvertor,
                                                          PyTorchDataConvertor)
-from freqtrade.freqai.torch.PyTorchMLPModel import PyTorchMLPModel
-from freqtrade.freqai.torch.PyTorchModelTrainer import PyTorchModelTrainer
+from freqtrade.freqai.torch.PyTorchModelTrainer import PyTorchTransformerTrainer
+from freqtrade.freqai.torch.PyTorchTransformerModel import PyTorchTransformerModel
 
 
-class PyTorchMLPRegressor(BasePyTorchRegressor):
+class PyTorchTransformerRegressor(BasePyTorchRegressor):
     """
     This class implements the fit method of IFreqaiModel.
     in the fit method we initialize the model and trainer objects.
@@ -29,7 +32,7 @@ class PyTorchMLPRegressor(BasePyTorchRegressor):
                 "trainer_kwargs": {
                     "max_iters": 5000,
                     "batch_size": 64,
-                    "max_n_eval_batches": null,
+                    "max_n_eval_batches": null
                 },
                 "model_kwargs": {
                     "hidden_dim": 512,
@@ -61,9 +64,11 @@ class PyTorchMLPRegressor(BasePyTorchRegressor):
         """
 
         n_features = data_dictionary["train_features"].shape[-1]
-        model = PyTorchMLPModel(
+        n_labels = data_dictionary["train_labels"].shape[-1]
+        model = PyTorchTransformerModel(
             input_dim=n_features,
-            output_dim=1,
+            output_dim=n_labels,
+            time_window=self.window_size,
             **self.model_kwargs
         )
         model.to(self.device)
@@ -72,14 +77,64 @@ class PyTorchMLPRegressor(BasePyTorchRegressor):
         # check if continual_learning is activated, and retreive the model to continue training
         trainer = self.get_init_model(dk.pair)
         if trainer is None:
-            trainer = PyTorchModelTrainer(
+            trainer = PyTorchTransformerTrainer(
                 model=model,
                 optimizer=optimizer,
                 criterion=criterion,
                 device=self.device,
                 data_convertor=self.data_convertor,
+                window_size=self.window_size,
                 tb_logger=self.tb_logger,
                 **self.trainer_kwargs,
             )
         trainer.fit(data_dictionary, self.splits)
         return trainer
+
+    def predict(
+        self, unfiltered_df: pd.DataFrame, dk: FreqaiDataKitchen, **kwargs
+    ) -> Tuple[pd.DataFrame, npt.NDArray[np.int_]]:
+        """
+        Filter the prediction features data and predict with it.
+        :param unfiltered_df: Full dataframe for the current backtest period.
+        :return:
+        :pred_df: dataframe containing the predictions
+        :do_predict: np.array of 1s and 0s to indicate places where freqai needed to remove
+        data (NaNs) or felt uncertain about data (PCA and DI index)
+        """
+
+        dk.find_features(unfiltered_df)
+        filtered_df, _ = dk.filter_features(
+            unfiltered_df, dk.training_features_list, training_filter=False
+        )
+        filtered_df = dk.normalize_data_from_metadata(filtered_df)
+        dk.data_dictionary["prediction_features"] = filtered_df
+
+        self.data_cleaning_predict(dk)
+        x = self.data_convertor.convert_x(
+            dk.data_dictionary["prediction_features"],
+            device=self.device
+        )
+        # if user is asking for multiple predictions, slide the window
+        # along the tensor
+        x = x.unsqueeze(0)
+        # create empty torch tensor
+        self.model.model.eval()
+        yb = torch.empty(0)
+        if x.shape[1] > 1:
+            ws = self.window_size
+            for i in range(0, x.shape[1] - ws):
+                xb = x[:, i:i + ws, :]
+                y = self.model.model(xb)
+                yb = torch.cat((yb, y), dim=0)
+        else:
+            yb = self.model.model(x)
+
+        yb = yb.cpu().squeeze()
+        pred_df = pd.DataFrame(yb.detach().numpy(), columns=dk.label_list)
+        pred_df = dk.denormalize_labels_from_metadata(pred_df)
+
+        if x.shape[1] > 1:
+            zeros_df = pd.DataFrame(np.zeros((x.shape[1] - len(pred_df), len(pred_df.columns))),
+                                    columns=pred_df.columns)
+            pred_df = pd.concat([zeros_df, pred_df], axis=0, ignore_index=True)
+        return (pred_df, dk.do_predict)
