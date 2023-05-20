@@ -752,17 +752,21 @@ class RPC:
 
         return {'status': 'No more entries will occur from now. Run /reload_config to reset.'}
 
-    def _rpc_reload_trade_from_exchange(self, trade_id: int) -> Dict[str, str]:
-        """
-        Handler for reload_trade_from_exchange.
-        Reloads a trade from it's orders, should manual interaction have happened.
-        """
+    async def __rpc_reload_trade_from_exchange(self, trade_id: int) -> Dict[str, str]:
+
         trade = Trade.get_trades(trade_filter=[Trade.id == trade_id]).first()
         if not trade:
             raise RPCException(f"Could not find trade with id {trade_id}.")
 
-        self._freqtrade.handle_onexchange_order(trade)
+        await self._freqtrade.handle_onexchange_order(trade)
         return {'status': 'Reloaded from orders from exchange'}
+
+    async def _rpc_reload_trade_from_exchange(self, trade_id: int) -> Dict[str, str]:
+        """
+        Handler for reload_trade_from_exchange.
+        Reloads a trade from it's orders, should manual interaction have happened.
+        """
+        self._run_async(self.__rpc_reload_trade_from_exchange(trade_id))
 
     async def __exec_force_exit(self, trade: Trade, ordertype: Optional[str],
                                 amount: Optional[float] = None) -> None:

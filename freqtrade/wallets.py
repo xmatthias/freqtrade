@@ -196,7 +196,7 @@ class Wallets:
             return True
         return False
 
-    def check_exit_amount(self, trade: Trade) -> bool:
+    async def check_exit_amount(self, trade: Trade) -> bool:
         """
         Checks if the exit amount is available in the wallet.
         :param trade: Trade to check
@@ -204,7 +204,7 @@ class Wallets:
         """
         if not self._check_exit_amount(trade):
             # Update wallets just to make sure
-            self.update()
+            await self.update()
             return self._check_exit_amount(trade)
 
         return True

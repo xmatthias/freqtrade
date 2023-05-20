@@ -750,7 +750,7 @@ def test_api_trade_reload_trade(botclient, mocker, fee, markets, ticker, is_shor
     patch_get_signal(ftbot, enter_long=not is_short, enter_short=is_short)
     stoploss_mock = MagicMock()
     cancel_mock = MagicMock()
-    ftbot.handle_onexchange_order = MagicMock()
+    ftbot.handle_onexchange_order = get_mock_coro()
     mocker.patch.multiple(
         EXMS,
         markets=PropertyMock(return_value=markets),

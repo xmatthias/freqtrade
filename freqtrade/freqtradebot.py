@@ -465,13 +465,13 @@ class FreqtradeBot(LoggingMixin):
             except ExchangeError:
                 logger.warning(f"Error updating {order.order_id}.")
 
-    def handle_onexchange_order(self, trade: Trade):
+    async def handle_onexchange_order(self, trade: Trade):
         """
         Try refinding a order that is not in the database.
         Only used balance disappeared, which would make exiting impossible.
         """
         try:
-            orders = self.exchange.fetch_orders(trade.pair, trade.open_date_utc)
+            orders = await self.exchange.fetch_orders(trade.pair, trade.open_date_utc)
             for order in orders:
                 trade_order = [o for o in trade.orders if o.order_id == order['id']]
                 if trade_order:
@@ -487,7 +487,7 @@ class FreqtradeBot(LoggingMixin):
                 Trade.commit()
                 prev_exit_reason = trade.exit_reason
                 trade.exit_reason = ExitType.SOLD_ON_EXCHANGE.value
-                self.update_trade_state(trade, order['id'], order)
+                await self.update_trade_state(trade, order['id'], order)
 
                 logger.info(f"handled order {order['id']}")
                 if not trade.is_open:
@@ -1098,11 +1098,11 @@ class FreqtradeBot(LoggingMixin):
         """
         Check open trade for sell possibilities
         """
-        if not self.wallets.check_exit_amount(trade):
+        if not await self.wallets.check_exit_amount(trade):
             logger.warning(
                 f'Not enough {trade.safe_base_currency} in wallet to exit {trade}. '
                 'Trying to recover.')
-            self.handle_onexchange_order(trade)
+            await self.handle_onexchange_order(trade)
         try:
             try:
                 if (self.strategy.order_types.get('stoploss_on_exchange') and
