@@ -156,7 +156,7 @@ def patch_exchange(
     mocker.patch(f'{EXMS}.precisionMode', PropertyMock(return_value=2))
 
     if mock_markets:
-        mocker.patch('freqtrade.exchange.Exchange.load_markets', get_mock_coro())
+        mocker.patch(f'{EXMS}.load_markets', get_mock_coro())
         if isinstance(mock_markets, bool):
             mock_markets = get_markets()
         mocker.patch(f'{EXMS}.markets', PropertyMock(return_value=mock_markets))

@@ -2340,7 +2340,7 @@ async def test_refresh_latest_ohlcv_cache(mocker, default_conf, candle_type, tim
     time_machine.move_to(start + timedelta(hours=99, minutes=30))
 
     exchange = await get_patched_exchange(mocker, default_conf)
-    mocker.patch("freqtrade.exchange.Exchange.ohlcv_candle_limit", return_value=100)
+    mocker.patch(f"{EXMS}.ohlcv_candle_limit", return_value=100)
     assert exchange._startup_candle_count == 0
 
     exchange._api_async.fetch_ohlcv = get_mock_coro(ohlcv)
@@ -4442,7 +4442,7 @@ async def test__fetch_and_calculate_funding_fees(
     assert pytest.approx(funding_fees) == -expected_fees
 
     # Return empty "refresh_latest"
-    mocker.patch("freqtrade.exchange.Exchange.refresh_latest_ohlcv", return_value={})
+    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", return_value={})
     ex = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange)
     with pytest.raises(ExchangeError, match="Could not find funding rates."):
         await ex._fetch_and_calculate_funding_fees(

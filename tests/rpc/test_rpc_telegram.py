@@ -41,7 +41,7 @@ from tests.conftest import (CURRENT_TEST_STRATEGY, EXMS, create_mock_trades,
 
 @pytest.fixture(autouse=True)
 def mock_exchange_loop(mocker):
-    mocker.patch('freqtrade.exchange.exchange.Exchange._init_async_loop')
+    mocker.patch(f'{EXMS}._init_async_loop')
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ async def get_telegram_testobject(mocker, default_conf, mock=True, ftbot=None):
             _start_thread=MagicMock(),
         )
     if not ftbot:
-        mocker.patch('freqtrade.exchange.exchange.Exchange._init_async_loop')
+        mocker.patch(f'{EXMS}._init_async_loop')
         ftbot = await get_patched_freqtradebot_thread(mocker, default_conf)
     rpc = RPC(ftbot)
     telegram = Telegram(rpc, default_conf)
@@ -119,7 +119,7 @@ def test_telegram_init(default_conf, mocker, caplog) -> None:
                           _start_thread=MagicMock(),
                           _init_telegram_app=MagicMock(return_value=app_mock),
                           _startup_telegram=AsyncMock())
-    mocker.patch('freqtrade.exchange.exchange.Exchange._init_async_loop')
+    mocker.patch(f'{EXMS}._init_async_loop')
 
     rpc = RPC(MagicMock())
     telegram = Telegram(rpc, default_conf)
