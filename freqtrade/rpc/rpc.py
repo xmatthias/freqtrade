@@ -1300,8 +1300,7 @@ class RPC:
         strategy = StrategyResolver.load_strategy(config)
         strategy.dp = DataProvider(config, exchange=exchange, pairlists=None,
                                    loop=asyncio.new_event_loop())
-        # TODO: asyncio - the below should be awaited.
-        strategy.ft_bot_start()
+        asyncio.new_event_loop().run_until_complete(strategy.ft_bot_start())
 
         df_analyzed = strategy.analyze_ticker(_data[pair], {'pair': pair})
 
