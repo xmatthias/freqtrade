@@ -1,12 +1,11 @@
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from zipfile import ZipFile
 
-import arrow
 import pytest
 
 from freqtrade.commands import (start_backtesting_show, start_convert_data, start_convert_trades,
@@ -25,6 +24,7 @@ from freqtrade.enums import RunMode
 from freqtrade.exceptions import OperationalException
 from freqtrade.persistence.models import init_db
 from freqtrade.persistence.pairlock_middleware import PairLocks
+from freqtrade.util import dt_floor_day, dt_now, dt_utc
 from tests.conftest import (CURRENT_TEST_STRATEGY, EXMS, create_mock_trades, get_args,
                             get_mock_coro, log_has, log_has_re, patch_exchange,
                             patched_configuration_load_config_file)
@@ -708,7 +708,7 @@ async def test_download_data_timerange(mocker, markets):
     await start_download_data(pargs)
     assert dl_mock.call_count == 1
     # 20days ago
-    days_ago = arrow.get(arrow.now().shift(days=-20).date()).int_timestamp
+    days_ago = dt_floor_day(dt_now() - timedelta(days=20)).timestamp()
     assert dl_mock.call_args_list[0][1]['timerange'].startts == days_ago
 
     dl_mock.reset_mock()
@@ -723,8 +723,7 @@ async def test_download_data_timerange(mocker, markets):
     await start_download_data(pargs)
     assert dl_mock.call_count == 1
 
-    assert dl_mock.call_args_list[0][1]['timerange'].startts == arrow.Arrow(
-        2020, 1, 1).int_timestamp
+    assert dl_mock.call_args_list[0][1]['timerange'].startts == int(dt_utc(2020, 1, 1).timestamp())
 
 
 async def test_download_data_no_markets(mocker, caplog):

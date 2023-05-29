@@ -1,10 +1,9 @@
 import logging
 import operator
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import arrow
 from pandas import DataFrame, concat
 
 from freqtrade.configuration import TimeRange
@@ -233,15 +232,15 @@ async def _download_pair_history(pair: str, *,
                      f"{data.iloc[-1]['date']:DATETIME_PRINT_FORMAT}" if not data.empty else 'None')
 
         # Default since_ms to 30 days if nothing is given
-        new_data = await exchange.get_historic_ohlcv(pair=pair,
-                                                     timeframe=timeframe,
-                                                     since_ms=since_ms if since_ms else
-                                                     arrow.utcnow().shift(
-                                                         days=-new_pairs_days).int_timestamp * 1000,
-                                                     is_new_pair=data.empty,
-                                                     candle_type=candle_type,
-                                                     until_ms=until_ms if until_ms else None
-                                                     )
+        new_data = await exchange.get_historic_ohlcv(
+            pair=pair,
+            timeframe=timeframe,
+            since_ms=since_ms if since_ms else
+            int((datetime.now() - timedelta(days=new_pairs_days)).timestamp()) * 1000,
+            is_new_pair=data.empty,
+            candle_type=candle_type,
+            until_ms=until_ms if until_ms else None
+            )
         # TODO: Maybe move parsing to exchange class (?)
         new_dataframe = ohlcv_to_dataframe(new_data, timeframe, pair,
                                            fill_missing=False, drop_incomplete=True)
@@ -349,7 +348,7 @@ async def _download_trades_history(exchange: Exchange,
             trades = []
 
         if not since:
-            since = arrow.utcnow().shift(days=-new_pairs_days).int_timestamp * 1000
+            since = int((datetime.now() - timedelta(days=-new_pairs_days)).timestamp()) * 1000
 
         from_id = trades[-1][1] if trades else None
         if trades and since < trades[-1][0]:

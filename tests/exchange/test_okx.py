@@ -519,7 +519,7 @@ async def test__set_leverage_okx(mocker, default_conf):
 async def test_fetch_stoploss_order_okx(default_conf, mocker):
     default_conf['dry_run'] = False
     api_mock = MagicMock()
-    api_mock.fetch_order = get_mock_coro()
+    api_mock.fetch_order = get_mock_coro(return_value=MagicMock())
 
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='okx')
 

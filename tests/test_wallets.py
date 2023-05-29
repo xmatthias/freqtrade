@@ -46,7 +46,7 @@ async def test_sync_wallet_at_boot(mocker, default_conf):
     assert freqtrade.wallets._wallets['GAS'].total == 0.260739
     assert freqtrade.wallets.get_free('BNT') == 1.0
     assert 'USDT' in freqtrade.wallets._wallets
-    assert freqtrade.wallets._last_wallet_refresh > 0
+    assert freqtrade.wallets._last_wallet_refresh is not None
     mocker.patch.multiple(
         EXMS,
         get_balances=get_mock_coro(return_value={
@@ -336,7 +336,7 @@ async def test_sync_wallet_futures_live(mocker, default_conf):
 
     assert 'USDT' in freqtrade.wallets._wallets
     assert 'ETH/USDT:USDT' in freqtrade.wallets._positions
-    assert freqtrade.wallets._last_wallet_refresh > 0
+    assert freqtrade.wallets._last_wallet_refresh is not None
 
     # Remove ETH/USDT:USDT position
     del mock_result[0]

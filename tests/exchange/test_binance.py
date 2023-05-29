@@ -520,7 +520,7 @@ async def test_fill_leverage_tiers_binance_dryrun(default_conf, mocker, leverage
 async def test_additional_exchange_init_binance(default_conf, mocker):
     mocker.patch('freqtrade.exchange.binance.Binance.fill_leverage_tiers')
     api_mock = MagicMock()
-    api_mock.fapiPrivateGetPositionsideDual = get_mock_coro(return_value={"dualSidePosition": True})
+    api_mock.fapiPrivateGetPositionSideDual = get_mock_coro(return_value={"dualSidePosition": True})
     api_mock.fapiPrivateGetMultiAssetsMargin = get_mock_coro(
         return_value={"multiAssetsMargin": True})
     default_conf['dry_run'] = False
@@ -529,14 +529,14 @@ async def test_additional_exchange_init_binance(default_conf, mocker):
     with pytest.raises(OperationalException,
                        match=r"Hedge Mode is not supported.*\nMulti-Asset Mode is not supported.*"):
         await get_patched_exchange(mocker, default_conf, id="binance", api_mock=api_mock)
-    api_mock.fapiPrivateGetPositionsideDual = get_mock_coro(
+    api_mock.fapiPrivateGetPositionSideDual = get_mock_coro(
         return_value={"dualSidePosition": False})
     api_mock.fapiPrivateGetMultiAssetsMargin = get_mock_coro(
         return_value={"multiAssetsMargin": False})
     exchange = await get_patched_exchange(mocker, default_conf, id="binance", api_mock=api_mock)
     assert exchange
     await async_ccxt_exception(mocker, default_conf, api_mock, 'binance',
-                               "additional_exchange_init", "fapiPrivateGetPositionsideDual")
+                               "additional_exchange_init", "fapiPrivateGetPositionSideDual")
 
 
 async def test__set_leverage_binance(mocker, default_conf):

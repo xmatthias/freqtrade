@@ -1098,7 +1098,7 @@ class FreqtradeBot(LoggingMixin):
         """
         Check open trade for sell possibilities
         """
-        if not await self.wallets.check_exit_amount(trade):
+        if trade.open_order_id is None and not await self.wallets.check_exit_amount(trade):
             logger.warning(
                 f'Not enough {trade.safe_base_currency} in wallet to exit {trade}. '
                 'Trying to recover.')
