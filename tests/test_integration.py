@@ -57,7 +57,7 @@ async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker,
         [],
         [ExitCheckTuple(exit_type=ExitType.EXIT_SIGNAL)]]
     )
-    cancel_order_mock = get_mock_coro()
+    cancel_order_mock = get_mock_coro(MagicMock())
     mocker.patch.multiple(
         EXMS,
         create_stoploss=stoploss,

@@ -206,7 +206,7 @@ class BaseReinforcementLearningModel(IFreqaiModel):
                     logger.error('No exchange available.')
                     return 0, 0, 0
                 else:
-                    current_rate = self.data_provider._exchange.get_rate(  # type: ignore
+                    current_rate = self.data_provider._exchange.get_rate_sync(  # type: ignore
                                 pair, refresh=False, side="exit", is_short=trade.is_short)
 
                 now = datetime.now(timezone.utc).timestamp()

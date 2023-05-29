@@ -15,7 +15,8 @@ from freqtrade.freqai.utils import download_all_data_for_training, get_required_
 from freqtrade.optimize.backtesting import Backtesting
 from freqtrade.persistence import Trade
 from freqtrade.plugins.pairlistmanager import PairListManager
-from tests.conftest import EXMS, create_mock_trades, get_mock_coro, get_patched_exchange, log_has_re
+from tests.conftest import (EXMS, create_mock_trades, get_mock_coro, get_patched_exchange,
+                            log_has_re, patch_eventloop_threading)
 from tests.freqai.conftest import (get_patched_freqai_strategy, is_mac, make_rl_config,
                                    mock_pytorch_mlp_model_training_parameters)
 
@@ -573,7 +574,8 @@ async def test_get_state_info(mocker, freqai_conf, dp_exists, caplog, tickers):
 
     strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
     exchange = await get_patched_exchange(mocker, freqai_conf)
-    ticker_mock = get_mock_coro(return_value=tickers()['ETH/BTC'])
+    patch_eventloop_threading(exchange)
+    ticker_mock = get_mock_coro(return_value=(await tickers())['ETH/BTC'])
     mocker.patch(f"{EXMS}.fetch_ticker", ticker_mock)
     strategy.dp = DataProvider(freqai_conf, exchange)
 

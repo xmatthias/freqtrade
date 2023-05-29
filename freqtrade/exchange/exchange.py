@@ -1674,6 +1674,15 @@ class Exchange:
             price_side = price_map[(side, 'short' if is_short else 'long', price_side)]
         return price_side
 
+    def get_rate_sync(self, pair: str, refresh: bool, side: EntryExit, is_short: bool) -> float:
+        """
+        Simple thread-safe wrapper around get_rate
+        """
+        return asyncio.run_coroutine_threadsafe(
+            self.get_rate(pair, refresh, side, is_short),
+            self.loop
+            ).result()
+
     async def get_rate(
             self, pair: str, refresh: bool, side: EntryExit, is_short: bool,
             order_book: Optional[OrderBook] = None, ticker: Optional[Ticker] = None
