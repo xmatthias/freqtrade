@@ -502,7 +502,7 @@ async def test__set_leverage_okx(mocker, default_conf):
         'mgnMode': 'isolated',
         'posSide': 'net'}
 
-    async_ccxt_exception(
+    await async_ccxt_exception(
         mocker,
         default_conf,
         api_mock,

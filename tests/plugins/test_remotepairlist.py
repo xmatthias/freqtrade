@@ -59,7 +59,7 @@ async def test_gen_pairlist_with_local_file(mocker, rpl_config):
     assert result == ['TKN/USDT', 'ETH/USDT']
 
 
-def test_fetch_pairlist_mock_response_html(mocker, rpl_config):
+async def test_fetch_pairlist_mock_response_html(mocker, rpl_config):
     mock_response = MagicMock()
     mock_response.headers = {'content-type': 'text/html'}
 
@@ -73,7 +73,7 @@ def test_fetch_pairlist_mock_response_html(mocker, rpl_config):
         }
     ]
 
-    exchange = get_patched_exchange(mocker, rpl_config)
+    exchange = await get_patched_exchange(mocker, rpl_config)
     pairlistmanager = PairListManager(exchange, rpl_config)
 
     mocker.patch("freqtrade.plugins.pairlist.RemotePairList.requests.get",
@@ -146,7 +146,7 @@ async def test_remote_pairlist_init_no_number_assets(mocker, rpl_config):
         await get_patched_freqtradebot(mocker, rpl_config)
 
 
-def test_fetch_pairlist_mock_response_valid(mocker, rpl_config):
+async def test_fetch_pairlist_mock_response_valid(mocker, rpl_config):
 
     rpl_config['pairlists'] = [
         {
@@ -174,7 +174,7 @@ def test_fetch_pairlist_mock_response_valid(mocker, rpl_config):
     mocker.patch("freqtrade.plugins.pairlist.RemotePairList.requests.get",
                  return_value=mock_response)
 
-    exchange = get_patched_exchange(mocker, rpl_config)
+    exchange = await get_patched_exchange(mocker, rpl_config)
     pairlistmanager = PairListManager(exchange, rpl_config)
     remote_pairlist = RemotePairList(exchange, pairlistmanager, rpl_config,
                                      rpl_config['pairlists'][0], 0)

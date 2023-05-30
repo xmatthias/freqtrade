@@ -2456,7 +2456,7 @@ async def test__async_get_candle_history(default_conf, mocker, caplog, exchange_
     assert res[3] == ohlcv
     assert exchange._api_async.fetch_ohlcv.call_count == 1
     assert not log_has(f"Using cached candle (OHLCV) data for {pair} ...", caplog)
-    exchange.close()
+    await exchange.close()
     # exchange = Exchange(default_conf)
     await async_ccxt_exception(mocker, default_conf, MagicMock(), 'bittrex',
                                "_async_get_candle_history", "fetch_ohlcv",
@@ -2471,7 +2471,7 @@ async def test__async_get_candle_history(default_conf, mocker, caplog, exchange_
         await exchange._async_get_candle_history(pair, "5m", CandleType.SPOT,
                                                  dt_ts(dt_now() - timedelta(seconds=2000)))
 
-    exchange.close()
+    await exchange.close()
 
     with pytest.raises(OperationalException, match=r'Exchange.* does not support fetching '
                                                    r'historical candle \(OHLCV\) data\..*'):
@@ -2479,7 +2479,7 @@ async def test__async_get_candle_history(default_conf, mocker, caplog, exchange_
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange._async_get_candle_history(pair, "5m", CandleType.SPOT,
                                                  dt_ts(dt_now() - timedelta(seconds=2000)))
-    exchange.close()
+    await exchange.close()
 
 
 async def test__async_kucoin_get_candle_history(default_conf, mocker, caplog):
@@ -2522,7 +2522,7 @@ async def test__async_kucoin_get_candle_history(default_conf, mocker, caplog):
         # Expect the "returned exception" message 12 times (4 retries * 3 (loop))
         assert num_log_has_re(msg, caplog) == 12
         assert num_log_has_re(msg2, caplog) == 9
-    exchange.close()
+    await exchange.close()
 
 
 async def test__async_get_candle_history_empty(default_conf, mocker, caplog):
@@ -2543,7 +2543,7 @@ async def test__async_get_candle_history_empty(default_conf, mocker, caplog):
     assert res[2] == CandleType.SPOT
     assert res[3] == ohlcv
     assert exchange._api_async.fetch_ohlcv.call_count == 1
-    exchange.close()
+    await exchange.close()
 
 
 async def test_refresh_latest_ohlcv_inv_result(default_conf, mocker, caplog):
@@ -3011,7 +3011,7 @@ async def test__async_fetch_trades(default_conf, mocker, caplog, exchange_name,
     assert exchange._api_async.fetch_trades.call_args[1]['limit'] == 1000
     assert exchange._api_async.fetch_trades.call_args[1]['params'] == {'from': '123'}
     assert log_has_re(f"Fetching trades for pair {pair}, params: .*", caplog)
-    exchange.close()
+    await exchange.close()
 
     exchange = Exchange(default_conf)
     await async_ccxt_exception(mocker, default_conf, MagicMock(), 'bittrex',
@@ -3023,14 +3023,14 @@ async def test__async_fetch_trades(default_conf, mocker, caplog, exchange_name,
         api_mock.fetch_trades = MagicMock(side_effect=ccxt.BaseError("Unknown error"))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange._async_fetch_trades(pair, since=dt_ts(dt_now() - timedelta(seconds=2000)))
-    exchange.close()
+    await exchange.close()
 
     with pytest.raises(OperationalException, match=r'Exchange.* does not support fetching '
                                                    r'historical trade data\..*'):
         api_mock.fetch_trades = MagicMock(side_effect=ccxt.NotSupported("Not supported"))
         exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
         await exchange._async_fetch_trades(pair, since=dt_ts(dt_now() - timedelta(seconds=2000)))
-    exchange.close()
+    await exchange.close()
 
 
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
@@ -3067,7 +3067,7 @@ async def test__async_fetch_trades_contract_size(default_conf, mocker, caplog, e
     pair = 'ETH/USDT:USDT'
     res = await exchange._async_fetch_trades(pair, since=None, params=None)
     assert res[0][5] == 300
-    exchange.close()
+    await exchange.close()
 
 
 @pytest.mark.asyncio
