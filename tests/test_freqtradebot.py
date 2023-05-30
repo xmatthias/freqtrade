@@ -2264,7 +2264,7 @@ async def test_exit_positions_exception(
     trade.open_order_id = None
     Trade.session.add(trade)
     Trade.commit()
-    freqtrade.wallets.update()
+    await freqtrade.wallets.update()
     trades = [trade]
 
     # Test raise of DependencyException exception

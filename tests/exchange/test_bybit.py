@@ -16,8 +16,8 @@ async def test_additional_exchange_init_bybit(default_conf, mocker):
     api_mock.set_position_mode = get_mock_coro(return_value={"dualSidePosition": False})
     await get_patched_exchange(mocker, default_conf, id="bybit", api_mock=api_mock)
     assert api_mock.set_position_mode.call_count == 1
-    async_ccxt_exception(mocker, default_conf, api_mock, 'bybit',
-                         "additional_exchange_init", "set_position_mode")
+    await async_ccxt_exception(mocker, default_conf, api_mock, 'bybit',
+                               "additional_exchange_init", "set_position_mode")
 
 
 async def test_bybit_fetch_funding_rate(default_conf, mocker):

@@ -1719,8 +1719,7 @@ class Exchange:
             order_book_top = conf_strategy.get('order_book_top', 1)
             if order_book is None:
                 order_book = await self.fetch_l2_order_book(pair, order_book_top)
-            rate = self._get_rate_from_ob(pair, side, order_book, name, price_side,
-                                                order_book_top)
+            rate = self._get_rate_from_ob(pair, side, order_book, name, price_side, order_book_top)
         else:
             logger.debug(f"Using Last {price_side.capitalize()} / Last Price")
             if ticker is None:
