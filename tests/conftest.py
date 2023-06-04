@@ -277,7 +277,8 @@ async def get_patched_worker(mocker, config) -> Worker:
     :return: Worker
     """
     patch_freqtradebot(mocker, config)
-    mocker.patch('freqtrade.configuration.Configuration.get_config', return_value=config)
+    mocker.patch('freqtrade.configuration.configuration.Configuration.get_config',
+                 return_value=config)
     worker = Worker(args=None)
     await worker.init_worker()
     return worker
