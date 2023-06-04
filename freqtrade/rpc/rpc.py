@@ -769,7 +769,7 @@ class RPC:
         return self._run_async(self.__rpc_reload_trade_from_exchange(trade_id))
 
     async def __exec_force_exit(self, trade: Trade, ordertype: Optional[str],
-                                amount: Optional[float] = None) -> None:
+                                amount: Optional[float] = None) -> bool:
         # Check if there is there is an open order
         fully_canceled = False
         if trade.open_order_id:
@@ -784,6 +784,9 @@ class RPC:
                 await self._freqtrade.handle_cancel_exit(trade, order, CANCEL_REASON['FORCE_EXIT'])
 
         if not fully_canceled:
+            if trade.open_order_id is not None:
+                # Order cancellation failed, so we can't exit.
+                return False
             # Get current rate and execute sell
             current_rate = await self._freqtrade.exchange.get_rate(
                 trade.pair, side='exit', is_short=trade.is_short, refresh=True)
@@ -803,10 +806,11 @@ class RPC:
             await self._freqtrade.execute_trade_exit(
                 trade, current_rate, exit_check, ordertype=order_type,
                 sub_trade_amt=sub_amount)
+            return True
+        return False
 
-    def _rpc_force_exit(
-            self, trade_id: str, ordertype: Optional[str] = None,
-            amount: Optional[float] = None) -> Dict[str, str]:
+    def _rpc_force_exit(self, trade_id: str, ordertype: Optional[str] = None, *,
+                        amount: Optional[float] = None) -> Dict[str, str]:
         """
         Handler for forceexit <id>.
         Sells the given trade at current price
@@ -825,13 +829,13 @@ class RPC:
 
         with self._freqtrade._exit_lock:
             if trade_id == 'all':
-                # Execute sell for all open orders
+                # Execute exit for all open orders
                 for trade in Trade.get_open_trades():
                     # TODO: asyncio: This should be spawned in tasks
                     await self.__exec_force_exit(trade, ordertype)
                 Trade.commit()
                 await self._freqtrade.wallets.update()
-                return {'result': 'Created sell orders for all open trades.'}
+                return {'result': 'Created exit orders for all open trades.'}
 
             # Query for trade
             trade = Trade.get_trades(
@@ -841,10 +845,12 @@ class RPC:
                 logger.warning('force_exit: Invalid argument received')
                 raise RPCException('invalid argument')
 
-            await self.__exec_force_exit(trade, ordertype, amount)
+            result = await self.__exec_force_exit(trade, ordertype, amount)
             Trade.commit()
             await self._freqtrade.wallets.update()
-            return {'result': f'Created sell order for trade {trade_id}.'}
+            if not result:
+                raise RPCException('Failed to exit trade.')
+            return {'result': f'Created exit order for trade {trade_id}.'}
 
     def _force_entry_validations(self, pair: str, order_side: SignalDirection):
         if not self._freqtrade.config.get('force_entry_enable', False):

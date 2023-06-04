@@ -643,11 +643,12 @@ async def test__load_markets(default_conf, mocker, caplog):
     assert ex.markets == expected_return
 
 
-async def test_reload_markets(default_conf, mocker, caplog):
+async def test_reload_markets(default_conf, mocker, caplog, time_machine):
     caplog.set_level(logging.DEBUG)
     initial_markets = {'ETH/BTC': {}}
     updated_markets = {'ETH/BTC': {}, "LTC/BTC": {}}
-
+    start_dt = dt_now()
+    time_machine.move_to(start_dt, tick=False)
     api_mock = MagicMock()
     api_mock.load_markets = get_mock_coro(return_value=initial_markets)
     default_conf['exchange']['markets_refresh_interval'] = 10
@@ -657,20 +658,27 @@ async def test_reload_markets(default_conf, mocker, caplog):
 
     assert exchange._last_markets_refresh == 0
     await exchange.reload_markets()
-    assert exchange._last_markets_refresh != 0
+    assert exchange._last_markets_refresh == dt_ts()
     assert exchange.markets == initial_markets
     exchange._last_markets_refresh = dt_ts()
 
+    time_machine.move_to(start_dt + timedelta(minutes=8), tick=False)
     # less than 10 minutes have passed, no reload
     await exchange.reload_markets()
     assert exchange.markets == initial_markets
 
     api_mock.load_markets = get_mock_coro(return_value=updated_markets)
     # more than 10 minutes have passed, reload is executed
-    exchange._last_markets_refresh = dt_ts(dt_now() - timedelta(minutes=15))
+    time_machine.move_to(start_dt + timedelta(minutes=11), tick=False)
     await exchange.reload_markets()
     assert exchange.markets == updated_markets
     assert log_has('Performing scheduled market reload..', caplog)
+
+    # Not called again
+    api_mock.load_markets.reset_mock()
+
+    exchange.reload_markets()
+    assert api_mock.load_markets.call_count == 0
 
 
 @pytest.mark.parametrize("stake_currency", ['ETH', 'BTC', 'USDT'])

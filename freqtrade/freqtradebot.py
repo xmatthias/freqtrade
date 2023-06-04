@@ -1321,6 +1321,10 @@ class FreqtradeBot(LoggingMixin):
                             f"(orderid:{order['id']}) in order to add another one ...")
 
                 await self.cancel_stoploss_on_exchange(trade)
+                if not trade.is_open:
+                    logger.warning(
+                        f"Trade {trade} is closed, not creating trailing stoploss order.")
+                    return
 
                 # Create new stoploss order
                 if not await self.create_stoploss_order(trade=trade, stop_price=stoploss_norm):

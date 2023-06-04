@@ -166,7 +166,7 @@ class Exchange:
 
         # Converts the interval provided in minutes in config to seconds
         self.markets_refresh_interval: int = exchange_conf.get(
-            "markets_refresh_interval", 60) * 60
+            "markets_refresh_interval", 60) * 60 * 1000
 
     async def init_exchange(self, load_markets: bool = True, validate: bool = True,
                             load_leverage_tiers: bool = False) -> None:
