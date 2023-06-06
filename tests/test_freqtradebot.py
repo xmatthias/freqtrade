@@ -668,7 +668,8 @@ async def test_process_operational_exception(default_conf_usdt, ticker_usdt, moc
         fetch_ticker=ticker_usdt,
         create_order=MagicMock(side_effect=OperationalException('fff'))
     )
-    mocker.patch('freqtrade.configuration.Configuration.get_config', return_value=default_conf_usdt)
+    mocker.patch('freqtrade.configuration.configuration.Configuration.get_config',
+                 return_value=default_conf_usdt)
     worker = Worker(args=None)
     await worker.init_worker()
     patch_get_signal(worker.freqtrade)
