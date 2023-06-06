@@ -5264,7 +5264,7 @@ async def test__get_params(mocker, default_conf, exchange_name):
 async def test_get_liquidation_price1(mocker, default_conf):
 
     mocker.patch(f'{EXMS}.fill_leverage_tiers')
-    mocker.patch('freqtrade.exchange.Binance.additional_exchange_init')
+    mocker.patch('freqtrade.exchange.binance.Binance.additional_exchange_init')
     api_mock = MagicMock()
     leverage = 9.97
     positions = [

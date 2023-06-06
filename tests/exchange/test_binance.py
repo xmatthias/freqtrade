@@ -182,7 +182,7 @@ async def test_stoploss_adjust_binance(mocker, default_conf, sl1, sl2, sl3, side
 
 
 async def test_fill_leverage_tiers_binance(default_conf, mocker):
-    mocker.patch('freqtrade.exchange.Binance.additional_exchange_init')
+    mocker.patch('freqtrade.exchange.binance.Binance.additional_exchange_init')
     api_mock = MagicMock()
     api_mock.fetch_leverage_tiers = get_mock_coro(return_value={
         'ADA/BUSD': [
