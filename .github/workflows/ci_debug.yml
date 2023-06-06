@@ -1,0 +1,119 @@
+name: Freqtrade CI Debugger
+
+on:
+  workflow_dispatch:
+    inputs:
+      codespace:
+        description: 'Name of the codespace to connect to'
+        required: true
+
+
+# concurrency:
+#   group: "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
+#   cancel-in-progress: true
+# permissions:
+#   repository-projects: read
+jobs:
+
+  build_macos:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ macos-latest ]
+        python-version: ["3.11"]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache_dependencies
+      uses: actions/cache@v3
+      id: cache
+      with:
+        path: ~/dependencies/
+        key: ${{ runner.os }}-dependencies
+
+    - name: pip cache (macOS)
+      uses: actions/cache@v3
+      if: runner.os == 'macOS'
+      with:
+        path: ~/Library/Caches/pip
+        key: test-${{ matrix.os }}-${{ matrix.python-version }}-pip
+
+    - name: TA binary *nix
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        cd build_helpers && ./install_ta-lib.sh ${HOME}/dependencies/; cd ..
+
+    - name: Installation - macOS
+      if: runner.os == 'macOS'
+      run: |
+        brew update
+        # homebrew fails to update python due to unlinking failures
+        # https://github.com/actions/runner-images/issues/6817
+        rm /usr/local/bin/2to3 || true
+        rm /usr/local/bin/2to3-3.11 || true
+        rm /usr/local/bin/idle3 || true
+        rm /usr/local/bin/idle3.11 || true
+        rm /usr/local/bin/pydoc3 || true
+        rm /usr/local/bin/pydoc3.11 || true
+        rm /usr/local/bin/python3 || true
+        rm /usr/local/bin/python3.11 || true
+        rm /usr/local/bin/python3-config || true
+        rm /usr/local/bin/python3.11-config || true
+
+        brew install hdf5 c-blosc
+        python -m pip install --upgrade pip wheel
+        export LD_LIBRARY_PATH=${HOME}/dependencies/lib:$LD_LIBRARY_PATH
+        export TA_LIBRARY_PATH=${HOME}/dependencies/lib
+        export TA_INCLUDE_PATH=${HOME}/dependencies/include
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    # - name: Tests
+    #   run: |
+    #     pytest --random-order
+
+    - name: Debug in Codespace
+      # if: failure()
+      uses: dlemstra/github-actions-debugger@main
+      with:
+        token: ${{ secrets.TOKEN_FOR_CODESPACES }}
+        codespace: ${{ inputs.codespace }}
+
+  build_windows:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-latest ]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Pip cache (Windows)
+      uses: actions/cache@v3
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ matrix.os }}-${{ matrix.python-version }}-pip
+
+    - name: Installation
+      run: |
+        ./build_helpers/install_windows.ps1
+
+    - name: Debug in Codespace
+      # if: failure()
+      uses: dlemstra/github-actions-debugger@main
+      with:
+        token: ${{ secrets.TOKEN_FOR_CODESPACES }}
+        codespace: ${{ inputs.codespace }}
