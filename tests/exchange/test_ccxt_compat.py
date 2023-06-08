@@ -400,7 +400,7 @@ class TestCCXTExchange():
         exch, exchange_name = exchange
         if orders := EXCHANGES[exchange_name].get('sample_order'):
             for order in orders:
-                po = exch._api.parse_order(order)
+                po = exch._api_async.parse_order(order)
                 assert isinstance(po['id'], str)
                 assert po['id'] is not None
                 if len(order.keys()) < 5:
