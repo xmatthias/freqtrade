@@ -310,7 +310,7 @@ class Exchange:
         return list((self._api_async.timeframes or {}).keys())
 
     @property
-    def markets(self) -> Dict:
+    def markets(self) -> Dict[str, Any]:
         """exchange ccxt markets"""
         if not self._markets:
             raise OperationalException("Load markets first!")
@@ -1144,8 +1144,8 @@ class Exchange:
         else:
             limit_rate = stop_price * (2 - limit_price_pct)
 
-        bad_stop_price = ((stop_price <= limit_rate) if side ==
-                          "sell" else (stop_price >= limit_rate))
+        bad_stop_price = ((stop_price < limit_rate) if side ==
+                          "sell" else (stop_price > limit_rate))
         # Ensure rate is less than stop price
         if bad_stop_price:
             # This can for example happen if the stop / liquidation price is set to 0
