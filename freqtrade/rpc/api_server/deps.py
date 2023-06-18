@@ -51,11 +51,11 @@ def _generate_exchange_key(config: Config) -> str:
     return f"{config['exchange']['name']}_{config.get('trading_mode', 'spot')}"
 
 
-def get_exchange(config=Depends(get_config)):
+async def get_exchange(config=Depends(get_config)):
     exchange_key = _generate_exchange_key(config)
     if not (exchange := ApiBG.exchanges.get(exchange_key)):
         from freqtrade.resolvers import ExchangeResolver
-        exchange = ExchangeResolver.load_exchange(
+        exchange = await ExchangeResolver.load_exchange(
             config, load_leverage_tiers=False)
         ApiBG.exchanges[exchange_key] = exchange
     return exchange

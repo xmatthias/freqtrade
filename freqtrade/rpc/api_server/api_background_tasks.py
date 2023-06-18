@@ -52,15 +52,15 @@ def list_pairlists(config=Depends(get_config)):
     ]}
 
 
-def __run_pairlist(job_id: str, config_loc: Config):
+async def __run_pairlist(job_id: str, config_loc: Config):
     try:
 
         ApiBG.jobs[job_id]['is_running'] = True
         from freqtrade.plugins.pairlistmanager import PairListManager
 
-        exchange = get_exchange(config_loc)
+        exchange = await get_exchange(config_loc)
         pairlists = PairListManager(exchange, config_loc)
-        pairlists.refresh_pairlist()
+        await pairlists.refresh_pairlist()
         ApiBG.jobs[job_id]['result'] = {
                 'method': pairlists.name_list,
                 'length': len(pairlists.whitelist),
@@ -70,9 +70,9 @@ def __run_pairlist(job_id: str, config_loc: Config):
     except (OperationalException, Exception) as e:
         logger.exception(e)
         ApiBG.jobs[job_id]['error'] = str(e)
+        ApiBG.jobs[job_id]['status'] = 'failed'
     finally:
         ApiBG.jobs[job_id]['is_running'] = False
-        ApiBG.jobs[job_id]['status'] = 'failed'
         ApiBG.pairlist_running = False
 
 
