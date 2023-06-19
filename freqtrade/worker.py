@@ -35,6 +35,7 @@ class Worker:
 
         self._args = args
         self.init_config()
+        self._initialized = False
 
         self._heartbeat_msg: float = 0
 
@@ -58,6 +59,7 @@ class Worker:
         # Init the instance of the bot
         self.freqtrade = FreqtradeBot(self._config)
         await self.freqtrade.init_bot()
+        self._initialized = True
 
         internals_config = self._config.get('internals', {})
         self._throttle_secs = internals_config.get('process_throttle_secs',
@@ -221,6 +223,6 @@ class Worker:
         # Tell systemd that we are exiting now
         self._notify("STOPPING=1")
 
-        if self.freqtrade:
+        if self._initialized:
             self.freqtrade.notify_status('process died')
             await self.freqtrade.cleanup()
