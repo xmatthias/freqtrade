@@ -104,9 +104,6 @@ class Exchange:
         self._markets: Dict = {}
         self._trading_fees: Dict[str, Any] = {}
         self._leverage_tiers: Dict[str, List[Dict]] = {}
-        # Lock event loop. This is necessary to avoid race-conditions when using force* commands
-        # Due to funding fee fetching.
-        self._loop_lock = Lock()
         self.loop = self._init_async_loop()
         self._config: Config = {}
 
@@ -2132,8 +2129,7 @@ class Exchange:
         results_df = {}
         # Chunk requests into batches of 100 to avoid overwelming ccxt Throttling
         for input_coro in chunks(input_coroutines, 100):
-            with self._loop_lock:
-                results = await asyncio.gather(*input_coro, return_exceptions=True)
+            results = await asyncio.gather(*input_coro, return_exceptions=True)
 
             for res in results:
                 if isinstance(res, Exception):
@@ -2403,9 +2399,8 @@ class Exchange:
         if not self.exchange_has("fetchTrades"):
             raise OperationalException("This exchange does not support downloading Trades.")
 
-        with self._loop_lock:
-            return await self._async_get_trade_history(pair=pair, since=since,
-                                                       until=until, from_id=from_id)
+        return await self._async_get_trade_history(pair=pair, since=since,
+                                                   until=until, from_id=from_id)
 
     @retrier_async
     async def _get_funding_fees_from_exchange(
