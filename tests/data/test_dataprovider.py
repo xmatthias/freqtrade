@@ -64,9 +64,10 @@ def test_historic_ohlcv(mocker, default_conf, ohlcv_history):
 
 async def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     hdf5loadmock = MagicMock(return_value=ohlcv_history)
-    jsonloadmock = MagicMock(return_value=ohlcv_history)
+    featherloadmock = MagicMock(return_value=ohlcv_history)
     mocker.patch("freqtrade.data.history.hdf5datahandler.HDF5DataHandler._ohlcv_load", hdf5loadmock)
-    mocker.patch("freqtrade.data.history.jsondatahandler.JsonDataHandler._ohlcv_load", jsonloadmock)
+    mocker.patch("freqtrade.data.history.featherdatahandler.FeatherDataHandler._ohlcv_load",
+                 featherloadmock)
 
     default_conf["runmode"] = RunMode.BACKTEST
     exchange = await get_patched_exchange(mocker, default_conf)
@@ -74,17 +75,17 @@ async def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     data = dp.historic_ohlcv("UNITTEST/BTC", "5m")
     assert isinstance(data, DataFrame)
     hdf5loadmock.assert_not_called()
-    jsonloadmock.assert_called_once()
+    featherloadmock.assert_called_once()
 
     # Switching to dataformat hdf5
     hdf5loadmock.reset_mock()
-    jsonloadmock.reset_mock()
+    featherloadmock.reset_mock()
     default_conf["dataformat_ohlcv"] = "hdf5"
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     data = dp.historic_ohlcv("UNITTEST/BTC", "5m")
     assert isinstance(data, DataFrame)
     hdf5loadmock.assert_called_once()
-    jsonloadmock.assert_not_called()
+    featherloadmock.assert_not_called()
 
 
 @pytest.mark.parametrize('candle_type', [
@@ -129,9 +130,14 @@ async def test_get_pair_dataframe(mocker, default_conf, ohlcv_history, candle_ty
     default_conf["runmode"] = RunMode.BACKTEST
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     assert dp.runmode == RunMode.BACKTEST
-    assert isinstance(dp.get_pair_dataframe(
-        "UNITTEST/BTC", timeframe, candle_type=candle_type), DataFrame)
-    # assert dp.get_pair_dataframe("NONESENSE/AAA", timeframe).empty
+    df = dp.get_pair_dataframe("UNITTEST/BTC", timeframe, candle_type=candle_type)
+    assert isinstance(df, DataFrame)
+    assert len(df) == 3  # ohlcv_history mock has just 3 rows
+
+    dp._set_dataframe_max_date(ohlcv_history.iloc[-1]['date'])
+    df = dp.get_pair_dataframe("UNITTEST/BTC", timeframe, candle_type=candle_type)
+    assert isinstance(df, DataFrame)
+    assert len(df) == 2  # ohlcv_history is limited to 2 rows now
 
 
 async def test_available_pairs(mocker, default_conf, ohlcv_history):
@@ -259,7 +265,7 @@ async def test_orderbook(mocker, default_conf, order_book_l2_sync):
     assert order_book_l2_sync.call_args_list[0][0][0] == 'ETH/BTC'
     assert order_book_l2_sync.call_args_list[0][0][1] >= 5
 
-    assert type(res) is dict
+    assert isinstance(res, dict)
     assert 'bids' in res
     assert 'asks' in res
 
@@ -272,7 +278,7 @@ async def test_market(mocker, default_conf, markets):
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.market('ETH/BTC')
 
-    assert type(res) is dict
+    assert isinstance(res, dict)
     assert 'symbol' in res
     assert res['symbol'] == 'ETH/BTC'
 
@@ -286,7 +292,7 @@ async def test_ticker(mocker, default_conf, tickers_sync):
     exchange = await get_patched_exchange(mocker, default_conf)
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     res = dp.ticker('ETH/BTC')
-    assert type(res) is dict
+    assert isinstance(res, dict)
     assert 'symbol' in res
     assert res['symbol'] == 'ETH/BTC'
 

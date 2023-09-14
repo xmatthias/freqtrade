@@ -5,6 +5,7 @@ Cryptocurrency Exchanges support
 import asyncio
 import inspect
 import logging
+import signal
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from math import floor
@@ -22,8 +23,7 @@ from freqtrade.constants import (DEFAULT_AMOUNT_RESERVE_PERCENT, NON_OPEN_EXCHAN
                                  BuySell, Config, EntryExit, ExchangeConfig,
                                  ListPairsWithTimeframes, MakerTaker, OBLiteral, PairWithTimeframe)
 from freqtrade.data.converter import clean_ohlcv_dataframe, ohlcv_to_dataframe, trades_dict_to_list
-from freqtrade.enums import OPTIMIZE_MODES, CandleType, MarginMode, TradingMode
-from freqtrade.enums.pricetype import PriceType
+from freqtrade.enums import OPTIMIZE_MODES, CandleType, MarginMode, PriceType, TradingMode
 from freqtrade.exceptions import (DDosProtection, ExchangeError, InsufficientFundsError,
                                   InvalidOrderException, OperationalException, PricingError,
                                   RetryableOrderError, TemporaryError)
@@ -80,9 +80,8 @@ class Exchange:
         "mark_ohlcv_price": "mark",
         "mark_ohlcv_timeframe": "8h",
         "ccxt_futures_name": "swap",
-        "fee_cost_in_contracts": False,  # Fee cost needs contract conversion
         "needs_trading_fees": False,  # use fetch_trading_fees to cache fees
-        "order_props_in_contracts": ['amount', 'cost', 'filled', 'remaining'],
+        "order_props_in_contracts": ['amount', 'filled', 'remaining'],
         # Override createMarketBuyOrderRequiresPrice where ccxt has it wrong
         "marketOrderRequiresPrice": False,
     }
@@ -269,8 +268,6 @@ class Exchange:
             raise OperationalException(f'Exchange {name} is not supported') from e
         except ccxt.BaseError as e:
             raise OperationalException(f"Initialization of ccxt failed. Reason: {e}") from e
-
-        self.set_sandbox(api, exchange_config, name)
 
         return api
 
@@ -472,16 +469,6 @@ class Exchange:
         return amount_to_contract_precision(amount, self.get_precision_amount(pair),
                                             self.precisionMode, contract_size)
 
-    def set_sandbox(self, api: ccxt.Exchange, exchange_config: dict, name: str) -> None:
-        if exchange_config.get('sandbox'):
-            if api.urls.get('test'):
-                api.urls['api'] = api.urls['test']
-                logger.info("Enabled Sandbox API on %s", name)
-            else:
-                logger.warning(
-                    f"No Sandbox URL in CCXT for {name}, exiting. Please check your config.json")
-                raise OperationalException(f'Exchange {name} does not provide a sandbox api')
-
     async def load_markets(self, reload: bool = False) -> None:
         """ Initialize markets """
         try:
@@ -573,7 +560,7 @@ class Exchange:
         for pair in [f"{curr_1}/{curr_2}", f"{curr_2}/{curr_1}"]:
             if pair in self.markets and self.markets[pair].get('active'):
                 return pair
-        raise ExchangeError(f"Could not combine {curr_1} and {curr_2} to get a valid pair.")
+        raise ValueError(f"Could not combine {curr_1} and {curr_2} to get a valid pair.")
 
     def validate_timeframes(self, timeframe: Optional[str]) -> None:
         """
@@ -836,7 +823,7 @@ class Exchange:
                                    rate: float, leverage: float, params: Dict = {},
                                    stop_loss: bool = False) -> Dict[str, Any]:
         now = dt_now()
-        order_id = f'dry_run_{side}_{now.timestamp()}'
+        order_id = f'dry_run_{side}_{pair}_{now.timestamp()}'
         # Rounding here must respect to contract sizes
         _amount = self._contracts_to_amount(
             pair, self.amount_to_precision(pair, self._amount_to_contracts(pair, amount)))
@@ -867,8 +854,8 @@ class Exchange:
         if self.exchange_has('fetchL2OrderBook'):
             orderbook = await self.fetch_l2_order_book(pair, 20)
         if ordertype == "limit" and orderbook:
-            # Allow a 3% price difference
-            allowed_diff = 0.03
+            # Allow a 1% price difference
+            allowed_diff = 0.01
             if await self._dry_is_price_crossed(pair, side, rate, orderbook, allowed_diff):
                 logger.info(
                     f"Converted order {pair} to market order due to price {rate} crossing spread "
@@ -924,7 +911,7 @@ class Exchange:
             max_slippage_val = rate * ((1 + slippage) if side == 'buy' else (1 - slippage))
 
             remaining_amount = amount
-            filled_amount = 0.0
+            filled_value = 0.0
             book_entry_price = 0.0
             for book_entry in orderbook[ob_type]:
                 book_entry_price = book_entry[0]
@@ -932,17 +919,17 @@ class Exchange:
                 if remaining_amount > 0:
                     if remaining_amount < book_entry_coin_volume:
                         # Orderbook at this slot bigger than remaining amount
-                        filled_amount += remaining_amount * book_entry_price
+                        filled_value += remaining_amount * book_entry_price
                         break
                     else:
-                        filled_amount += book_entry_coin_volume * book_entry_price
+                        filled_value += book_entry_coin_volume * book_entry_price
                     remaining_amount -= book_entry_coin_volume
                 else:
                     break
             else:
                 # If remaining_amount wasn't consumed completely (break was not called)
-                filled_amount += remaining_amount * book_entry_price
-            forecast_avg_filled_price = max(filled_amount, 0) / amount
+                filled_value += remaining_amount * book_entry_price
+            forecast_avg_filled_price = max(filled_value, 0) / amount
             # Limit max. slippage to specified value
             if side == 'buy':
                 forecast_avg_filled_price = min(forecast_avg_filled_price, max_slippage_val)
@@ -1427,8 +1414,18 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
+    async def __fetch_orders_emulate(self, pair: str, since_ms: int) -> List[Dict]:
+        orders = []
+        if self.exchange_has('fetchClosedOrders'):
+            orders = await self._api_async.fetch_closed_orders(pair, since=since_ms)
+            if self.exchange_has('fetchOpenOrders'):
+                orders_open = await self._api_async.fetch_open_orders(pair, since=since_ms)
+                orders.extend(orders_open)
+        return orders
+
     @retrier_async(retries=0)
-    async def fetch_orders(self, pair: str, since: datetime) -> List[Dict]:
+    async def fetch_orders(
+            self, pair: str, since: datetime, params: Optional[Dict] = None) -> List[Dict]:
         """
         Fetch all orders for a pair "since"
         :param pair: Pair for the query
@@ -1437,26 +1434,19 @@ class Exchange:
         if self._config['dry_run']:
             return []
 
-        async def fetch_orders_emulate() -> List[Dict]:
-            orders = []
-            if self.exchange_has('fetchClosedOrders'):
-                orders = await self._api_async.fetch_closed_orders(pair, since=since_ms)
-                if self.exchange_has('fetchOpenOrders'):
-                    orders_open = await self._api_async.fetch_open_orders(pair, since=since_ms)
-                    orders.extend(orders_open)
-            return orders
-
         try:
             since_ms = int((since.timestamp() - 10) * 1000)
             if self.exchange_has('fetchOrders'):
+                if not params:
+                    params = {}
                 try:
                     orders: List[Dict] = await self._api_async.fetch_orders(pair, since=since_ms)
                 except ccxt.NotSupported:
                     # Some exchanges don't support fetchOrders
                     # attempt to fetch open and closed orders separately
-                    orders = await fetch_orders_emulate()
+                    orders = await self.__fetch_orders_emulate(pair, since_ms)
             else:
-                orders = await fetch_orders_emulate()
+                orders = await self.__fetch_orders_emulate(pair, since_ms)
             self._log_exchange_response('fetch_orders', orders)
             orders = [self._order_contracts_to_amount(o) for o in orders]
             return orders
@@ -1905,9 +1895,6 @@ class Exchange:
         if fee_curr is None:
             return None
         fee_cost = float(fee['cost'])
-        if self._ft_has['fee_cost_in_contracts']:
-            # Convert cost via "contracts" conversion
-            fee_cost = self._contracts_to_amount(symbol, fee['cost'])
 
         # Calculate fee based on order details
         if fee_curr == self.get_pair_base_currency(symbol):
@@ -1926,7 +1913,7 @@ class Exchange:
                 tick = await self.fetch_ticker(comb)
 
                 fee_to_quote_rate = safe_value_fallback2(tick, tick, 'last', 'ask')
-            except ExchangeError:
+            except (ValueError, ExchangeError):
                 fee_to_quote_rate = self._config['exchange'].get('unknown_fee_rate', None)
                 if not fee_to_quote_rate:
                     return None
@@ -2208,7 +2195,7 @@ class Exchange:
             except IndexError:
                 logger.exception("Error loading %s. Result was %s.", pair, data)
                 return pair, timeframe, candle_type, [], self._ohlcv_partial_candle
-            logger.debug("Done fetching pair %s, interval %s ...", pair, timeframe)
+            logger.debug("Done fetching pair %s, %s interval %s...", pair, candle_type, timeframe)
             return pair, timeframe, candle_type, data, self._ohlcv_partial_candle
 
         except ccxt.NotSupported as e:
@@ -2310,20 +2297,24 @@ class Exchange:
             from_id = t[-1][1]
             trades.extend(t[:-1])
         while True:
-            t = await self._async_fetch_trades(pair,
-                                               params={self._trades_pagination_arg: from_id})
-            if t:
-                # Skip last id since its the key for the next call
-                trades.extend(t[:-1])
-                if from_id == t[-1][1] or t[-1][0] > until:
-                    logger.debug(f"Stopping because from_id did not change. "
-                                 f"Reached {t[-1][0]} > {until}")
-                    # Reached the end of the defined-download period - add last trade as well.
-                    trades.extend(t[-1:])
-                    break
+            try:
+                t = await self._async_fetch_trades(pair,
+                                                   params={self._trades_pagination_arg: from_id})
+                if t:
+                    # Skip last id since its the key for the next call
+                    trades.extend(t[:-1])
+                    if from_id == t[-1][1] or t[-1][0] > until:
+                        logger.debug(f"Stopping because from_id did not change. "
+                                     f"Reached {t[-1][0]} > {until}")
+                        # Reached the end of the defined-download period - add last trade as well.
+                        trades.extend(t[-1:])
+                        break
 
-                from_id = t[-1][1]
-            else:
+                    from_id = t[-1][1]
+                else:
+                    break
+            except asyncio.CancelledError:
+                logger.debug("Async operation Interrupted, breaking trades DL loop.")
                 break
 
         return (pair, trades)
@@ -2343,16 +2334,20 @@ class Exchange:
         # DEFAULT_TRADES_COLUMNS: 0 -> timestamp
         # DEFAULT_TRADES_COLUMNS: 1 -> id
         while True:
-            t = await self._async_fetch_trades(pair, since=since)
-            if t:
-                since = t[-1][0]
-                trades.extend(t)
-                # Reached the end of the defined-download period
-                if until and t[-1][0] > until:
-                    logger.debug(
-                        f"Stopping because until was reached. {t[-1][0]} > {until}")
+            try:
+                t = await self._async_fetch_trades(pair, since=since)
+                if t:
+                    since = t[-1][0]
+                    trades.extend(t)
+                    # Reached the end of the defined-download period
+                    if until and t[-1][0] > until:
+                        logger.debug(
+                            f"Stopping because until was reached. {t[-1][0]} > {until}")
+                        break
+                else:
                     break
-            else:
+            except asyncio.CancelledError:
+                logger.debug("Async operation Interrupted, breaking trades DL loop.")
                 break
 
         return (pair, trades)
@@ -2401,6 +2396,18 @@ class Exchange:
 
         return await self._async_get_trade_history(pair=pair, since=since,
                                                    until=until, from_id=from_id)
+        # TODO: asyncio: how can the below be handled?
+        # with self._loop_lock:
+        #     task = asyncio.ensure_future(self._async_get_trade_history(
+        #         pair=pair, since=since, until=until, from_id=from_id))
+
+        #     for sig in [signal.SIGINT, signal.SIGTERM]:
+        #         try:
+        #             self.loop.add_signal_handler(sig, task.cancel)
+        #         except NotImplementedError:
+        #             # Not all platforms implement signals (e.g. windows)
+        #             pass
+        #     return self.loop.run_until_complete(task)
 
     @retrier_async
     async def _get_funding_fees_from_exchange(

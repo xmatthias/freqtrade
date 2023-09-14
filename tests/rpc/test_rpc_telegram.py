@@ -310,7 +310,7 @@ async def test_telegram_status_multi_entry(default_conf, update, mocker, fee) ->
 
     create_mock_trades(fee)
     trades = Trade.get_open_trades()
-    trade = trades[0]
+    trade = trades[3]
     # Average may be empty on some exchanges
     trade.orders[0].average = 0
     trade.orders.append(Order(
@@ -338,11 +338,11 @@ async def test_telegram_status_multi_entry(default_conf, update, mocker, fee) ->
 
     await telegram._status(update=update, context=MagicMock())
     assert msg_mock.call_count == 4
-    msg = msg_mock.call_args_list[0][0][0]
+    msg = msg_mock.call_args_list[3][0][0]
     assert re.search(r'Number of Entries.*2', msg)
-    assert re.search(r'Number of Exits.*0', msg)
-    assert re.search(r'Average Entry Price', msg)
-    assert re.search(r'Order filled', msg)
+    assert re.search(r'Number of Exits.*1', msg)
+    assert re.search(r'from 1st entry rate', msg)
+    assert re.search(r'Order Filled', msg)
     assert re.search(r'Close Date:', msg) is None
     assert re.search(r'Close Profit:', msg) is None
 
@@ -793,6 +793,8 @@ async def test_telegram_profit_handle(
     assert '*Best Performing:* `ETH/USDT: 9.45%`' in msg_mock.call_args_list[-1][0][0]
     assert '*Max Drawdown:*' in msg_mock.call_args_list[-1][0][0]
     assert '*Profit factor:*' in msg_mock.call_args_list[-1][0][0]
+    assert '*Winrate:*' in msg_mock.call_args_list[-1][0][0]
+    assert '*Expectancy (Ratio):*' in msg_mock.call_args_list[-1][0][0]
     assert '*Trading volume:* `126 USDT`' in msg_mock.call_args_list[-1][0][0]
 
 

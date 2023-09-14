@@ -373,7 +373,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         return True
 
     def custom_stoploss(self, pair: str, trade: Trade, current_time: datetime, current_rate: float,
-                        current_profit: float, **kwargs) -> float:
+                        current_profit: float, after_fill: bool, **kwargs) -> Optional[float]:
         """
         Custom stoploss logic, returning the new distance relative to current_rate (as ratio).
         e.g. returning -0.05 would create a stoploss 5% below current_rate.
@@ -381,7 +381,7 @@ class IStrategy(ABC, HyperStrategyMixin):
 
         For full documentation please go to https://www.freqtrade.io/en/latest/strategy-advanced/
 
-        When not implemented by a strategy, returns the initial stoploss value
+        When not implemented by a strategy, returns the initial stoploss value.
         Only called when use_custom_stoploss is set to True.
 
         :param pair: Pair that's currently analyzed
@@ -389,6 +389,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         :param current_time: datetime object, containing the current datetime
         :param current_rate: Rate, calculated based on pricing settings in exit_pricing.
         :param current_profit: Current profit (as ratio), calculated based on current_rate.
+        :param after_fill: True if the stoploss is called after the order was filled.
         :param **kwargs: Ensure to keep this here so updates to this won't break your strategy.
         :return float: New stoploss value, relative to the current_rate
         """
@@ -719,6 +720,8 @@ class IStrategy(ABC, HyperStrategyMixin):
 # END - Intended to be overridden by strategy
 ###
 
+    _ft_stop_uses_after_fill = False
+
     def __informative_pairs_freqai(self) -> ListPairsWithTimeframes:
         """
         Create informative-pairs needed for FreqAI
@@ -825,6 +828,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         """
         Parses the given candle (OHLCV) data and returns a populated DataFrame
         add several TA indicators and entry order signal to it
+        Should only be used in live.
         :param dataframe: Dataframe containing data from exchange
         :param metadata: Metadata dictionary with additional data (e.g. 'pair')
         :return: DataFrame of candle (OHLCV) data with indicator data and signals added
@@ -1159,13 +1163,17 @@ class IStrategy(ABC, HyperStrategyMixin):
     def ft_stoploss_adjust(self, current_rate: float, trade: Trade,
                            current_time: datetime, current_profit: float,
                            force_stoploss: float, low: Optional[float] = None,
-                           high: Optional[float] = None) -> None:
+                           high: Optional[float] = None, after_fill: bool = False) -> None:
         """
         Adjust stop-loss dynamically if configured to do so.
         :param current_profit: current profit as ratio
         :param low: Low value of this candle, only set in backtesting
         :param high: High value of this candle, only set in backtesting
         """
+        if after_fill and not self._ft_stop_uses_after_fill:
+            # Skip if the strategy doesn't support after fill.
+            return
+
         stop_loss_value = force_stoploss if force_stoploss else self.stoploss
 
         # Initiate stoploss with open_rate. Does nothing if stoploss is already set.
@@ -1180,17 +1188,20 @@ class IStrategy(ABC, HyperStrategyMixin):
         bound = (low if trade.is_short else high)
         bound_profit = current_profit if not bound else trade.calc_profit_ratio(bound)
         if self.use_custom_stoploss and dir_correct:
-            stop_loss_value = strategy_safe_wrapper(self.custom_stoploss, default_retval=None
-                                                    )(pair=trade.pair, trade=trade,
-                                                      current_time=current_time,
-                                                      current_rate=(bound or current_rate),
-                                                      current_profit=bound_profit)
+            stop_loss_value_custom = strategy_safe_wrapper(
+                self.custom_stoploss, default_retval=None, supress_error=True
+                    )(pair=trade.pair, trade=trade,
+                        current_time=current_time,
+                        current_rate=(bound or current_rate),
+                        current_profit=bound_profit,
+                        after_fill=after_fill)
             # Sanity check - error cases will return None
-            if stop_loss_value:
-                # logger.info(f"{trade.pair} {stop_loss_value=} {bound_profit=}")
-                trade.adjust_stop_loss(bound or current_rate, stop_loss_value)
+            if stop_loss_value_custom:
+                stop_loss_value = stop_loss_value_custom
+                trade.adjust_stop_loss(bound or current_rate, stop_loss_value,
+                                       allow_refresh=after_fill)
             else:
-                logger.warning("CustomStoploss function did not return valid stoploss")
+                logger.debug("CustomStoploss function did not return valid stoploss")
 
         if self.trailing_stop and dir_correct:
             # trailing stoploss handling
@@ -1243,7 +1254,7 @@ class IStrategy(ABC, HyperStrategyMixin):
             exit_type = ExitType.STOP_LOSS
 
             # If initial stoploss is not the same as current one then it is trailing.
-            if trade.initial_stop_loss != trade.stop_loss:
+            if trade.is_stop_loss_trailing:
                 exit_type = ExitType.TRAILING_STOP_LOSS
                 logger.debug(
                     f"{trade.pair} - HIT STOP: current price at "
@@ -1320,6 +1331,20 @@ class IStrategy(ABC, HyperStrategyMixin):
         """
         return {pair: self.advise_indicators(pair_data.copy(), {'pair': pair}).copy()
                 for pair, pair_data in data.items()}
+
+    def ft_advise_signals(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        """
+        Call advise_entry and advise_exit and return the resulting dataframe.
+        :param dataframe: Dataframe containing data from exchange, as well as pre-calculated
+                          indicators
+        :param metadata: Metadata dictionary with additional data (e.g. 'pair')
+        :return: DataFrame of candle (OHLCV) data with indicator data and signals added
+
+        """
+
+        dataframe = self.advise_entry(dataframe, metadata)
+        dataframe = self.advise_exit(dataframe, metadata)
+        return dataframe
 
     def advise_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """

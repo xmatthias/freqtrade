@@ -18,7 +18,7 @@ from tests.exchange.test_exchange import async_ccxt_exception
 async def test_create_stoploss_order_kucoin(
         default_conf, mocker, limitratio, expected, side, order_type):
     api_mock = MagicMock()
-    order_id = 'test_prod_buy_{}'.format(randint(0, 10 ** 6))
+    order_id = f'test_prod_buy_{randint(0, 10 ** 6)}'
 
     api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
@@ -139,7 +139,7 @@ async def test_stoploss_adjust_kucoin(mocker, default_conf):
 ])
 async def test_kucoin_create_order(default_conf, mocker, side, ordertype, rate):
     api_mock = MagicMock()
-    order_id = 'test_prod_{}_{}'.format(side, randint(0, 10 ** 6))
+    order_id = f'test_prod_{side}_{randint(0, 10 ** 6)}'
     api_mock.create_order = get_mock_coro(return_value={
         'id': order_id,
         'info': {

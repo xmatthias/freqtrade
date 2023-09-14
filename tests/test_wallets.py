@@ -7,8 +7,8 @@ from sqlalchemy import select
 from freqtrade.constants import UNLIMITED_STAKE_AMOUNT
 from freqtrade.exceptions import DependencyException
 from freqtrade.persistence import Trade
-from tests.conftest import (EXMS, create_mock_trades, get_mock_coro, get_patched_freqtradebot,
-                            patch_wallet)
+from tests.conftest import (EXMS, create_mock_trades, create_mock_trades_usdt, get_mock_coro,
+                            get_patched_freqtradebot, patch_wallet)
 
 
 async def test_sync_wallet_at_boot(mocker, default_conf):
@@ -343,6 +343,33 @@ async def test_sync_wallet_futures_live(mocker, default_conf):
     await freqtrade.wallets.update()
     assert len(freqtrade.wallets._positions) == 1
     assert 'ETH/USDT:USDT' not in freqtrade.wallets._positions
+
+
+async def test_sync_wallet_dry(mocker, default_conf_usdt, fee):
+    default_conf_usdt['dry_run'] = True
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
+    assert len(freqtrade.wallets._wallets) == 1
+    assert len(freqtrade.wallets._positions) == 0
+    assert freqtrade.wallets.get_total('USDT') == 1000
+
+    create_mock_trades_usdt(fee, is_short=None)
+
+    await freqtrade.wallets.update()
+
+    assert len(freqtrade.wallets._wallets) == 5
+    assert len(freqtrade.wallets._positions) == 0
+    bal = freqtrade.wallets.get_all_balances()
+    assert bal['NEO'].total == 10
+    assert bal['XRP'].total == 10
+    assert bal['LTC'].total == 2
+    assert bal['USDT'].total == 922.74
+
+    assert freqtrade.wallets.get_starting_balance() == default_conf_usdt['dry_run_wallet']
+    total = freqtrade.wallets.get_total('LTC')
+    free = freqtrade.wallets.get_free('LTC')
+    used = freqtrade.wallets.get_used('LTC')
+    assert free != 0
+    assert free + used == total
 
 
 async def test_sync_wallet_futures_dry(mocker, default_conf, fee):

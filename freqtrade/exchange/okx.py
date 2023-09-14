@@ -4,8 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import ccxt
 
 from freqtrade.constants import BuySell
-from freqtrade.enums import CandleType, MarginMode, TradingMode
-from freqtrade.enums.pricetype import PriceType
+from freqtrade.enums import CandleType, MarginMode, PriceType, TradingMode
 from freqtrade.exceptions import (DDosProtection, OperationalException, RetryableOrderError,
                                   TemporaryError)
 from freqtrade.exchange import Exchange, date_minus_candles
@@ -32,7 +31,6 @@ class Okx(Exchange):
     }
     _ft_has_futures: Dict = {
         "tickers_have_quoteVolume": False,
-        "fee_cost_in_contracts": True,
         "stop_price_type_field": "slTriggerPxType",
         "stop_price_type_value_mapping": {
             PriceType.LAST: "last",

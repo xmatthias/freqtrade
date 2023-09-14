@@ -51,6 +51,7 @@ class TimeunitMappings:
     message2: str
     callback: str
     default: int
+    dateformat: str
 
 
 def authorized_only(command_handler: Callable[..., Coroutine[Any, Any, None]]):
@@ -528,40 +529,24 @@ class Telegram(RPCHandler):
             cur_entry_amount = order["filled"] or order["amount"]
             cur_entry_average = order["safe_price"]
             lines.append("  ")
+            lines.append(f"*{wording} #{order_nr}:*")
             if order_nr == 1:
-                lines.append(f"*{wording} #{order_nr}:*")
                 lines.append(
                     f"*Amount:* {cur_entry_amount:.8g} "
                     f"({round_coin_value(order['cost'], quote_currency)})"
                 )
                 lines.append(f"*Average Price:* {cur_entry_average:.8g}")
             else:
-                sum_stake = 0
-                sum_amount = 0
-                for y in range(order_nr):
-                    loc_order = filled_orders[y]
-                    if loc_order['is_open'] is True:
-                        # Skip open orders (e.g. stop orders)
-                        continue
-                    amount = loc_order["filled"] or loc_order["amount"]
-                    sum_stake += amount * loc_order["safe_price"]
-                    sum_amount += amount
-                prev_avg_price = sum_stake / sum_amount
                 # TODO: This calculation ignores fees.
                 price_to_1st_entry = ((cur_entry_average - first_avg) / first_avg)
-                minus_on_entry = 0
-                if prev_avg_price:
-                    minus_on_entry = (cur_entry_average - prev_avg_price) / prev_avg_price
-
-                lines.append(f"*{wording} #{order_nr}:* at {minus_on_entry:.2%} avg Profit")
                 if is_open:
                     lines.append("({})".format(dt_humanize(order["order_filled_date"],
                                                            granularity=["day", "hour", "minute"])))
                 lines.append(f"*Amount:* {cur_entry_amount:.8g} "
                              f"({round_coin_value(order['cost'], quote_currency)})")
                 lines.append(f"*Average {wording} Price:* {cur_entry_average:.8g} "
-                             f"({price_to_1st_entry:.2%} from 1st entry Rate)")
-                lines.append(f"*Order filled:* {order['order_filled_date']}")
+                             f"({price_to_1st_entry:.2%} from 1st entry rate)")
+                lines.append(f"*Order Filled:* {order['order_filled_date']}")
 
             lines_detail.append("\n".join(lines))
 
@@ -659,10 +644,10 @@ class Telegram(RPCHandler):
                              ("`({stop_loss_ratio:.2%})`" if r['stop_loss_ratio'] else ""))
                 lines.append("*Stoploss distance:* `{stoploss_current_dist:.8g}` "
                              "`({stoploss_current_dist_ratio:.2%})`")
-                if r['open_order']:
+                if r.get('open_orders'):
                     lines.append(
-                        "*Open Order:* `{open_order}`"
-                        + "- `{exit_order_status}`" if r['exit_order_status'] else "")
+                        "*Open Order:* `{open_orders}`"
+                        + ("- `{exit_order_status}`" if r['exit_order_status'] else ""))
 
             lines_detail = self._prepare_order_details(
                 r['orders'], r['quote_currency'], r['is_open'])
@@ -733,10 +718,10 @@ class Telegram(RPCHandler):
         """
 
         vals = {
-            'days': TimeunitMappings('Day', 'Daily', 'days', 'update_daily', 7),
+            'days': TimeunitMappings('Day', 'Daily', 'days', 'update_daily', 7, '%Y-%m-%d'),
             'weeks': TimeunitMappings('Monday', 'Weekly', 'weeks (starting from Monday)',
-                                      'update_weekly', 8),
-            'months': TimeunitMappings('Month', 'Monthly', 'months', 'update_monthly', 6),
+                                      'update_weekly', 8, '%Y-%m-%d'),
+            'months': TimeunitMappings('Month', 'Monthly', 'months', 'update_monthly', 6, '%Y-%m'),
         }
         val = vals[unit]
 
@@ -753,7 +738,7 @@ class Telegram(RPCHandler):
             unit
         )
         stats_tab = tabulate(
-            [[f"{period['date']} ({period['trade_count']})",
+            [[f"{period['date']:{val.dateformat}} ({period['trade_count']})",
               f"{round_coin_value(period['abs_profit'], stats['stake_currency'])}",
               f"{period['fiat_value']:.2f} {stats['fiat_display_currency']}",
               f"{period['rel_profit']:.2%}",
@@ -844,6 +829,10 @@ class Telegram(RPCHandler):
         avg_duration = stats['avg_duration']
         best_pair = stats['best_pair']
         best_pair_profit_ratio = stats['best_pair_profit_ratio']
+        winrate = stats['winrate']
+        expectancy = stats['expectancy']
+        expectancy_ratio = stats['expectancy_ratio']
+
         if stats['trade_count'] == 0:
             markdown_msg = f"No trades yet.\n*Bot started:* `{stats['bot_start_date']}`"
         else:
@@ -868,7 +857,9 @@ class Telegram(RPCHandler):
                 f"*{'First Trade opened' if not timescale else 'Showing Profit since'}:* "
                 f"`{first_trade_date}`\n"
                 f"*Latest Trade opened:* `{latest_trade_date}`\n"
-                f"*Win / Loss:* `{stats['winning_trades']} / {stats['losing_trades']}`"
+                f"*Win / Loss:* `{stats['winning_trades']} / {stats['losing_trades']}`\n"
+                f"*Winrate:* `{winrate:.2%}`\n"
+                f"*Expectancy (Ratio):* `{expectancy:.2f} ({expectancy_ratio:.2f})`"
             )
             if stats['closed_trade_count'] > 0:
                 markdown_msg += (
@@ -877,7 +868,11 @@ class Telegram(RPCHandler):
                     f"*Trading volume:* `{round_coin_value(stats['trading_volume'], stake_cur)}`\n"
                     f"*Profit factor:* `{stats['profit_factor']:.2f}`\n"
                     f"*Max Drawdown:* `{stats['max_drawdown']:.2%} "
-                    f"({round_coin_value(stats['max_drawdown_abs'], stake_cur)})`"
+                    f"({round_coin_value(stats['max_drawdown_abs'], stake_cur)})`\n"
+                    f"    from `{stats['max_drawdown_start']} "
+                    f"({round_coin_value(stats['drawdown_high'], stake_cur)})`\n"
+                    f"    to `{stats['max_drawdown_end']} "
+                    f"({round_coin_value(stats['drawdown_low'], stake_cur)})`\n"
                 )
         await self._send_msg(markdown_msg, reload_able=True, callback_path="update_profit",
                              query=update.callback_query)

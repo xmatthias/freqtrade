@@ -10,6 +10,7 @@ from unittest.mock import ANY, MagicMock, PropertyMock
 
 import pandas as pd
 import pytest
+import rapidjson
 import uvicorn
 from fastapi import FastAPI, WebSocketDisconnect
 from fastapi.exceptions import HTTPException
@@ -79,6 +80,16 @@ def client_post(client: TestClient, url, data={}):
                                 'Origin': 'http://example.com',
                                 'content-type': 'application/json'
                                 })
+
+
+def client_patch(client: TestClient, url, data={}):
+
+    return client.patch(url,
+                        json=data,
+                        headers={'Authorization': _basic_auth_str(_TEST_USER, _TEST_PASS),
+                                 'Origin': 'http://example.com',
+                                 'content-type': 'application/json'
+                                 })
 
 
 def client_get(client: TestClient, url):
@@ -610,6 +621,47 @@ def test_api_daily(botclient, mocker, ticker, fee, markets):
     assert rc.json()['data'][0]['date'] == str(datetime.now(timezone.utc).date())
 
 
+def test_api_weekly(botclient, mocker, ticker, fee, markets, time_machine):
+    ftbot, client = botclient
+    patch_get_signal(ftbot)
+    mocker.patch.multiple(
+        EXMS,
+        get_balances=MagicMock(return_value=ticker),
+        fetch_ticker=ticker,
+        get_fee=fee,
+        markets=PropertyMock(return_value=markets)
+    )
+    time_machine.move_to("2023-03-31 21:45:05 +00:00")
+    rc = client_get(client, f"{BASE_URI}/weekly")
+    assert_response(rc)
+    assert len(rc.json()['data']) == 4
+    assert rc.json()['stake_currency'] == 'BTC'
+    assert rc.json()['fiat_display_currency'] == 'USD'
+    # Moved to monday
+    assert rc.json()['data'][0]['date'] == '2023-03-27'
+    assert rc.json()['data'][1]['date'] == '2023-03-20'
+
+
+def test_api_monthly(botclient, mocker, ticker, fee, markets, time_machine):
+    ftbot, client = botclient
+    patch_get_signal(ftbot)
+    mocker.patch.multiple(
+        EXMS,
+        get_balances=MagicMock(return_value=ticker),
+        fetch_ticker=ticker,
+        get_fee=fee,
+        markets=PropertyMock(return_value=markets)
+    )
+    time_machine.move_to("2023-03-31 21:45:05 +00:00")
+    rc = client_get(client, f"{BASE_URI}/monthly")
+    assert_response(rc)
+    assert len(rc.json()['data']) == 3
+    assert rc.json()['stake_currency'] == 'BTC'
+    assert rc.json()['fiat_display_currency'] == 'USD'
+    assert rc.json()['data'][0]['date'] == '2023-03-01'
+    assert rc.json()['data'][1]['date'] == '2023-02-01'
+
+
 @pytest.mark.parametrize('is_short', [True, False])
 def test_api_trades(botclient, mocker, fee, markets, is_short):
     ftbot, client = botclient
@@ -699,7 +751,7 @@ def test_api_delete_trade(botclient, mocker, fee, markets, is_short):
     assert len(trades) - 1 == len(Trade.session.scalars(select(Trade)).all())
     rc = client_delete(client, f"{BASE_URI}/trades/2")
     assert_response(rc)
-    assert rc.json()['result_msg'] == 'Deleted trade 2. Closed 2 open orders.'
+    assert rc.json()['result_msg'] == 'Deleted trade 2. Closed 1 open orders.'
     assert len(trades) - 2 == len(Trade.session.scalars(select(Trade)).all())
     assert stoploss_mock.call_count == 1
 
@@ -833,7 +885,8 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
          'profit_closed_percent_mean': -0.75, 'profit_closed_ratio_sum': -0.015,
          'profit_closed_percent_sum': -1.5, 'profit_closed_ratio': -6.739057628404269e-06,
          'profit_closed_percent': -0.0, 'winning_trades': 0, 'losing_trades': 2,
-         'profit_factor': 0.0, 'trading_volume': 91.074,
+         'profit_factor': 0.0, 'winrate': 0.0, 'expectancy': -0.0033695635,
+         'expectancy_ratio': -1.0, 'trading_volume': 75.945,
          }
     ),
     (
@@ -848,7 +901,8 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
          'profit_closed_percent_mean': 0.75, 'profit_closed_ratio_sum': 0.015,
          'profit_closed_percent_sum': 1.5, 'profit_closed_ratio': 7.391275897987988e-07,
          'profit_closed_percent': 0.0, 'winning_trades': 2, 'losing_trades': 0,
-         'profit_factor': None, 'trading_volume': 91.074,
+         'profit_factor': None, 'winrate': 1.0, 'expectancy': 0.0003695635,
+         'expectancy_ratio': 100, 'trading_volume': 75.945,
          }
     ),
     (
@@ -863,7 +917,9 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
          'profit_closed_percent_mean': 0.25, 'profit_closed_ratio_sum': 0.005,
          'profit_closed_percent_sum': 0.5, 'profit_closed_ratio': -5.429078808526421e-06,
          'profit_closed_percent': -0.0, 'winning_trades': 1, 'losing_trades': 1,
-         'profit_factor': 0.02775724835771106, 'trading_volume': 91.074,
+         'profit_factor': 0.02775724835771106, 'winrate': 0.5,
+         'expectancy': -0.0027145635000000003, 'expectancy_ratio': -0.48612137582114445,
+         'trading_volume': 75.945,
          }
     )
 ])
@@ -920,8 +976,15 @@ def test_api_profit(botclient, mocker, ticker, fee, markets, is_short, expected)
         'winning_trades': expected['winning_trades'],
         'losing_trades': expected['losing_trades'],
         'profit_factor': expected['profit_factor'],
+        'winrate': expected['winrate'],
+        'expectancy': expected['expectancy'],
+        'expectancy_ratio': expected['expectancy_ratio'],
         'max_drawdown': ANY,
         'max_drawdown_abs': ANY,
+        'max_drawdown_start': ANY,
+        'max_drawdown_start_timestamp': ANY,
+        'max_drawdown_end': ANY,
+        'max_drawdown_end_timestamp': ANY,
         'trading_volume': expected['trading_volume'],
         'bot_start_timestamp': 0,
         'bot_start_date': '',
@@ -967,12 +1030,11 @@ def test_api_performance(botclient, fee):
         exchange='binance',
         stake_amount=1,
         open_rate=0.245441,
-        open_order_id="123456",
         is_open=False,
         fee_close=fee.return_value,
         fee_open=fee.return_value,
         close_rate=0.265441,
-
+        leverage=1.0,
     )
     trade.close_profit = trade.calc_profit_ratio(trade.close_rate)
     trade.close_profit_abs = trade.calc_profit(trade.close_rate)
@@ -984,11 +1046,11 @@ def test_api_performance(botclient, fee):
         stake_amount=1,
         exchange='binance',
         open_rate=0.412,
-        open_order_id="123456",
         is_open=False,
         fee_close=fee.return_value,
         fee_open=fee.return_value,
-        close_rate=0.391
+        close_rate=0.391,
+        leverage=1.0,
     )
     trade.close_profit = trade.calc_profit_ratio(trade.close_rate)
     trade.close_profit_abs = trade.calc_profit(trade.close_rate)
@@ -1006,11 +1068,11 @@ def test_api_performance(botclient, fee):
 
 
 @pytest.mark.parametrize(
-    'is_short,current_rate,open_order_id,open_trade_value',
-    [(True, 1.098e-05, 'dry_run_buy_short_12345', 15.0911775),
-     (False, 1.099e-05, 'dry_run_buy_long_12345', 15.1668225)])
+    'is_short,current_rate,open_trade_value',
+    [(True, 1.098e-05, 15.0911775),
+     (False, 1.099e-05, 15.1668225)])
 def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
-                    current_rate, open_order_id, open_trade_value):
+                    current_rate, open_trade_value):
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
@@ -1051,7 +1113,6 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'current_rate': current_rate,
         'open_date': ANY,
         'open_timestamp': ANY,
-        'open_order': None,
         'open_rate': 0.123,
         'pair': 'ETH/BTC',
         'base_currency': 'ETH',
@@ -1084,7 +1145,6 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         "is_short": is_short,
         'max_rate': ANY,
         'min_rate': ANY,
-        'open_order_id': open_order_id,
         'open_rate_requested': ANY,
         'open_trade_value': open_trade_value,
         'exit_reason': None,
@@ -1102,6 +1162,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'price_precision': None,
         'precision_mode': None,
         'orders': [ANY],
+        'has_open_orders': True,
     }
 
     mocker.patch(f'{EXMS}.get_rate',
@@ -1111,7 +1172,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
     assert_response(rc)
     resp_values = rc.json()
     assert len(resp_values) == 4
-    assert resp_values[0]['profit_abs'] is None
+    assert resp_values[0]['profit_abs'] == 0.0
 
 
 def test_api_version(botclient):
@@ -1231,7 +1292,6 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
         exchange='binance',
         stake_amount=1,
         open_rate=0.245441,
-        open_order_id="123456",
         open_date=datetime.now(timezone.utc),
         is_open=False,
         is_short=False,
@@ -1292,7 +1352,6 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
         'is_short': False,
         'max_rate': None,
         'min_rate': None,
-        'open_order_id': '123456',
         'open_rate_requested': None,
         'open_trade_value': 0.24605460,
         'exit_reason': None,
@@ -1309,6 +1368,7 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
         'amount_precision': None,
         'price_precision': None,
         'precision_mode': None,
+        'has_open_orders': False,
         'orders': [],
     }
 
@@ -1415,12 +1475,12 @@ def test_api_pair_candles(botclient, ohlcv_history):
     assert len(rc.json()['data']) == amount
 
     assert (rc.json()['data'] ==
-            [['2017-11-26 08:50:00', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05, 0.0877869,
+            [['2017-11-26T08:50:00Z', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05, 0.0877869,
               None, 0, 0, 0, 0, 1511686200000, None, None, None, None],
-             ['2017-11-26 08:55:00', 8.88e-05, 8.942e-05, 8.88e-05,
+             ['2017-11-26T08:55:00Z', 8.88e-05, 8.942e-05, 8.88e-05,
                  8.893e-05, 0.05874751, 8.886500000000001e-05, 1, 0, 0, 0, 1511686500000, 8.893e-05,
                  None, None, None],
-             ['2017-11-26 09:00:00', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
+             ['2017-11-26T09:00:00Z', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
                  0.7039405, 8.885e-05, 0, 0, 0, 0, 1511686800000, None, None, None, None]
 
              ])
@@ -1434,13 +1494,13 @@ def test_api_pair_candles(botclient, ohlcv_history):
                     f"{BASE_URI}/pair_candles?limit={amount}&pair=XRP%2FBTC&timeframe={timeframe}")
     assert_response(rc)
     assert (rc.json()['data'] ==
-            [['2017-11-26 08:50:00', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05, 0.0877869,
+            [['2017-11-26T08:50:00Z', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05, 0.0877869,
               None, 0, None, 0, 0, None, 1511686200000, None, None, None, None],
-             ['2017-11-26 08:55:00', 8.88e-05, 8.942e-05, 8.88e-05,
-                 8.893e-05, 0.05874751, 8.886500000000001e-05, 1, 0.0, 0, 0, '2017-11-26 08:55:00',
+             ['2017-11-26T08:55:00Z', 8.88e-05, 8.942e-05, 8.88e-05,
+                 8.893e-05, 0.05874751, 8.886500000000001e-05, 1, 0.0, 0, 0, '2017-11-26T08:55:00Z',
                  1511686500000, 8.893e-05, None, None, None],
-             ['2017-11-26 09:00:00', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
-                 0.7039405, 8.885e-05, 0, 0.0, 0, 0, '2017-11-26 09:00:00', 1511686800000,
+             ['2017-11-26T09:00:00Z', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
+                 0.7039405, 8.885e-05, 0, 0.0, 0, 0, '2017-11-26T09:00:00Z', 1511686800000,
                  None, None, None, None]
              ])
 
@@ -1473,30 +1533,47 @@ def test_api_pair_history(botclient, mocker):
                     "&timerange=20180111-20180112")
     assert_response(rc, 422)
 
+    # Invalid strategy
+    rc = client_get(client,
+                    f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
+                    "&timerange=20180111-20180112&strategy={CURRENT_TEST_STRATEGY}11")
+    assert_response(rc, 502)
+
     # Working
     rc = client_get(client,
                     f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
                     f"&timerange=20180111-20180112&strategy={CURRENT_TEST_STRATEGY}")
     assert_response(rc, 200)
-    assert rc.json()['length'] == 289
-    assert len(rc.json()['data']) == rc.json()['length']
-    assert 'columns' in rc.json()
-    assert 'data' in rc.json()
+    result = rc.json()
+    assert result['length'] == 289
+    assert len(result['data']) == result['length']
+    assert 'columns' in result
+    assert 'data' in result
+    data = result['data']
+    assert len(data) == 289
+    # analyed DF has 28 columns
+    assert len(result['columns']) == 28
+    assert len(data[0]) == 28
+    date_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'date'][0]
+    rsi_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'rsi'][0]
+
+    assert data[0][date_col_idx] == '2018-01-11T00:00:00Z'
+    assert data[0][rsi_col_idx] is not None
+    assert data[0][rsi_col_idx] > 0
     assert lfm.call_count == 1
-    assert rc.json()['pair'] == 'UNITTEST/BTC'
-    assert rc.json()['strategy'] == CURRENT_TEST_STRATEGY
-    assert rc.json()['data_start'] == '2018-01-11 00:00:00+00:00'
-    assert rc.json()['data_start_ts'] == 1515628800000
-    assert rc.json()['data_stop'] == '2018-01-12 00:00:00+00:00'
-    assert rc.json()['data_stop_ts'] == 1515715200000
+    assert result['pair'] == 'UNITTEST/BTC'
+    assert result['strategy'] == CURRENT_TEST_STRATEGY
+    assert result['data_start'] == '2018-01-11 00:00:00+00:00'
+    assert result['data_start_ts'] == 1515628800000
+    assert result['data_stop'] == '2018-01-12 00:00:00+00:00'
+    assert result['data_stop_ts'] == 1515715200000
 
     # No data found
     rc = client_get(client,
                     f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
                     f"&timerange=20200111-20200112&strategy={CURRENT_TEST_STRATEGY}")
     assert_response(rc, 502)
-    assert rc.json()['error'] == ("Error querying /api/v1/pair_history: "
-                                  "No data for UNITTEST/BTC, 5m in 20200111-20200112 found.")
+    assert rc.json()['detail'] == ("No data for UNITTEST/BTC, 5m in 20200111-20200112 found.")
 
 
 def test_api_plot_config(botclient, mocker):
@@ -1532,6 +1609,10 @@ def test_api_plot_config(botclient, mocker):
     rc = client_get(client, f"{BASE_URI}/plot_config?strategy=HyperoptableStrategy")
     assert_response(rc)
     assert rc.json()['subplots'] == {}
+
+    rc = client_get(client, f"{BASE_URI}/plot_config?strategy=NotAStrategy")
+    assert_response(rc, 502)
+    assert rc.json()['detail'] is not None
 
     mocker.patch('freqtrade.rpc.api_server.api_v1.get_rpc_optional', return_value=None)
 
@@ -1739,7 +1820,7 @@ def test_api_pairlists_evaluate(botclient, tmpdir, mocker):
     rc = client_get(client, f"{BASE_URI}/pairlists/evaluate/{job_id}")
     assert_response(rc)
     response = rc.json()
-    assert response['result']['whitelist'] == ['ETH/BTC', 'LTC/BTC', 'XRP/BTC', 'NEO/BTC',]
+    assert response['result']['whitelist'] == ['ETH/BTC', 'LTC/BTC', 'XRP/BTC', 'NEO/BTC']
     assert response['result']['length'] == 4
 
     # Restart with additional filter, reducing the list to 2
@@ -1783,7 +1864,7 @@ def test_list_available_pairs(botclient):
     rc = client_get(client, f"{BASE_URI}/available_pairs")
 
     assert_response(rc)
-    assert rc.json()['length'] == 13
+    assert rc.json()['length'] == 12
     assert isinstance(rc.json()['pairs'], list)
 
     rc = client_get(client, f"{BASE_URI}/available_pairs?timeframe=5m")
@@ -1985,7 +2066,8 @@ def test_api_backtest_history(botclient, mocker, testdatadir):
     result = rc.json()
     assert len(result) == 3
     fn = result[0]['filename']
-    assert fn == "backtest-result_multistrat.json"
+    assert fn == "backtest-result_multistrat"
+    assert result[0]['notes'] == ''
     strategy = result[0]['strategy']
     rc = client_get(client, f"{BASE_URI}/backtest/history/result?filename={fn}&strategy={strategy}")
     assert_response(rc)
@@ -1997,6 +2079,103 @@ def test_api_backtest_history(botclient, mocker, testdatadir):
     # Only one strategy loaded - even though we use multiresult
     assert len(result2['backtest_result']['strategy']) == 1
     assert result2['backtest_result']['strategy'][strategy]
+
+
+def test_api_delete_backtest_history_entry(botclient, tmp_path: Path):
+    ftbot, client = botclient
+
+    # Create a temporary directory and file
+    bt_results_base = tmp_path / "backtest_results"
+    bt_results_base.mkdir()
+    file_path = bt_results_base / "test.json"
+    file_path.touch()
+    meta_path = file_path.with_suffix('.meta.json')
+    meta_path.touch()
+
+    rc = client_delete(client, f"{BASE_URI}/backtest/history/randomFile.json")
+    assert_response(rc, 503)
+    assert rc.json()['detail'] == 'Bot is not in the correct state.'
+
+    ftbot.config['user_data_dir'] = tmp_path
+    ftbot.config['runmode'] = RunMode.WEBSERVER
+    rc = client_delete(client, f"{BASE_URI}/backtest/history/randomFile.json")
+    assert rc.status_code == 404
+    assert rc.json()['detail'] == 'File not found.'
+
+    rc = client_delete(client, f"{BASE_URI}/backtest/history/{file_path.name}")
+    assert rc.status_code == 200
+
+    assert not file_path.exists()
+    assert not meta_path.exists()
+
+
+def test_api_patch_backtest_history_entry(botclient, tmp_path: Path):
+    ftbot, client = botclient
+
+    # Create a temporary directory and file
+    bt_results_base = tmp_path / "backtest_results"
+    bt_results_base.mkdir()
+    file_path = bt_results_base / "test.json"
+    file_path.touch()
+    meta_path = file_path.with_suffix('.meta.json')
+    with meta_path.open('w') as metafile:
+        rapidjson.dump({
+            CURRENT_TEST_STRATEGY: {
+                "run_id": "6e542efc8d5e62cef6e5be0ffbc29be81a6e751d",
+                "backtest_start_time": 1690176003}
+            }, metafile)
+
+    def read_metadata():
+        with meta_path.open('r') as metafile:
+            return rapidjson.load(metafile)
+
+    rc = client_patch(client, f"{BASE_URI}/backtest/history/randomFile.json")
+    assert_response(rc, 503)
+
+    ftbot.config['user_data_dir'] = tmp_path
+    ftbot.config['runmode'] = RunMode.WEBSERVER
+
+    rc = client_patch(client, f"{BASE_URI}/backtest/history/randomFile.json", {
+        "strategy": CURRENT_TEST_STRATEGY,
+    })
+    assert rc.status_code == 404
+
+    # Nonexisting strategy
+    rc = client_patch(client, f"{BASE_URI}/backtest/history/{file_path.name}", {
+        "strategy": f"{CURRENT_TEST_STRATEGY}xxx",
+    })
+    assert rc.status_code == 400
+    assert rc.json()['detail'] == 'Strategy not in metadata.'
+
+    # no Notes
+    rc = client_patch(client, f"{BASE_URI}/backtest/history/{file_path.name}", {
+        "strategy": CURRENT_TEST_STRATEGY,
+    })
+    assert rc.status_code == 200
+    res = rc.json()
+    assert isinstance(res, list)
+    assert len(res) == 1
+    assert res[0]['strategy'] == CURRENT_TEST_STRATEGY
+    assert res[0]['notes'] == ''
+
+    fileres = read_metadata()
+    assert fileres[CURRENT_TEST_STRATEGY]['run_id'] == res[0]['run_id']
+    assert fileres[CURRENT_TEST_STRATEGY]['notes'] == ''
+
+    rc = client_patch(client, f"{BASE_URI}/backtest/history/{file_path.name}", {
+        "strategy": CURRENT_TEST_STRATEGY,
+        "notes": "FooBar",
+    })
+    assert rc.status_code == 200
+    res = rc.json()
+    assert isinstance(res, list)
+    assert len(res) == 1
+    assert res[0]['strategy'] == CURRENT_TEST_STRATEGY
+    assert res[0]['notes'] == 'FooBar'
+
+    fileres = read_metadata()
+    assert fileres[CURRENT_TEST_STRATEGY]['run_id'] == res[0]['run_id']
+    assert fileres[CURRENT_TEST_STRATEGY]['notes'] == 'FooBar'
 
 
 def test_health(botclient):
