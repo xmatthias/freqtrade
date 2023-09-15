@@ -204,7 +204,8 @@ class Bybit(Exchange):
                     pair, amount, is_short, open_date)
         return 0.0
 
-    def fetch_orders(self, pair: str, since: datetime, params: Optional[Dict] = None) -> List[Dict]:
+    async def fetch_orders(
+            self, pair: str, since: datetime, params: Optional[Dict] = None) -> List[Dict]:
         """
         Fetch all orders for a pair "since"
         :param pair: Pair for the query
@@ -216,13 +217,13 @@ class Bybit(Exchange):
 
         while since < dt_now():
             until = since + timedelta(days=7, minutes=-1)
-            orders += super().fetch_orders(pair, since, params={'until': dt_ts(until)})
+            orders += await super().fetch_orders(pair, since, params={'until': dt_ts(until)})
             since = until
 
         return orders
 
-    def fetch_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
-        order = super().fetch_order(order_id, pair, params)
+    async def fetch_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
+        order = await super().fetch_order(order_id, pair, params)
         if (
             order.get('status') == 'canceled'
             and order.get('filled') == 0.0
