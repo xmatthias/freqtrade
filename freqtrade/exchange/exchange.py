@@ -5,7 +5,6 @@ Cryptocurrency Exchanges support
 import asyncio
 import inspect
 import logging
-import signal
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from math import floor
@@ -2396,18 +2395,6 @@ class Exchange:
 
         return await self._async_get_trade_history(pair=pair, since=since,
                                                    until=until, from_id=from_id)
-        # TODO: asyncio: how can the below be handled?
-        # with self._loop_lock:
-        #     task = asyncio.ensure_future(self._async_get_trade_history(
-        #         pair=pair, since=since, until=until, from_id=from_id))
-
-        #     for sig in [signal.SIGINT, signal.SIGTERM]:
-        #         try:
-        #             self.loop.add_signal_handler(sig, task.cancel)
-        #         except NotImplementedError:
-        #             # Not all platforms implement signals (e.g. windows)
-        #             pass
-        #     return self.loop.run_until_complete(task)
 
     @retrier_async
     async def _get_funding_fees_from_exchange(
