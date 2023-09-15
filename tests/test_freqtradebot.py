@@ -2922,7 +2922,7 @@ async def test_adjust_entry_maintain_replace(
         fetch_order=get_mock_coro(return_value=old_order),
         cancel_order_with_result=cancel_order_mock,
         get_fee=fee,
-        _dry_is_price_crossed=MagicMock(return_value=False),
+        _dry_is_price_crossed=get_mock_coro(return_value=False),
     )
 
     open_trade.is_short = is_short
@@ -4201,7 +4201,7 @@ async def test_execute_trade_exit_market_order(
     mocker.patch.multiple(
         EXMS,
         fetch_ticker=ticker_usdt_sell_up,
-        _dry_is_price_crossed=MagicMock(return_value=False),
+        _dry_is_price_crossed=get_mock_coro(return_value=False),
     )
     freqtrade.config['order_types']['exit'] = 'market'
 
@@ -5170,8 +5170,8 @@ async def test_apply_fee_conditional(default_conf_usdt, fee, mocker, caplog,
     (8.0, 0.1, 12, 0.1),
     (8.0, 0.1, 15.9, 0.1),
 ])
-def test_apply_fee_conditional_multibuy(default_conf_usdt, fee, mocker, caplog,
-                                        amount, fee_abs, wallet, amount_exp):
+async def test_apply_fee_conditional_multibuy(default_conf_usdt, fee, mocker, caplog,
+                                              amount, fee_abs, wallet, amount_exp):
     walletmock = mocker.patch('freqtrade.wallets.Wallets.update')
     mocker.patch('freqtrade.wallets.Wallets.get_free', return_value=wallet)
     trade = Trade(
@@ -5201,11 +5201,12 @@ def test_apply_fee_conditional_multibuy(default_conf_usdt, fee, mocker, caplog,
     )
     trade.orders.append(order1)
 
-    freqtrade = get_patched_freqtradebot(mocker, default_conf_usdt)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
 
     walletmock.reset_mock()
     # The new trade amount will be 2x amount - fee / wallet will have to be adapted to this.
-    assert freqtrade.apply_fee_conditional(trade, 'LTC', amount, fee_abs, order1) == amount_exp
+    assert await freqtrade.apply_fee_conditional(
+        trade, 'LTC', amount, fee_abs, order1) == amount_exp
     assert walletmock.call_count == 1
     if fee_abs != 0 and amount_exp is None:
         assert log_has_re(r"Fee amount.*Eating.*dust\.", caplog)
