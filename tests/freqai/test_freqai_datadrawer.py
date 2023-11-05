@@ -139,14 +139,14 @@ async def test_get_timerange_from_backtesting_live_df_pred_not_found(mocker, fre
         freqai.dd.get_timerange_from_live_historic_predictions()
 
 
-def test_set_initial_return_values(mocker, freqai_conf):
+async def test_set_initial_return_values(mocker, freqai_conf):
     """
     Simple test of the set initial return values that ensures
     we are concatening and ffilling values properly.
     """
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     freqai = strategy.freqai
     freqai.live = False
@@ -192,15 +192,14 @@ def test_set_initial_return_values(mocker, freqai_conf):
     mock_logger_warning.assert_not_called()
 
 
-def test_set_initial_return_values_warning(mocker, freqai_conf):
+async def test_set_initial_return_values_warning(mocker, freqai_conf):
     """
     Simple test of set_initial_return_values that hits the warning
     associated with leaving a FreqAI bot offline so long that the
     exchange candles have no common date with the historic predictions
     """
-
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     freqai = strategy.freqai
     freqai.live = False
