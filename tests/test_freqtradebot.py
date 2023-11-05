@@ -5863,6 +5863,10 @@ async def test_handle_insufficient_funds(mocker, default_conf_usdt, fee, is_shor
 @pytest.mark.parametrize("is_short", [False, True])
 async def test_handle_onexchange_order(mocker, default_conf_usdt, limit_order, is_short, caplog):
     default_conf_usdt['dry_run'] = False
+    mocker.patch.multiple(
+        EXMS,
+        get_balances=get_mock_coro([]),
+    )
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     mock_uts = mocker.spy(freqtrade, 'update_trade_state')
 
@@ -5907,6 +5911,10 @@ async def test_handle_onexchange_order(mocker, default_conf_usdt, limit_order, i
 @pytest.mark.parametrize("is_short", [False, True])
 async def test_handle_onexchange_order_exit(mocker, default_conf_usdt, limit_order, is_short):
     default_conf_usdt['dry_run'] = False
+    mocker.patch.multiple(
+        EXMS,
+        get_balances=get_mock_coro([]),
+    )
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     mock_uts = mocker.spy(freqtrade, 'update_trade_state')
 
