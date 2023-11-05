@@ -11,9 +11,10 @@ from freqtrade.exceptions import OperationalException
 from tests.conftest import EXMS, log_has, log_has_re, patch_exchange
 
 
-def test_import_kraken_trades_from_csv(testdatadir, tmpdir, caplog, default_conf_usdt, mocker):
+async def test_import_kraken_trades_from_csv(
+        testdatadir, tmpdir, caplog, default_conf_usdt, mocker):
     with pytest.raises(OperationalException, match="This function is only for the kraken exchange"):
-        import_kraken_trades_from_csv(default_conf_usdt, 'feather')
+        await import_kraken_trades_from_csv(default_conf_usdt, 'feather')
 
     default_conf_usdt['exchange']['name'] = 'kraken'
 
@@ -34,7 +35,7 @@ def test_import_kraken_trades_from_csv(testdatadir, tmpdir, caplog, default_conf
 
     copytree(testdatadir / 'kraken/trades_csv', tmpdir1 / 'trades_csv')
 
-    import_kraken_trades_from_csv(default_conf_usdt, 'feather')
+    await import_kraken_trades_from_csv(default_conf_usdt, 'feather')
     assert log_has("Found csv files for BCHEUR.", caplog)
     assert log_has_re(r"BCH/EUR: 340 trades.* 2023-01-01.* 2023-01-02.*", caplog)
 

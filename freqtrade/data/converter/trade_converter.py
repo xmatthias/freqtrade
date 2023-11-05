@@ -120,7 +120,7 @@ def convert_trades_to_ohlcv(
                 logger.exception(f'Could not convert {pair} to OHLCV.')
 
 
-def convert_trades_format(config: Config, convert_from: str, convert_to: str, erase: bool):
+async def convert_trades_format(config: Config, convert_from: str, convert_to: str, erase: bool):
     """
     Convert trades from one format to another format.
     :param config: Config dictionary
@@ -135,7 +135,7 @@ def convert_trades_format(config: Config, convert_from: str, convert_to: str, er
                 'Please refer to the documentation for details about this special mode.'
             )
         from freqtrade.data.converter.trade_converter_kraken import import_kraken_trades_from_csv
-        import_kraken_trades_from_csv(config, convert_to)
+        await import_kraken_trades_from_csv(config, convert_to)
         return
 
     from freqtrade.data.history.idatahandler import get_datahandler

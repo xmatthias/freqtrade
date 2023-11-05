@@ -323,7 +323,7 @@ def test_trades_dict_to_list(fetch_trades_result):
         assert t[6] == fetch_trades_result[i]['cost']
 
 
-def test_convert_trades_format(default_conf, testdatadir, tmpdir):
+async def test_convert_trades_format(default_conf, testdatadir, tmpdir):
     tmpdir1 = Path(tmpdir)
     files = [{'old': tmpdir1 / "XRP_ETH-trades.json.gz",
               'new': tmpdir1 / "XRP_ETH-trades.json"},
@@ -336,8 +336,8 @@ def test_convert_trades_format(default_conf, testdatadir, tmpdir):
 
     default_conf['datadir'] = tmpdir1
 
-    convert_trades_format(default_conf, convert_from='jsongz',
-                          convert_to='json', erase=False)
+    await convert_trades_format(
+        default_conf, convert_from='jsongz', convert_to='json', erase=False)
 
     for file in files:
         assert file['new'].exists()
@@ -346,8 +346,8 @@ def test_convert_trades_format(default_conf, testdatadir, tmpdir):
         # Remove original file
         file['old'].unlink()
     # Convert back
-    convert_trades_format(default_conf, convert_from='json',
-                          convert_to='jsongz', erase=True)
+    await convert_trades_format(default_conf, convert_from='json',
+                                convert_to='jsongz', erase=True)
     for file in files:
         assert file['old'].exists()
         assert not file['new'].exists()

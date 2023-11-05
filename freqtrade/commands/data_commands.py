@@ -72,7 +72,7 @@ async def start_convert_trades(args: Dict[str, Any]) -> None:
     )
 
 
-def start_convert_data(args: Dict[str, Any], ohlcv: bool = True) -> None:
+async def start_convert_data(args: Dict[str, Any], ohlcv: bool = True) -> None:
     """
     Convert data from one format to another
     """
@@ -84,9 +84,9 @@ def start_convert_data(args: Dict[str, Any], ohlcv: bool = True) -> None:
                              convert_to=args['format_to'],
                              erase=args['erase'])
     else:
-        convert_trades_format(config,
-                              convert_from=args['format_from_trades'], convert_to=args['format_to'],
-                              erase=args['erase'])
+        await convert_trades_format(
+            config, convert_from=args['format_from_trades'], convert_to=args['format_to'],
+            erase=args['erase'])
 
 
 def start_list_data(args: Dict[str, Any]) -> None:

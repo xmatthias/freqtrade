@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 KRAKEN_CSV_TRADE_COLUMNS = ['timestamp', 'price', 'amount']
 
 
-def import_kraken_trades_from_csv(config: Config, convert_to: str):
+async def import_kraken_trades_from_csv(config: Config, convert_to: str):
     """
     Import kraken trades from csv
     """
@@ -27,7 +27,7 @@ def import_kraken_trades_from_csv(config: Config, convert_to: str):
     data_handler = get_datahandler(datadir, data_format=convert_to)
 
     tradesdir: Path = config['datadir'] / 'trades_csv'
-    exchange = ExchangeResolver.load_exchange(config, validate=False)
+    exchange = await ExchangeResolver.load_exchange(config, validate=False)
     # iterate through directories in this directory
     data_symbols = {p.stem for p in tradesdir.rglob('*.csv')}
 

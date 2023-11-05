@@ -1361,7 +1361,7 @@ def test_hyperopt_show(mocker, capsys, saved_hyperopt_results):
         start_hyperopt_show(pargs)
 
 
-def test_convert_data(mocker, testdatadir):
+async def test_convert_data(mocker, testdatadir):
     ohlcv_mock = mocker.patch("freqtrade.commands.data_commands.convert_ohlcv_format")
     trades_mock = mocker.patch("freqtrade.commands.data_commands.convert_trades_format")
     args = [
@@ -1375,7 +1375,7 @@ def test_convert_data(mocker, testdatadir):
     ]
     pargs = get_args(args)
     pargs['config'] = None
-    start_convert_data(pargs, True)
+    await start_convert_data(pargs, True)
     assert trades_mock.call_count == 0
     assert ohlcv_mock.call_count == 1
     assert ohlcv_mock.call_args[1]['convert_from'] == 'json'
@@ -1383,7 +1383,7 @@ def test_convert_data(mocker, testdatadir):
     assert ohlcv_mock.call_args[1]['erase'] is False
 
 
-def test_convert_data_trades(mocker, testdatadir):
+async def test_convert_data_trades(mocker, testdatadir):
     ohlcv_mock = mocker.patch("freqtrade.commands.data_commands.convert_ohlcv_format")
     trades_mock = mocker.patch("freqtrade.commands.data_commands.convert_trades_format")
     args = [
@@ -1397,7 +1397,7 @@ def test_convert_data_trades(mocker, testdatadir):
     ]
     pargs = get_args(args)
     pargs['config'] = None
-    start_convert_data(pargs, False)
+    await start_convert_data(pargs, False)
     assert ohlcv_mock.call_count == 0
     assert trades_mock.call_count == 1
     assert trades_mock.call_args[1]['convert_from'] == 'jsongz'
