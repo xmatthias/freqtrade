@@ -168,10 +168,12 @@ Most indicators have an instable startup period, in which they are either not av
 To account for this, the strategy can be assigned the `startup_candle_count` attribute.
 This should be set to the maximum number of candles that the strategy requires to calculate stable indicators. In the case where a user includes higher timeframes with informative pairs, the `startup_candle_count` does not necessarily change. The value is the maximum period (in candles) that any of the informatives timeframes need to compute stable indicators.
 
-In this example strategy, this should be set to 100 (`startup_candle_count = 100`), since the longest needed history is 100 candles.
+You can use [recursive-analysis](recursive-analysis.md) to check and find the correct `startup_candle_count` to be used.
+
+In this example strategy, this should be set to 400 (`startup_candle_count = 400`), since the minimum needed history for ema100 calculation to make sure the value is correct is 400 candles.
 
 ``` python
-    dataframe['ema100'] = ta.EMA(dataframe, timeperiod=100)
+    dataframe['ema100'] = ta.EMA(dataframe, timeperiod=400)
 ```
 
 By letting the bot know how much history is needed, backtest trades can start at the specified timerange during backtesting and hyperopt.
@@ -193,11 +195,11 @@ Let's try to backtest 1 month (January 2019) of 5m candles using an example stra
 freqtrade backtesting --timerange 20190101-20190201 --timeframe 5m
 ```
 
-Assuming `startup_candle_count` is set to 100, backtesting knows it needs 100 candles to generate valid buy signals. It will load data from `20190101 - (100 * 5m)` - which is ~2018-12-31 15:30:00.
+Assuming `startup_candle_count` is set to 400, backtesting knows it needs 400 candles to generate valid buy signals. It will load data from `20190101 - (400 * 5m)` - which is ~2018-12-30 11:40:00.
 If this data is available, indicators will be calculated with this extended timerange. The instable startup period (up to 2019-01-01 00:00:00) will then be removed before starting backtesting.
 
 !!! Note
-    If data for the startup period is not available, then the timerange will be adjusted to account for this startup period - so Backtesting would start at 2019-01-01 08:30:00.
+    If data for the startup period is not available, then the timerange will be adjusted to account for this startup period - so Backtesting would start at 2019-01-02 09:20:00.
 
 ### Entry signal rules
 
@@ -484,17 +486,18 @@ for more information.
 
         :param timeframe: Informative timeframe. Must always be equal or higher than strategy timeframe.
         :param asset: Informative asset, for example BTC, BTC/USDT, ETH/BTC. Do not specify to use
-        current pair.
+                    current pair. Also supports limited pair format strings (see below)
         :param fmt: Column format (str) or column formatter (callable(name, asset, timeframe)). When not
         specified, defaults to:
-        * {base}_{quote}_{column}_{timeframe} if asset is specified. 
+        * {base}_{quote}_{column}_{timeframe} if asset is specified.
         * {column}_{timeframe} if asset is not specified.
-        Format string supports these format variables:
-        * {asset} - full name of the asset, for example 'BTC/USDT'.
+        Pair format supports these format variables:
         * {base} - base currency in lower case, for example 'eth'.
         * {BASE} - same as {base}, except in upper case.
         * {quote} - quote currency in lower case, for example 'usdt'.
         * {QUOTE} - same as {quote}, except in upper case.
+        Format string additionally supports this variables.
+        * {asset} - full name of the asset, for example 'BTC/USDT'.
         * {column} - name of dataframe column.
         * {timeframe} - timeframe of informative dataframe.
         :param ffill: ffill dataframe after merging informative pair.
@@ -1005,6 +1008,10 @@ The following lists some common patterns which should be avoided to prevent frus
 - don't use `.iloc[-1]` or any other absolute position in the dataframe, this will be different between dry-run and backtesting.
 - don't use `dataframe['volume'].mean()`. This uses the full DataFrame for backtesting, including data from the future. Use `dataframe['volume'].rolling(<window>).mean()` instead
 - don't use `.resample('1h')`. This uses the left border of the interval, so moves data from an hour to the start of the hour. Use `.resample('1h', label='right')` instead.
+
+!!! Tip "Identifying problems"
+    You may also want to check the 2 helper commands [lookahead-analysis](lookahead-analysis.md) and [recursive-analysis](recursive-analysis.md), which can each help you figure out problems with your strategy in different ways.
+    Please treat them as what they are - helpers to identify most common problems. A negative result of each does not guarantee that there's none of the above errors included.
 
 ### Colliding signals
 

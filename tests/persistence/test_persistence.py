@@ -583,7 +583,7 @@ def test_calc_open_close_trade_price(
     oobj.update_from_ccxt_object(entry_order)
     trade.update_trade(oobj)
 
-    trade.funding_fees = funding_fees
+    trade.funding_fee_running = funding_fees
 
     oobj = Order.parse_from_ccxt_object(exit_order, 'ADA/USDT', trade.exit_side)
     oobj._trade_live = trade
@@ -591,7 +591,9 @@ def test_calc_open_close_trade_price(
     trade.update_trade(oobj)
 
     assert trade.is_open is False
+    # Funding fees transfer from funding_fee_running to funding_Fees
     assert trade.funding_fees == funding_fees
+    assert trade.orders[-1].funding_fee == funding_fees
 
     assert pytest.approx(trade._calc_open_trade_value(trade.amount, trade.open_rate)) == open_value
     assert pytest.approx(trade.calc_close_trade_value(trade.close_rate)) == close_value
@@ -1385,6 +1387,7 @@ def test_to_json(fee):
         precision_mode=1,
         amount_precision=8.0,
         price_precision=7.0,
+        contract_size=1,
     )
     result = trade.to_json()
     assert isinstance(result, dict)
@@ -1450,6 +1453,7 @@ def test_to_json(fee):
         'amount_precision': 8.0,
         'price_precision': 7.0,
         'precision_mode': 1,
+        'contract_size': 1,
         'orders': [],
         'has_open_orders': False,
     }
@@ -1471,6 +1475,7 @@ def test_to_json(fee):
         precision_mode=2,
         amount_precision=7.0,
         price_precision=8.0,
+        contract_size=1
     )
     result = trade.to_json()
     assert isinstance(result, dict)
@@ -1536,6 +1541,7 @@ def test_to_json(fee):
         'amount_precision': 7.0,
         'price_precision': 8.0,
         'precision_mode': 2,
+        'contract_size': 1,
         'orders': [],
         'has_open_orders': False,
     }
@@ -1928,11 +1934,15 @@ def test_get_best_pair_lev(fee):
 
 @pytest.mark.usefixtures("init_persistence")
 @pytest.mark.parametrize('is_short', [True, False])
-def test_get_exit_order_count(fee, is_short):
+def test_get_canceled_exit_order_count(fee, is_short):
 
     create_mock_trades(fee, is_short=is_short)
     trade = Trade.get_trades([Trade.pair == 'ETC/BTC']).first()
-    assert trade.get_exit_order_count() == 1
+    # No canceled order.
+    assert trade.get_canceled_exit_order_count() == 0
+
+    trade.orders[-1].status = 'canceled'
+    assert trade.get_canceled_exit_order_count() == 1
 
 
 @pytest.mark.usefixtures("init_persistence")
@@ -2086,11 +2096,10 @@ def test_Trade_object_idem():
         'get_enter_tag_performance',
         'get_mix_tag_performance',
         'get_trading_volume',
-        'from_json',
         'validate_string_len',
     )
     EXCLUDES2 = ('trades', 'trades_open', 'bt_trades_open_pp', 'bt_open_open_trade_count',
-                 'total_profit')
+                 'total_profit', 'from_json',)
 
     # Parent (LocalTrade) should have the same attributes
     for item in trade:
@@ -2291,6 +2300,101 @@ def test_recalc_trade_from_orders(fee):
     assert trade.open_rate == avg_price
     assert pytest.approx(trade.fee_open_cost) == o1_fee_cost + o2_fee_cost + o3_fee_cost
     assert pytest.approx(trade.open_trade_value) == o1_trade_val + o2_trade_val + o3_trade_val
+
+
+@pytest.mark.usefixtures("init_persistence")
+def test_recalc_trade_from_orders_kucoin():
+    # Taken from https://github.com/freqtrade/freqtrade/issues/9346
+    o1_amount = 11511963.8634448908
+    o2_amount = 11750101.7743937783
+    o3_amount = 23262065.6378386617  # Exit amount - barely doesn't even out
+
+    res = o1_amount + o2_amount - o3_amount
+    assert res > 0.0
+    assert res < 0.1
+    o1_rate = 0.000029901
+    o2_rate = 0.000029295
+    o3_rate = 0.000029822
+
+    o1_cost = o1_amount * o1_rate
+
+    trade = Trade(
+        pair='FLOKI/USDT',
+        stake_amount=o1_cost,
+        open_date=dt_now() - timedelta(hours=2),
+        amount=o1_amount,
+        fee_open=0.001,
+        fee_close=0.001,
+        exchange='binance',
+        open_rate=o1_rate,
+        max_rate=o1_rate,
+        leverage=1,
+    )
+    # Check with 1 order
+    order1 = Order(
+        ft_order_side='buy',
+        ft_pair=trade.pair,
+        ft_is_open=False,
+        status="closed",
+        symbol=trade.pair,
+        order_type="market",
+        side="buy",
+        price=o1_rate,
+        average=o1_rate,
+        filled=o1_amount,
+        remaining=0,
+        cost=o1_cost,
+        order_date=trade.open_date,
+        order_filled_date=trade.open_date,
+    )
+    trade.orders.append(order1)
+    order2 = Order(
+        ft_order_side='buy',
+        ft_pair=trade.pair,
+        ft_is_open=False,
+        status="closed",
+        symbol=trade.pair,
+        order_type="market",
+        side="buy",
+        price=o2_rate,
+        average=o2_rate,
+        filled=o2_amount,
+        remaining=0,
+        cost=o2_amount * o2_rate,
+        order_date=trade.open_date,
+        order_filled_date=trade.open_date,
+    )
+    trade.orders.append(order2)
+    trade.recalc_trade_from_orders()
+    assert trade.amount == o1_amount + o2_amount
+    profit = trade.calculate_profit(o3_rate)
+    assert profit.profit_abs == pytest.approx(3.90069871)
+    assert profit.profit_ratio == pytest.approx(0.00566035)
+
+    order3 = Order(
+        ft_order_side='sell',
+        ft_pair=trade.pair,
+        ft_is_open=False,
+        status="closed",
+        symbol=trade.pair,
+        order_type="market",
+        side="sell",
+        price=o3_rate,
+        average=o3_rate,
+        filled=o3_amount,
+        remaining=0,
+        cost=o2_amount * o2_rate,
+        order_date=trade.open_date,
+        order_filled_date=trade.open_date,
+    )
+
+    trade.orders.append(order3)
+    trade.update_trade(order3)
+    assert trade.is_open is False
+    # Trade closed correctly - but left a minimal amount.
+    assert trade.amount == 8e-09
+    assert trade.close_profit_abs == 3.90069871
+    assert trade.close_profit == 0.00566035
 
 
 @pytest.mark.parametrize('is_short', [True, False])

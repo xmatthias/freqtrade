@@ -621,3 +621,70 @@ async def test__get_stop_params_okx(mocker, default_conf):
 
     assert params['tdMode'] == 'isolated'
     assert params['posSide'] == 'net'
+
+
+async def test_fetch_orders_okx(default_conf, mocker, limit_order):
+
+    api_mock = MagicMock()
+    api_mock.fetch_orders = get_mock_coro(return_value=[
+        limit_order['buy'],
+        limit_order['sell'],
+    ])
+    api_mock.fetch_open_orders = get_mock_coro(return_value=[limit_order['buy']])
+    api_mock.fetch_closed_orders = get_mock_coro(return_value=[limit_order['buy']])
+
+    mocker.patch(f'{EXMS}.exchange_has', return_value=True)
+    start_time = datetime.now(timezone.utc) - timedelta(days=20)
+
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='okx')
+    # Not available in dry-run
+    assert await exchange.fetch_orders('mocked', start_time) == []
+    assert api_mock.fetch_orders.call_count == 0
+    default_conf['dry_run'] = False
+
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id='okx')
+
+    def has_resp(_, endpoint):
+        if endpoint == 'fetchOrders':
+            return False
+        if endpoint == 'fetchClosedOrders':
+            return True
+        if endpoint == 'fetchOpenOrders':
+            return True
+
+    mocker.patch(f'{EXMS}.exchange_has', has_resp)
+
+    history_params = {'method': 'privateGetTradeOrdersHistoryArchive'}
+
+    # happy path without fetchOrders
+    await exchange.fetch_orders('mocked', start_time)
+    assert api_mock.fetch_orders.call_count == 0
+    assert api_mock.fetch_open_orders.call_count == 1
+    assert api_mock.fetch_closed_orders.call_count == 2
+    assert 'params' not in api_mock.fetch_closed_orders.call_args_list[0][1]
+    assert api_mock.fetch_closed_orders.call_args_list[1][1]['params'] == history_params
+
+    api_mock.fetch_open_orders.reset_mock()
+    api_mock.fetch_closed_orders.reset_mock()
+
+    # regular closed_orders endpoint only has history for 7 days.
+    await exchange.fetch_orders('mocked', datetime.now(timezone.utc) - timedelta(days=6))
+    assert api_mock.fetch_orders.call_count == 0
+    assert api_mock.fetch_open_orders.call_count == 1
+    assert api_mock.fetch_closed_orders.call_count == 1
+    assert 'params' not in api_mock.fetch_closed_orders.call_args_list[0][1]
+
+    mocker.patch(f'{EXMS}.exchange_has', return_value=True)
+
+    # Unhappy path - first fetch-orders call fails.
+    api_mock.fetch_orders = get_mock_coro(side_effect=ccxt.NotSupported())
+    api_mock.fetch_open_orders.reset_mock()
+    api_mock.fetch_closed_orders.reset_mock()
+
+    await exchange.fetch_orders('mocked', start_time)
+
+    assert api_mock.fetch_orders.call_count == 1
+    assert api_mock.fetch_open_orders.call_count == 1
+    assert api_mock.fetch_closed_orders.call_count == 2
+    assert 'params' not in api_mock.fetch_closed_orders.call_args_list[0][1]
+    assert api_mock.fetch_closed_orders.call_args_list[1][1]['params'] == history_params
