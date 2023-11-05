@@ -608,14 +608,16 @@ class Backtesting:
             order.close_bt_order(current_date, trade)
             if not (order.ft_order_side == trade.exit_side and order.safe_amount == trade.amount):
                 # trade is still open
-                trade.set_liquidation_price(self.exchange.get_liquidation_price(
-                    pair=trade.pair,
-                    open_rate=trade.open_rate,
-                    is_short=trade.is_short,
-                    amount=trade.amount,
-                    stake_amount=trade.stake_amount,
-                    leverage=trade.leverage,
-                    wallet_balance=trade.stake_amount,
+                trade.set_liquidation_price(asyncio.get_event_loop().run_until_complete(
+                    self.exchange.get_liquidation_price(
+                        pair=trade.pair,
+                        open_rate=trade.open_rate,
+                        is_short=trade.is_short,
+                        amount=trade.amount,
+                        stake_amount=trade.stake_amount,
+                        leverage=trade.leverage,
+                        wallet_balance=trade.stake_amount,
+                    )
                 ))
                 self._call_adjust_stop(current_date, trade, order.ft_price)
                 # pass
@@ -728,7 +730,7 @@ class Backtesting:
     ) -> Optional[LocalTrade]:
 
         if self.trading_mode == TradingMode.FUTURES:
-            trade.set_funding_fees(asyncio.get_event_loop().run_until_complete(
+            trade.set_funding_fees(
                 self.exchange.calculate_funding_fees(
                     self.futures_data[trade.pair],
                     amount=trade.amount,
@@ -736,7 +738,7 @@ class Backtesting:
                     open_date=trade.date_last_filled_utc,
                     close_date=current_time
                 )
-            ))
+            )
 
         # Check if we need to adjust our current positions
         if self.strategy.position_adjustment_enable:

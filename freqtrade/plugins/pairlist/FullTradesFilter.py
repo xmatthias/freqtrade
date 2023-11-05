@@ -39,7 +39,7 @@ class FullTradesFilter(IPairList):
     def description() -> str:
         return "Shrink whitelist when trade slots are full."
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Tickers) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Tickers) -> List[str]:
         """
         Filters and sorts pairlist and returns the allowlist again.
         Called on each bot iteration - please use internal caching if necessary

@@ -1466,7 +1466,7 @@ async def test_ProducerPairlist(mocker, whitelist_conf, markets):
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_FullTradesFilter(mocker, default_conf_usdt, fee, caplog) -> None:
+async def test_FullTradesFilter(mocker, default_conf_usdt, fee, caplog) -> None:
     default_conf_usdt['exchange']['pair_whitelist'].extend(['ADA/USDT', 'XRP/USDT', 'ETC/USDT'])
     default_conf_usdt['pairlists'] = [
         {"method": "StaticPairList"},
@@ -1474,23 +1474,23 @@ def test_FullTradesFilter(mocker, default_conf_usdt, fee, caplog) -> None:
     ]
     default_conf_usdt['max_open_trades'] = -1
     mocker.patch(f'{EXMS}.exchange_has', MagicMock(return_value=True))
-    exchange = get_patched_exchange(mocker, default_conf_usdt)
+    exchange = await get_patched_exchange(mocker, default_conf_usdt)
     pm = PairListManager(exchange, default_conf_usdt)
-    pm.refresh_pairlist()
+    await pm.refresh_pairlist()
 
     assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
 
     with time_machine.travel("2021-09-01 05:00:00 +00:00") as t:
         create_mock_trades_usdt(fee)
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
 
         # Unlimited max open trades, so no change to whitelist
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
         assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
 
         # Set max_open_trades to 4, the filter should empty the whitelist
         default_conf_usdt['max_open_trades'] = 4
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
         assert pm.whitelist == []
         assert log_has_re(r'Whitelist with 0 pairs: \[]', caplog)
 
@@ -1505,11 +1505,11 @@ def test_FullTradesFilter(mocker, default_conf_usdt, fee, caplog) -> None:
         # open trades count below max_open_trades, whitelist restored
         list_trades = LocalTrade.get_open_trades()
         assert len(list_trades) == 3
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
         assert pm.whitelist == ['ETH/USDT', 'XRP/USDT', 'NEO/USDT', 'TKN/USDT']
 
         # Set max_open_trades to 3, the filter should empty the whitelist
         default_conf_usdt['max_open_trades'] = 3
-        pm.refresh_pairlist()
+        await pm.refresh_pairlist()
         assert pm.whitelist == []
         assert log_has_re(r'Whitelist with 0 pairs: \[]', caplog)
