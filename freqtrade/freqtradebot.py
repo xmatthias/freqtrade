@@ -7,7 +7,6 @@ import traceback
 from copy import deepcopy
 from datetime import datetime, time, timedelta, timezone
 from math import isclose
-from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from freqtrade import constants
@@ -35,7 +34,7 @@ from freqtrade.rpc.rpc_types import (RPCBuyMsg, RPCCancelMsg, RPCProtectionMsg, 
                                      RPCSellMsg)
 from freqtrade.strategy.interface import IStrategy
 from freqtrade.strategy.strategy_wrapper import strategy_safe_wrapper
-from freqtrade.util import FtPrecise
+from freqtrade.util import FtAsyncLock, FtPrecise
 from freqtrade.util.binance_mig import migrate_binance_futures_names
 from freqtrade.vendor.AsyncSchedule import AsyncScheduler
 from freqtrade.wallets import Wallets
@@ -67,7 +66,7 @@ class FreqtradeBot(LoggingMixin):
         self.config = config
 
         # Protect exit-logic from forcesell and vice versa
-        self._exit_lock = Lock()
+        self._exit_lock = FtAsyncLock()
         self.trading_mode: TradingMode = self.config.get('trading_mode', TradingMode.SPOT)
         # Set initial bot state from config
         initial_state = self.config.get('initial_state')
@@ -233,21 +232,21 @@ class FreqtradeBot(LoggingMixin):
         # methods will no longer work.
         self.strategy.analyze(self.active_pair_whitelist)
 
-        with self._exit_lock:
+        async with self._exit_lock:
             # Check for exchange cancelations, timeouts and user requested replace
             await self.manage_open_orders()
 
         # Protect from collisions with force_exit.
         # Without this, freqtrade may try to recreate stoploss_on_exchange orders
         # while exiting is in process, since telegram messages arrive in an different thread.
-        with self._exit_lock:
+        async with self._exit_lock:
             trades = Trade.get_open_trades()
             # First process current opened trades (positions)
             await self.exit_positions(trades)
 
         # Check if we need to adjust our current positions before attempting to buy new trades.
         if self.strategy.position_adjustment_enable:
-            with self._exit_lock:
+            async with self._exit_lock:
                 await self.process_open_trade_positions()
 
         # Then looking for buy opportunities
@@ -414,7 +413,7 @@ class FreqtradeBot(LoggingMixin):
 
         trades = Trade.get_open_trades_without_assigned_fees()
         for trade in trades:
-            with self._exit_lock:
+            async with self._exit_lock:
                 if trade.is_open and not trade.fee_updated(trade.entry_side):
                     order = trade.select_order(trade.entry_side, False, only_filled=True)
                     open_order = trade.select_order(trade.entry_side, True)
@@ -540,7 +539,7 @@ class FreqtradeBot(LoggingMixin):
         # Create entity and execute trade for each pair from whitelist
         for pair in whitelist:
             try:
-                with self._exit_lock:
+                async with self._exit_lock:
                     trades_created += await self.create_trade(pair)
             except DependencyException as exception:
                 logger.warning('Unable to create trade for %s: %s', pair, exception)
