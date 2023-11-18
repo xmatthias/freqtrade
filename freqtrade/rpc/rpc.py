@@ -104,12 +104,18 @@ class RPC:
         if self._config.get('fiat_display_currency'):
             self._fiat_converter = CryptoToFiatConverter()
 
-    def _run_async(self, coro: Coroutine):
+    def _run_async(self, coro: Coroutine, require_lock=False):
         """
         Async helper
         """
-        resp = asyncio.run_coroutine_threadsafe(
-            coro, self._freqtrade.loop).result()
+        async def _run_async_helper():
+            async with self._freqtrade._exit_lock:
+                return asyncio.run_coroutine_threadsafe(coro, self._freqtrade.loop).result()
+        if require_lock:
+            resp = asyncio.new_event_loop().run_until_complete(_run_async_helper())
+        else:
+            resp = asyncio.run_coroutine_threadsafe(
+                coro, self._freqtrade.loop).result()
 
         return resp
 
@@ -850,7 +856,8 @@ class RPC:
         Handler for forceexit <id>.
         Sells the given trade at current price
         """
-        return self._run_async(self.__rpc_force_exit_async(trade_id, ordertype, amount))
+        return self._run_async(self.__rpc_force_exit_async(trade_id, ordertype, amount),
+                               require_lock=True)
 
     async def __rpc_force_exit_async(
             self, trade_id: str, ordertype: Optional[str] = None,
@@ -862,30 +869,29 @@ class RPC:
         if self._freqtrade.state != State.RUNNING:
             raise RPCException('trader is not running')
 
-        with self._freqtrade._exit_lock:
-            if trade_id == 'all':
-                # Execute exit for all open orders
-                for trade in Trade.get_open_trades():
-                    # TODO: asyncio: This should be spawned in tasks
-                    await self.__exec_force_exit(trade, ordertype)
-                Trade.commit()
-                await self._freqtrade.wallets.update()
-                return {'result': 'Created exit orders for all open trades.'}
-
-            # Query for trade
-            trade = Trade.get_trades(
-                trade_filter=[Trade.id == trade_id, Trade.is_open.is_(True), ]
-            ).first()
-            if not trade:
-                logger.warning('force_exit: Invalid argument received')
-                raise RPCException('invalid argument')
-
-            result = await self.__exec_force_exit(trade, ordertype, amount)
+        if trade_id == 'all':
+            # Execute exit for all open orders
+            for trade in Trade.get_open_trades():
+                # TODO: asyncio: This should be spawned in tasks
+                await self.__exec_force_exit(trade, ordertype)
             Trade.commit()
             await self._freqtrade.wallets.update()
-            if not result:
-                raise RPCException('Failed to exit trade.')
-            return {'result': f'Created exit order for trade {trade_id}.'}
+            return {'result': 'Created exit orders for all open trades.'}
+
+        # Query for trade
+        trade = Trade.get_trades(
+            trade_filter=[Trade.id == trade_id, Trade.is_open.is_(True), ]
+        ).first()
+        if not trade:
+            logger.warning('force_exit: Invalid argument received')
+            raise RPCException('invalid argument')
+
+        result = await self.__exec_force_exit(trade, ordertype, amount)
+        Trade.commit()
+        await self._freqtrade.wallets.update()
+        if not result:
+            raise RPCException('Failed to exit trade.')
+        return {'result': f'Created exit order for trade {trade_id}.'}
 
     def _force_entry_validations(self, pair: str, order_side: SignalDirection):
         if not self._freqtrade.config.get('force_entry_enable', False):
@@ -923,7 +929,7 @@ class RPC:
             stake_amount=stake_amount,
             enter_tag=enter_tag,
             leverage=leverage
-        ))
+        ), require_lock=True)
 
     async def __rpc_force_entry(self, pair: str, price: Optional[float], *,
                                 order_type: Optional[str] = None,
@@ -962,91 +968,88 @@ class RPC:
         if not order_type:
             order_type = self._freqtrade.strategy.order_types.get(
                 'force_entry', self._freqtrade.strategy.order_types['entry'])
-        with self._freqtrade._exit_lock:
-            if await self._freqtrade.execute_entry(pair, stake_amount, price,
-                                                   ordertype=order_type, trade=trade,
-                                                   is_short=is_short,
-                                                   enter_tag=enter_tag,
-                                                   leverage_=leverage,
-                                                   ):
-                Trade.commit()
-                logger.info("after commit")
-                trade = Trade.get_trades([Trade.is_open.is_(True), Trade.pair == pair]).first()
-                return trade
-            else:
-                raise RPCException(f'Failed to enter position for {pair}.')
+        if await self._freqtrade.execute_entry(pair, stake_amount, price,
+                                               ordertype=order_type, trade=trade,
+                                               is_short=is_short,
+                                               enter_tag=enter_tag,
+                                               leverage_=leverage,
+                                               ):
+            Trade.commit()
+            logger.info("after commit")
+            trade = Trade.get_trades([Trade.is_open.is_(True), Trade.pair == pair]).first()
+            return trade
+        else:
+            raise RPCException(f'Failed to enter position for {pair}.')
 
     def _rpc_cancel_open_order(self, trade_id: int):
-        self._run_async(self.__rpc_cancel_open_order(trade_id))
+        self._run_async(self.__rpc_cancel_open_order(trade_id), require_lock=True)
 
     async def __rpc_cancel_open_order(self, trade_id: int):
 
         if self._freqtrade.state != State.RUNNING:
             raise RPCException('trader is not running')
-        with self._freqtrade._exit_lock:
-            # Query for trade
-            trade = Trade.get_trades(
-                trade_filter=[Trade.id == trade_id, Trade.is_open.is_(True), ]
-            ).first()
-            if not trade:
-                logger.warning('cancel_open_order: Invalid trade_id received.')
-                raise RPCException('Invalid trade_id.')
-            if not trade.has_open_orders:
-                logger.warning('cancel_open_order: No open order for trade_id.')
-                raise RPCException('No open order for trade_id.')
+        # Query for trade
+        trade = Trade.get_trades(
+            trade_filter=[Trade.id == trade_id, Trade.is_open.is_(True), ]
+        ).first()
+        if not trade:
+            logger.warning('cancel_open_order: Invalid trade_id received.')
+            raise RPCException('Invalid trade_id.')
+        if not trade.has_open_orders:
+            logger.warning('cancel_open_order: No open order for trade_id.')
+            raise RPCException('No open order for trade_id.')
 
-            for open_order in trade.open_orders:
-                try:
-                    order = await self._freqtrade.exchange.fetch_order(
-                        open_order.order_id, trade.pair)
-                except ExchangeError as e:
-                    logger.info(f"Cannot query order for {trade} due to {e}.", exc_info=True)
-                    raise RPCException("Order not found.")
-                await self._freqtrade.handle_cancel_order(
-                    order, open_order, trade, CANCEL_REASON['USER_CANCEL'])
-            Trade.commit()
+        for open_order in trade.open_orders:
+            try:
+                order = await self._freqtrade.exchange.fetch_order(
+                    open_order.order_id, trade.pair)
+            except ExchangeError as e:
+                logger.info(f"Cannot query order for {trade} due to {e}.", exc_info=True)
+                raise RPCException("Order not found.")
+            await self._freqtrade.handle_cancel_order(
+                order, open_order, trade, CANCEL_REASON['USER_CANCEL'])
+        Trade.commit()
 
     def _rpc_delete(self, trade_id: int) -> Dict[str, Union[str, int]]:
-        return self._run_async(self.__rpc_delete_async(trade_id))
+        return self._run_async(self.__rpc_delete_async(trade_id), require_lock=True)
 
     async def __rpc_delete_async(self, trade_id: int) -> Dict[str, Union[str, int]]:
         """
         Handler for delete <id>.
         Delete the given trade and close eventually existing open orders.
         """
-        with self._freqtrade._exit_lock:
-            c_count = 0
-            trade = Trade.get_trades(trade_filter=[Trade.id == trade_id]).first()
-            if not trade:
-                logger.warning('delete trade: Invalid argument received')
-                raise RPCException('invalid argument')
+        c_count = 0
+        trade = Trade.get_trades(trade_filter=[Trade.id == trade_id]).first()
+        if not trade:
+            logger.warning('delete trade: Invalid argument received')
+            raise RPCException('invalid argument')
 
-            # Try cancelling regular order if that exists
-            for open_order in trade.open_orders:
-                try:
-                    await self._freqtrade.exchange.cancel_order(open_order.order_id, trade.pair)
-                    c_count += 1
-                except (ExchangeError):
-                    pass
+        # Try cancelling regular order if that exists
+        for open_order in trade.open_orders:
+            try:
+                await self._freqtrade.exchange.cancel_order(open_order.order_id, trade.pair)
+                c_count += 1
+            except (ExchangeError):
+                pass
 
-            # cancel stoploss on exchange ...
-            if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
-                    and trade.stoploss_order_id):
-                try:
-                    await self._freqtrade.exchange.cancel_stoploss_order(trade.stoploss_order_id,
-                                                                         trade.pair)
-                    c_count += 1
-                except (ExchangeError):
-                    pass
+        # cancel stoploss on exchange ...
+        if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
+                and trade.stoploss_order_id):
+            try:
+                await self._freqtrade.exchange.cancel_stoploss_order(trade.stoploss_order_id,
+                                                                        trade.pair)
+                c_count += 1
+            except (ExchangeError):
+                pass
 
-            trade.delete()
-            await self._freqtrade.wallets.update()
-            return {
-                'result': 'success',
-                'trade_id': trade_id,
-                'result_msg': f'Deleted trade {trade_id}. Closed {c_count} open orders.',
-                'cancel_order_count': c_count,
-            }
+        trade.delete()
+        await self._freqtrade.wallets.update()
+        return {
+            'result': 'success',
+            'trade_id': trade_id,
+            'result_msg': f'Deleted trade {trade_id}. Closed {c_count} open orders.',
+            'cancel_order_count': c_count,
+        }
 
     def _rpc_performance(self) -> List[Dict[str, Any]]:
         """
