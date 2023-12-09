@@ -1548,7 +1548,7 @@ class Exchange:
         except ccxt.BadSymbol as e:
             logger.warning(f"Could not load tickers due to {e.__class__.__name__}. Message: {e} ."
                            "Reloading markets.")
-            self.reload_markets(True)
+            await self.reload_markets(True)
             # Re-raise exception to repeat the call.
             raise TemporaryError from e
         except ccxt.DDoSProtection as e:
@@ -2136,7 +2136,7 @@ class Exchange:
             results = await asyncio.gather(*input_coro, return_exceptions=True)
 
             for res in results:
-                if isinstance(res, Exception):
+                if isinstance(res, BaseException):
                     logger.warning(f"Async code raised an exception: {repr(res)}")
                     continue
                 # Deconstruct tuple (has 5 elements)
@@ -2521,7 +2521,7 @@ class Exchange:
                     results = await asyncio.gather(*input_coro, return_exceptions=True)
 
                     for res in results:
-                        if isinstance(res, Exception):
+                        if isinstance(res, BaseException):
                             logger.warning(f"Leverage tier exception: {repr(res)}")
                             continue
                         symbol, tier = res
