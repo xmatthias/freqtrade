@@ -371,7 +371,7 @@ async def test_order_handle(default_conf, update, ticker, fee, mocker) -> None:
         EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
-        _dry_is_price_crossed=MagicMock(return_value=True),
+        _dry_is_price_crossed=get_mock_coro(return_value=True),
     )
     status_table = MagicMock()
     mocker.patch.multiple(
@@ -379,7 +379,7 @@ async def test_order_handle(default_conf, update, ticker, fee, mocker) -> None:
         _status_table=status_table,
     )
 
-    telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
+    telegram, freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf)
 
     patch_get_signal(freqtradebot)
 
@@ -387,7 +387,7 @@ async def test_order_handle(default_conf, update, ticker, fee, mocker) -> None:
     msg_mock.reset_mock()
 
     # Create some test data
-    freqtradebot.enter_positions()
+    await freqtradebot.enter_positions()
 
     mocker.patch('freqtrade.rpc.telegram.MAX_MESSAGE_LENGTH', 500)
 
@@ -423,11 +423,11 @@ async def test_telegram_order_multi_entry(default_conf, update, mocker, fee) -> 
     default_conf['position_adjustment_enable'] = True
     mocker.patch.multiple(
         EXMS,
-        fetch_order=MagicMock(return_value=None),
-        get_rate=MagicMock(return_value=0.22),
+        fetch_order=get_mock_coro(return_value=None),
+        get_rate=get_mock_coro(return_value=0.22),
     )
 
-    telegram, _, msg_mock = get_telegram_testobject(mocker, default_conf)
+    telegram, _, msg_mock = await get_telegram_testobject(mocker, default_conf)
 
     create_mock_trades(fee)
     trades = Trade.get_open_trades()
