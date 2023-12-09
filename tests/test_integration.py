@@ -10,6 +10,7 @@ from freqtrade.persistence.models import Order
 from freqtrade.rpc.rpc import RPC
 from tests.conftest import (EXMS, get_mock_coro, get_patched_freqtradebot,
                             get_patched_freqtradebot_thread, log_has_re, patch_get_signal)
+from tests.rpc import patch_run_async
 
 
 async def test_may_execute_exit_stoploss_on_exchange_multi(default_conf, ticker, fee,
@@ -178,6 +179,7 @@ async def test_forcebuy_last_unlimited(
 
     freqtrade = await get_patched_freqtradebot_thread(mocker, default_conf)
     rpc = RPC(freqtrade)
+    patch_run_async(rpc)
     freqtrade.strategy.order_types['stoploss_on_exchange'] = True
     # Switch ordertype to market to close trade immediately
     freqtrade.strategy.order_types['exit'] = 'market'
@@ -190,6 +192,7 @@ async def test_forcebuy_last_unlimited(
     trades = Trade.session.scalars(select(Trade)).all()
     assert len(trades) == 4
     assert await freqtrade.wallets.get_trade_stake_amount('XRP/BTC') == result1
+
 
     rpc._rpc_force_entry('TKN/BTC', None)
 
