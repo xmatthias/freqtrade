@@ -34,8 +34,10 @@ from freqtrade.rpc.telegram import Telegram, authorized_only
 from freqtrade.util.datetime_helpers import dt_now
 from tests.conftest import (CURRENT_TEST_STRATEGY, EXMS, create_mock_trades,
                             create_mock_trades_usdt, get_mock_coro, get_patched_freqtradebot,
-                            log_has, log_has_re, patch_eventloop_threading, patch_exchange,
-                            patch_get_signal, patch_whitelist)
+                            get_patched_freqtradebot_thread, log_has, log_has_re,
+                            patch_eventloop_threading, patch_exchange, patch_get_signal,
+                            patch_whitelist)
+from tests.rpc import patch_run_async
 
 
 @pytest.fixture(autouse=True)
@@ -95,8 +97,10 @@ async def get_telegram_testobject(mocker, default_conf, mock=True, ftbot=None):
             _start_thread=MagicMock(),
         )
     if not ftbot:
-        ftbot = await get_patched_freqtradebot(mocker, default_conf)
+        ftbot = await get_patched_freqtradebot_thread(mocker, default_conf)
     rpc = RPC(ftbot)
+    patch_run_async(rpc)
+
     telegram = Telegram(rpc, default_conf)
     telegram._loop = MagicMock()
     patch_eventloop_threading(telegram)

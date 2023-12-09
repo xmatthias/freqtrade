@@ -16,6 +16,7 @@ from freqtrade.rpc.fiat_convert import CryptoToFiatConverter
 from tests.conftest import (EXMS, create_mock_trades, create_mock_trades_usdt, get_mock_coro,
                             get_patched_freqtradebot, get_patched_freqtradebot_thread,
                             patch_get_signal)
+from tests.rpc import patch_run_async
 
 
 async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
@@ -352,6 +353,7 @@ async def test_rpc_delete_trade(mocker, default_conf, fee, markets, caplog, is_s
     freqtradebot.strategy.order_types['stoploss_on_exchange'] = True
     create_mock_trades(fee, is_short)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
     with pytest.raises(RPCException, match='invalid argument'):
         rpc._rpc_delete('200')
 
@@ -712,6 +714,7 @@ async def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
 
     freqtradebot.state = State.STOPPED
     with pytest.raises(RPCException, match=r'.*trader is not running*'):
@@ -1082,6 +1085,7 @@ async def test_rpc_force_entry(mocker, default_conf, ticker, fee, limit_buy_orde
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
     pair = 'ETH/BTC'
     with pytest.raises(RPCException, match='Maximum number of trades is reached.'):
         rpc._rpc_force_entry(pair, None)
@@ -1128,6 +1132,7 @@ async def test_rpc_force_entry(mocker, default_conf, ticker, fee, limit_buy_orde
     freqtradebot.config['stake_amount'] = 0
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
     pair = 'TKN/BTC'
     with pytest.raises(RPCException, match=r"Failed to enter position for TKN/BTC."):
         trade = rpc._rpc_force_entry(pair, None)
@@ -1141,6 +1146,7 @@ async def test_rpc_force_entry_stopped(mocker, default_conf) -> None:
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
     pair = 'ETH/BTC'
     with pytest.raises(RPCException, match=r'trader is not running'):
         await rpc._rpc_force_entry(pair, None)
@@ -1152,6 +1158,7 @@ async def test_rpc_force_entry_disabled(mocker, default_conf) -> None:
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
     pair = 'ETH/BTC'
     with pytest.raises(RPCException, match=r'Force_entry not enabled.'):
         await rpc._rpc_force_entry(pair, None)
@@ -1164,6 +1171,7 @@ async def test_rpc_force_entry_wrong_mode(mocker, default_conf) -> None:
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
+    patch_run_async(rpc)
     pair = 'ETH/BTC'
     with pytest.raises(RPCException, match="Can't go short on Spot markets."):
         await rpc._rpc_force_entry(pair, None, order_side=SignalDirection.SHORT)
