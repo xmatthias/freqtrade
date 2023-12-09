@@ -502,14 +502,14 @@ def test_get_required_data_timerange(mocker, freqai_conf):
     assert (time_range.stopts - time_range.startts) == 177300
 
 
-async def test_download_all_data_for_training(mocker, freqai_conf, caplog, tmpdir):
+async def test_download_all_data_for_training(mocker, freqai_conf, caplog, tmp_path):
     caplog.set_level(logging.DEBUG)
     strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
     exchange = await get_patched_exchange(mocker, freqai_conf)
     pairlist = PairListManager(exchange, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange, pairlist)
     freqai_conf['pairs'] = freqai_conf['exchange']['pair_whitelist']
-    freqai_conf['datadir'] = Path(tmpdir)
+    freqai_conf['datadir'] = tmp_path
     await download_all_data_for_training(strategy.dp, freqai_conf)
 
     assert log_has_re(

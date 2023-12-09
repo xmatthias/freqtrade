@@ -1,3 +1,4 @@
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -446,6 +447,7 @@ async def test_dca_order_adjust(default_conf_usdt, ticker_usdt, leverage, fee, m
     assert trade.open_rate == 1.99
     assert trade.orders[-1].price == 1.96
     assert trade.orders[-1].cost == 120 * leverage
+    time.sleep(0.1)
 
     # Replace new order with diff. order at a lower price
     freqtrade.strategy.adjust_entry_price = MagicMock(return_value=1.95)

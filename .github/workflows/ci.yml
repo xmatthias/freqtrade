@@ -91,7 +91,7 @@ jobs:
 
     - name: Backtesting (multi)
       run: |
-        cp config_examples/config_bittrex.example.json config.json
+        cp tests/testdata/config.tests.json config.json
         freqtrade create-userdir --userdir user_data
         freqtrade new-strategy -s AwesomeStrategy
         freqtrade new-strategy -s AwesomeStrategyMin --template minimal
@@ -99,7 +99,7 @@ jobs:
 
     - name: Hyperopt
       run: |
-        cp config_examples/config_bittrex.example.json config.json
+        cp tests/testdata/config.tests.json config.json
         freqtrade create-userdir --userdir user_data
         freqtrade hyperopt --datadir tests/testdata -e 6 --strategy SampleStrategy --hyperopt-loss SharpeHyperOptLossDaily --print-all
 
@@ -127,7 +127,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest ]
+        os: [ "macos-latest" ]
         python-version: ["3.9", "3.10", "3.11"]
 
     steps:
@@ -144,14 +144,13 @@ jobs:
       id: cache
       with:
         path: ~/dependencies/
-        key: ${{ runner.os }}-dependencies
+        key: ${{ matrix.os }}-dependencies
 
     - name: pip cache (macOS)
       uses: actions/cache@v3
-      if: runner.os == 'macOS'
       with:
         path: ~/Library/Caches/pip
-        key: test-${{ matrix.os }}-${{ matrix.python-version }}-pip
+        key: ${{ matrix.os }}-${{ matrix.python-version }}-pip
 
     - name: TA binary *nix
       if: steps.cache.outputs.cache-hit != 'true'
@@ -159,7 +158,6 @@ jobs:
         cd build_helpers && ./install_ta-lib.sh ${HOME}/dependencies/; cd ..
 
     - name: Installation - macOS
-      if: runner.os == 'macOS'
       run: |
         # brew update
         # TODO: Should be the brew upgrade
@@ -176,7 +174,7 @@ jobs:
         rm /usr/local/bin/python3-config || true
         rm /usr/local/bin/python3.11-config || true
 
-        brew install hdf5 c-blosc
+        brew install hdf5 c-blosc libomp
         python -m pip install --upgrade pip wheel
         export LD_LIBRARY_PATH=${HOME}/dependencies/lib:$LD_LIBRARY_PATH
         export TA_LIBRARY_PATH=${HOME}/dependencies/lib
@@ -201,14 +199,14 @@ jobs:
 
     - name: Backtesting
       run: |
-        cp config_examples/config_bittrex.example.json config.json
+        cp tests/testdata/config.tests.json config.json
         freqtrade create-userdir --userdir user_data
         freqtrade new-strategy -s AwesomeStrategyAdv --template advanced
         freqtrade backtesting --datadir tests/testdata --strategy AwesomeStrategyAdv
 
     - name: Hyperopt
       run: |
-        cp config_examples/config_bittrex.example.json config.json
+        cp tests/testdata/config.tests.json config.json
         freqtrade create-userdir --userdir user_data
         freqtrade hyperopt --datadir tests/testdata -e 5 --strategy SampleStrategy --hyperopt-loss SharpeHyperOptLossDaily --print-all
 
@@ -276,13 +274,13 @@ jobs:
 
     - name: Backtesting
       run: |
-        cp config_examples/config_bittrex.example.json config.json
+        cp tests/testdata/config.tests.json config.json
         freqtrade create-userdir --userdir user_data
         freqtrade backtesting --datadir tests/testdata --strategy SampleStrategy
 
     - name: Hyperopt
       run: |
-        cp config_examples/config_bittrex.example.json config.json
+        cp tests/testdata/config.tests.json config.json
         freqtrade create-userdir --userdir user_data
         freqtrade hyperopt --datadir tests/testdata -e 5 --strategy SampleStrategy --hyperopt-loss SharpeHyperOptLossDaily --print-all
 
@@ -462,7 +460,7 @@ jobs:
         python setup.py sdist bdist_wheel
 
     - name: Publish to PyPI (Test)
-      uses: pypa/gh-action-pypi-publish@v1.8.10
+      uses: pypa/gh-action-pypi-publish@v1.8.11
       if: (github.event_name == 'release')
       with:
         user: __token__
@@ -470,7 +468,7 @@ jobs:
         repository_url: https://test.pypi.org/legacy/
 
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@v1.8.10
+      uses: pypa/gh-action-pypi-publish@v1.8.11
       if: (github.event_name == 'release')
       with:
         user: __token__

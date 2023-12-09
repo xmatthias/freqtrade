@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from pathlib import Path
 from shutil import copytree
 from unittest.mock import PropertyMock
 
@@ -12,7 +11,7 @@ from tests.conftest import EXMS, log_has, log_has_re, patch_exchange
 
 
 async def test_import_kraken_trades_from_csv(
-        testdatadir, tmpdir, caplog, default_conf_usdt, mocker):
+        testdatadir, tmp_path, caplog, default_conf_usdt, mocker):
     with pytest.raises(OperationalException, match="This function is only for the kraken exchange"):
         await import_kraken_trades_from_csv(default_conf_usdt, 'feather')
 
@@ -22,10 +21,9 @@ async def test_import_kraken_trades_from_csv(
     mocker.patch(f'{EXMS}.markets', PropertyMock(return_value={
         'BCH/EUR': {'symbol': 'BCH/EUR', 'id': 'BCHEUR', 'altname': 'BCHEUR'},
     }))
-    tmpdir1 = Path(tmpdir)
-    dstfile = tmpdir1 / 'BCH_EUR-trades.feather'
+    dstfile = tmp_path / 'BCH_EUR-trades.feather'
     assert not dstfile.is_file()
-    default_conf_usdt['datadir'] = tmpdir1
+    default_conf_usdt['datadir'] = tmp_path
     # There's 2 files in this tree, containing a total of 2 days.
     # tests/testdata/kraken/
     # └── trades_csv
@@ -33,7 +31,7 @@ async def test_import_kraken_trades_from_csv(
     # └── incremental_q2
     #     └── BCHEUR.csv   <-- 2023-01-02
 
-    copytree(testdatadir / 'kraken/trades_csv', tmpdir1 / 'trades_csv')
+    copytree(testdatadir / 'kraken/trades_csv', tmp_path / 'trades_csv')
 
     await import_kraken_trades_from_csv(default_conf_usdt, 'feather')
     assert log_has("Found csv files for BCHEUR.", caplog)
@@ -41,7 +39,7 @@ async def test_import_kraken_trades_from_csv(
 
     assert dstfile.is_file()
 
-    dh = get_datahandler(tmpdir1, 'feather')
+    dh = get_datahandler(tmp_path, 'feather')
     trades = dh.trades_load('BCH_EUR')
     assert len(trades) == 340
 
