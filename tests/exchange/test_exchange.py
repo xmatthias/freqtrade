@@ -1927,14 +1927,14 @@ async def test_get_tickers(default_conf, mocker, exchange_name, caplog):
     caplog.clear()
     api_mock.fetch_tickers = get_mock_coro(side_effect=[ccxt.BadSymbol("SomeSymbol"), []])
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    x = exchange.get_tickers()
+    x = await exchange.get_tickers()
     assert x == []
     assert log_has_re(r'Could not load tickers due to BadSymbol\..*SomeSymbol', caplog)
     caplog.clear()
 
     api_mock.fetch_tickers = get_mock_coro(return_value={})
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
-    exchange.get_tickers()
+    await exchange.get_tickers()
 
     api_mock.fetch_tickers.reset_mock()
     api_mock.fetch_bids_asks.reset_mock()
@@ -2049,6 +2049,7 @@ async def test_fetch_ticker(default_conf, mocker, exchange_name):
         await exchange.fetch_ticker(pair='XRP/ETH')
 
 
+@pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test___now_is_time_to_refresh(default_conf, mocker, exchange_name, time_machine):
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
     pair = 'BTC/USDT'

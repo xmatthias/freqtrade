@@ -569,7 +569,7 @@ async def test_download_trades_history(trades_history, mocker, default_conf, tes
     start_dt = dt_utc(2023, 1, 1)
     time_machine.move_to(start_dt, tick=False)
 
-    ght_mock = MagicMock(side_effect=lambda pair, *args, **kwargs: (pair, trades_history))
+    ght_mock = get_mock_coro(side_effect=lambda pair, *args, **kwargs: (pair, trades_history))
     mocker.patch(f'{EXMS}.get_historic_trades', ght_mock)
     exchange = await get_patched_exchange(mocker, default_conf)
     file1 = tmp_path / 'ETH_BTC-trades.json.gz'
