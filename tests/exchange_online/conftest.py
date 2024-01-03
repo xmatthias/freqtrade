@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 from pathlib import Path
 from typing import Tuple
@@ -298,7 +299,7 @@ async def get_exchange(exchange_name, exchange_conf):
     exchange = await ExchangeResolver.load_exchange(exchange_conf, validate=True,
                                                     load_leverage_tiers=True)
 
-    yield exchange, exchange_name
+    return exchange, exchange_name
 
 
 async def get_futures_exchange(exchange_name, exchange_conf, class_mocker):
@@ -320,7 +321,7 @@ async def get_futures_exchange(exchange_name, exchange_conf, class_mocker):
         class_mocker.patch(f'{EXMS}.load_cached_leverage_tiers', return_value=None)
         class_mocker.patch(f'{EXMS}.cache_leverage_tiers')
 
-        yield await get_exchange(exchange_name, exchange_conf)
+        return await get_exchange(exchange_name, exchange_conf)
 
 
 @pytest.fixture(params=EXCHANGES, scope="class")
@@ -332,3 +333,8 @@ async def exchange(request, exchange_conf):
 async def exchange_futures(request, exchange_conf, class_mocker):
 
     yield await get_futures_exchange(request.param, exchange_conf, class_mocker)
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    return asyncio.get_event_loop()
