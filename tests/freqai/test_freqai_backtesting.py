@@ -106,7 +106,7 @@ def test_freqai_backtest_live_models_model_not_found(freqai_conf, mocker, testda
     Backtesting.cleanup()
 
 
-def test_freqai_backtest_consistent_timerange(mocker, freqai_conf):
+async def test_freqai_backtest_consistent_timerange(mocker, freqai_conf):
     mocker.patch('freqtrade.plugins.pairlistmanager.PairListManager.whitelist',
                  PropertyMock(return_value=['XRP/USDT:USDT']))
 
@@ -118,8 +118,8 @@ def test_freqai_backtest_consistent_timerange(mocker, freqai_conf):
         {'include_timeframes': ['5m', '1h'], 'include_corr_pairlist': []})
     freqai_conf['timerange'] = '20211120-20211121'
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
 
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})

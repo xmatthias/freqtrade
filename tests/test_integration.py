@@ -666,7 +666,7 @@ async def test_dca_exiting(default_conf_usdt, ticker_usdt, fee, mocker, caplog, 
 
     # Amount too low...
     freqtrade.strategy.adjust_trade_position = MagicMock(return_value=-(trade.stake_amount * 0.99))
-    freqtrade.process()
+    await freqtrade.process()
 
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 2
@@ -674,7 +674,7 @@ async def test_dca_exiting(default_conf_usdt, ticker_usdt, fee, mocker, caplog, 
     # Amount exactly comes out as exactly 0
     freqtrade.strategy.adjust_trade_position = MagicMock(
         return_value=-(trade.amount / trade.leverage * 2.02))
-    freqtrade.process()
+    await freqtrade.process()
 
     trade = Trade.get_trades().first()
     assert len(trade.orders) == 3

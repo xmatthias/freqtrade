@@ -138,9 +138,9 @@ async def test_get_full_model_path(mocker, freqai_conf, model):
     assert model_path.is_dir() is True
 
 
-def test_get_pair_data_for_features_with_prealoaded_data(mocker, freqai_conf):
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+async def test_get_pair_data_for_features_with_prealoaded_data(mocker, freqai_conf):
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -155,11 +155,11 @@ def test_get_pair_data_for_features_with_prealoaded_data(mocker, freqai_conf):
     assert not df.empty
 
 
-def test_get_pair_data_for_features_without_preloaded_data(mocker, freqai_conf):
+async def test_get_pair_data_for_features_without_preloaded_data(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180115-20180130"})
 
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
@@ -176,9 +176,9 @@ def test_get_pair_data_for_features_without_preloaded_data(mocker, freqai_conf):
     assert df.iloc[-1]['date'].strftime("%Y-%m-%d %H:%M:%S") == "2018-01-30 00:00:00"
 
 
-def test_populate_features(mocker, freqai_conf):
-    strategy = get_patched_freqai_strategy(mocker, freqai_conf)
-    exchange = get_patched_exchange(mocker, freqai_conf)
+async def test_populate_features(mocker, freqai_conf):
+    strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
+    exchange = await get_patched_exchange(mocker, freqai_conf)
     strategy.dp = DataProvider(freqai_conf, exchange)
     strategy.freqai_info = freqai_conf.get("freqai", {})
     freqai = strategy.freqai
