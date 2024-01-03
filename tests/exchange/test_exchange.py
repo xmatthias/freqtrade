@@ -2398,7 +2398,7 @@ async def test__async_get_candle_history(default_conf, mocker, caplog, exchange_
     assert not log_has(f"Using cached candle (OHLCV) data for {pair} ...", caplog)
     await exchange.close()
     # exchange = Exchange(default_conf)
-    await async_ccxt_exception(mocker, default_conf, MagicMock(), 'bittrex',
+    await async_ccxt_exception(mocker, default_conf, MagicMock(), 'binance',
                                "_async_get_candle_history", "fetch_ohlcv",
                                pair='ABCD/BTC', timeframe=default_conf['timeframe'],
                                candle_type=CandleType.SPOT)
@@ -2953,7 +2953,7 @@ async def test__async_fetch_trades(default_conf, mocker, caplog, exchange_name,
     await exchange.close()
 
     exchange = Exchange(default_conf)
-    await async_ccxt_exception(mocker, default_conf, MagicMock(), 'bittrex',
+    await async_ccxt_exception(mocker, default_conf, MagicMock(), 'binance',
                                "_async_fetch_trades", "fetch_trades",
                                pair='ABCD/BTC', since=None)
 

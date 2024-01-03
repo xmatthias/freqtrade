@@ -1289,22 +1289,22 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf_usdt, fee, caplo
 
 
 @pytest.mark.parametrize("is_short", [False, True])
-def test_handle_stoploss_on_exchange_emergency(mocker, default_conf_usdt, fee, is_short,
-                                               limit_order) -> None:
+async def test_handle_stoploss_on_exchange_emergency(mocker, default_conf_usdt, fee, is_short,
+                                                     limit_order) -> None:
     stop_order_dict = {'id': "13434334"}
-    stoploss = MagicMock(return_value=stop_order_dict)
+    stoploss = get_mock_coro(return_value=stop_order_dict)
     enter_order = limit_order[entry_side(is_short)]
     exit_order = limit_order[exit_side(is_short)]
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
         EXMS,
-        fetch_ticker=MagicMock(return_value={
+        fetch_ticker=get_mock_coro(return_value={
             'bid': 1.9,
             'ask': 2.2,
             'last': 1.9
         }),
-        create_order=MagicMock(side_effect=[
+        create_order=get_mock_coro(side_effect=[
             enter_order,
             exit_order,
         ]),
@@ -1312,9 +1312,10 @@ def test_handle_stoploss_on_exchange_emergency(mocker, default_conf_usdt, fee, i
         create_stoploss=stoploss
     )
     freqtrade = FreqtradeBot(default_conf_usdt)
+    await freqtrade.init_bot()
     patch_get_signal(freqtrade, enter_short=is_short, enter_long=not is_short)
 
-    freqtrade.enter_positions()
+    await freqtrade.enter_positions()
     trade = Trade.session.scalars(select(Trade)).first()
     assert trade.is_short == is_short
     assert trade.is_open

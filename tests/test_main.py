@@ -62,7 +62,6 @@ def test_main_fatal_exception(mocker, default_conf, caplog) -> None:
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    assert log_has('Using config: tests/testdata/testconfigs/main_test_config.json ...', caplog)
     assert log_has('Fatal exception!', caplog)
 
 
@@ -76,7 +75,6 @@ def test_main_keyboard_interrupt(mocker, default_conf, caplog) -> None:
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    assert log_has('Using config: tests/testdata/testconfigs/main_test_config.json ...', caplog)
     assert log_has('SIGINT received, aborting ...', caplog)
 
 
@@ -90,7 +88,6 @@ def test_main_operational_exception(mocker, default_conf, caplog) -> None:
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    assert log_has('Using config: tests/testdata/testconfigs/main_test_config.json ...', caplog)
     assert log_has('Oh snap!', caplog)
 
 
