@@ -324,10 +324,11 @@ class Exchange:
         """
         pass
 
-    def _log_exchange_response(self, endpoint, response) -> None:
+    def _log_exchange_response(self, endpoint: str, response, *, add_info=None) -> None:
         """ Log exchange responses """
         if self.log_responses:
-            logger.info(f"API {endpoint}: {response}")
+            add_info_str = "" if add_info is None else f" {add_info}: "
+            logger.info(f"API {endpoint}: {add_info_str}{response}")
 
     def ohlcv_candle_limit(
             self, timeframe: str, candle_type: CandleType, since_ms: Optional[int] = None) -> int:
@@ -335,6 +336,7 @@ class Exchange:
         Exchange ohlcv candle limit
         Uses ohlcv_candle_limit_per_timeframe if the exchange has different limits
         per timeframe (e.g. bittrex), otherwise falls back to ohlcv_candle_limit
+        TODO: this is most likely no longer needed since only bittrex needed this.
         :param timeframe: Timeframe to check
         :param candle_type: Candle-type
         :param since_ms: Starting timestamp
@@ -1376,7 +1378,7 @@ class Exchange:
             order = await self.fetch_stoploss_order(order_id, pair)
         except InvalidOrderException:
             logger.warning(f"Could not fetch cancelled stoploss order {order_id}.")
-            order = {'fee': {}, 'status': 'canceled', 'amount': amount, 'info': {}}
+            order = {'id': order_id, 'fee': {}, 'status': 'canceled', 'amount': amount, 'info': {}}
 
         return order
 
@@ -2444,6 +2446,8 @@ class Exchange:
                 symbol=pair,
                 since=since
             )
+            self._log_exchange_response('funding_history', funding_history,
+                                        add_info=f"pair: {pair}, since: {since}")
             return sum(fee['amount'] for fee in funding_history)
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e

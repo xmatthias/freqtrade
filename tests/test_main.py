@@ -57,12 +57,12 @@ def test_main_start_hyperopt(mocker) -> None:
 def test_main_fatal_exception(mocker, default_conf, caplog) -> None:
     mocker.patch('freqtrade.commands.start_trading', MagicMock(side_effect=Exception))
 
-    args = ['trade', '-c', 'config_examples/config_bittrex.example.json']
+    args = ['trade', '-c', 'tests/testdata/testconfigs/main_test_config.json']
 
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    # assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
+    assert log_has('Using config: tests/testdata/testconfigs/main_test_config.json ...', caplog)
     assert log_has('Fatal exception!', caplog)
 
 
@@ -71,12 +71,12 @@ def test_main_keyboard_interrupt(mocker, default_conf, caplog) -> None:
     mocker.patch('freqtrade.commands.start_trading', MagicMock(side_effect=KeyboardInterrupt))
     patched_configuration_load_config_file(mocker, default_conf)
 
-    args = ['trade', '-c', 'config_examples/config_bittrex.example.json']
+    args = ['trade', '-c', 'tests/testdata/testconfigs/main_test_config.json']
 
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
-    # assert log_has('Using config: config_examples/config_bittrex.example.json ...', caplog)
+    assert log_has('Using config: tests/testdata/testconfigs/main_test_config.json ...', caplog)
     assert log_has('SIGINT received, aborting ...', caplog)
 
 
@@ -85,11 +85,12 @@ def test_main_operational_exception(mocker, default_conf, caplog) -> None:
     mocker.patch('freqtrade.commands.start_trading',
                  MagicMock(side_effect=FreqtradeException('Oh snap!')))
 
-    args = ['trade', '-c', 'config_examples/config_bittrex.example.json']
+    args = ['trade', '-c', 'tests/testdata/testconfigs/main_test_config.json']
 
     # Test Main + the KeyboardInterrupt exception
     with pytest.raises(SystemExit):
         main(args)
+    assert log_has('Using config: tests/testdata/testconfigs/main_test_config.json ...', caplog)
     assert log_has('Oh snap!', caplog)
 
 

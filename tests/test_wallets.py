@@ -122,7 +122,7 @@ async def test_get_trade_stake_amount_no_stake_amount(default_conf, mocker) -> N
     await freqtrade.wallets.update()
 
     with pytest.raises(DependencyException, match=r'.*stake amount.*'):
-        await freqtrade.wallets.get_trade_stake_amount('ETH/BTC')
+        await freqtrade.wallets.get_trade_stake_amount('ETH/BTC', 1)
 
 
 @pytest.mark.parametrize("balance_ratio,capital,result1,result2", [
@@ -149,7 +149,6 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
     conf = deepcopy(default_conf)
     conf['stake_amount'] = UNLIMITED_STAKE_AMOUNT
     conf['dry_run_wallet'] = 100
-    conf['max_open_trades'] = 2
     conf['tradable_balance_ratio'] = balance_ratio
     if capital is not None:
         conf['available_capital'] = capital
@@ -157,30 +156,28 @@ async def test_get_trade_stake_amount_unlimited_amount(default_conf, ticker, bal
     freqtrade = await get_patched_freqtradebot(mocker, conf)
 
     # no open trades, order amount should be 'balance / max_open_trades'
-    result = await freqtrade.wallets.get_trade_stake_amount('ETH/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('ETH/USDT', 2)
     assert result == result1
 
     # create one trade, order amount should be 'balance / (max_open_trades - num_open_trades)'
     await freqtrade.execute_entry('ETH/USDT', result)
 
-    result = await freqtrade.wallets.get_trade_stake_amount('LTC/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('LTC/USDT', 2)
     assert result == result1
 
     # create 2 trades, order amount should be None
     await freqtrade.execute_entry('LTC/BTC', result)
 
-    result = await freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('XRP/USDT', 2)
     assert result == 0
 
-    freqtrade.config['max_open_trades'] = 3
     freqtrade.config['dry_run_wallet'] = 200
     freqtrade.wallets.start_cap = 200
-    result = await freqtrade.wallets.get_trade_stake_amount('XRP/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('XRP/USDT', 3)
     assert round(result, 4) == round(result2, 4)
 
     # set max_open_trades = None, so do not trade
-    freqtrade.config['max_open_trades'] = 0
-    result = await freqtrade.wallets.get_trade_stake_amount('NEO/USDT')
+    result = await freqtrade.wallets.get_trade_stake_amount('NEO/USDT', 0)
     assert result == 0
 
 
