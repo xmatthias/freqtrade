@@ -574,9 +574,6 @@ async def test_handle_stoploss_on_exchange_trailing(
             exit_order,
         ]),
         get_fee=fee,
-    )
-    mocker.patch.multiple(
-        EXMS,
         create_stoploss=stoploss,
         stoploss_adjust=MagicMock(return_value=True),
     )
@@ -657,7 +654,7 @@ async def test_handle_stoploss_on_exchange_trailing(
     cancel_order_mock = get_mock_coro(return_value={
         'id': '13434334', 'status': 'canceled', 'fee': {}, 'amount': trade.amount})
     stoploss_order_mock = get_mock_coro(return_value={'id': 'so1', 'status': 'open'})
-    mocker.patch(f'{EXMS}.fetch_stoploss_order')
+    mocker.patch(f'{EXMS}.fetch_stoploss_order', get_mock_coro(MagicMock()))
     mocker.patch(f'{EXMS}.cancel_stoploss_order', cancel_order_mock)
     mocker.patch(f'{EXMS}.create_stoploss', stoploss_order_mock)
 
@@ -1050,7 +1047,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, limi
     assert pytest.approx(trade.stop_loss) == 1.76
 
     cancel_order_mock = get_mock_coro()
-    stoploss_order_mock = get_mock_coro()
+    stoploss_order_mock = get_mock_coro(return_value=MagicMock())
     mocker.patch(f'{EXMS}.cancel_stoploss_order', cancel_order_mock)
     mocker.patch(f'{EXMS}.create_stoploss', stoploss_order_mock)
 
