@@ -78,7 +78,7 @@ async def start_convert_data(args: Dict[str, Any], ohlcv: bool = True) -> None:
     """
     config = setup_utils_configuration(args, RunMode.UTIL_NO_EXCHANGE)
     if ohlcv:
-        migrate_data(config)
+        await migrate_data(config)
         convert_ohlcv_format(config,
                              convert_from=args['format_from'],
                              convert_to=args['format_to'],

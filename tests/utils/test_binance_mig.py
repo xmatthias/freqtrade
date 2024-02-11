@@ -56,11 +56,11 @@ def test_binance_mig_db_conversion(default_conf_usdt, fee, caplog):
     assert log_has('Migrating binance futures pairs in database.', caplog)
 
 
-def test_migration_wrapper(default_conf_usdt, mocker):
+async def test_migration_wrapper(default_conf_usdt, mocker):
     default_conf_usdt['trading_mode'] = 'futures'
     binmock = mocker.patch('freqtrade.util.migrations.migrate_binance_futures_data')
     funding_mock = mocker.patch('freqtrade.util.migrations.migrate_funding_fee_timeframe')
-    migrate_data(default_conf_usdt)
+    await migrate_data(default_conf_usdt)
 
     assert binmock.call_count == 1
     assert funding_mock.call_count == 1

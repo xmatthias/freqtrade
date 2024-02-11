@@ -10,7 +10,7 @@ from freqtrade.exchange import Exchange
 logger = logging.getLogger(__name__)
 
 
-def migrate_funding_fee_timeframe(config: Config, exchange: Optional[Exchange]):
+async def migrate_funding_fee_timeframe(config: Config, exchange: Optional[Exchange]):
     if (
         config.get('trading_mode', TradingMode.SPOT) != TradingMode.FUTURES
     ):
@@ -19,7 +19,7 @@ def migrate_funding_fee_timeframe(config: Config, exchange: Optional[Exchange]):
 
     if not exchange:
         from freqtrade.resolvers import ExchangeResolver
-        exchange = ExchangeResolver.load_exchange(config, validate=False)
+        exchange = await ExchangeResolver.load_exchange(config, validate=False)
 
     ff_timeframe = exchange.get_option('funding_fee_timeframe')
 
