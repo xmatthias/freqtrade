@@ -280,6 +280,6 @@ async def test_stoploss_adjust_kraken(mocker, default_conf, sl1, sl2, sl3, side)
     ('1705443695120072285', True),
     ('170544369512007228555', True),
 ])
-def test__valid_trade_pagination_id_kraken(mocker, default_conf_usdt, trade_id, expected):
-    exchange = get_patched_exchange(mocker, default_conf_usdt, id='kraken')
+async def test__valid_trade_pagination_id_kraken(mocker, default_conf_usdt, trade_id, expected):
+    exchange = await get_patched_exchange(mocker, default_conf_usdt, id='kraken')
     assert exchange._valid_trade_pagination_id('XRP/USDT', trade_id) == expected

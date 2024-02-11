@@ -54,6 +54,6 @@ async def test_import_kraken_trades_from_csv(
     caplog.clear()
     default_conf_usdt['pairs'] = ['XRP/EUR']
     # Filtered to non-existing pair
-    import_kraken_trades_from_csv(default_conf_usdt, 'feather')
+    await import_kraken_trades_from_csv(default_conf_usdt, 'feather')
     assert log_has("Found csv files for BCHEUR.", caplog)
     assert log_has("No data found for pairs XRP/EUR.", caplog)
