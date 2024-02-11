@@ -903,7 +903,8 @@ async def test_handle_stoploss_on_exchange_custom_stop(
         x['id'] = order_id
         return x
 
-    mocker.patch(f'{EXMS}.fetch_stoploss_order', get_mock_coro(fetch_stoploss_order_mock))
+    mocker.patch(f'{EXMS}.fetch_stoploss_order', get_mock_coro(
+        side_effect=fetch_stoploss_order_mock))
     mocker.patch(f'{EXMS}.cancel_stoploss_order', return_value=slo_canceled)
 
     assert await freqtrade.handle_trade(trade) is False
@@ -1067,6 +1068,7 @@ async def test_tsl_on_exchange_compatible_with_edge(mocker, edge_conf, fee, limi
 
     # stoploss on exchange should not be canceled
     cancel_order_mock.assert_not_called()
+    stoploss_order_mock.assert_not_called()
 
     # price jumped 2x
     mocker.patch(f'{EXMS}.fetch_ticker', get_mock_coro(return_value={
