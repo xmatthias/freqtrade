@@ -124,8 +124,7 @@ async def test_load_data_with_new_pair_1min(ohlcv_history_list, mocker, caplog,
 
     # download a new pair if refresh_pairs is set
     await refresh_data(datadir=tmp_path, timeframe='1m', pairs=['MEME/BTC'],
-                       exchange=exchange, candle_type=CandleType.SPOT
-                 )
+                       exchange=exchange, candle_type=CandleType.SPOT)
     load_pair_history(datadir=tmp_path, timeframe='1m', pair='MEME/BTC', candle_type=candle_type)
     assert file.is_file()
     assert log_has_re(

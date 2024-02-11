@@ -18,7 +18,8 @@ from tests.freqtradebot.test_freqtradebot import patch_RPCManager
 
 
 @pytest.mark.parametrize("is_short", [False, True])
-async def test_add_stoploss_on_exchange(mocker, default_conf_usdt, limit_order, is_short, fee) -> None:
+async def test_add_stoploss_on_exchange(
+        mocker, default_conf_usdt, limit_order, is_short, fee) -> None:
     patch_RPCManager(mocker)
     patch_exchange(mocker)
     mocker.patch.multiple(
@@ -32,7 +33,8 @@ async def test_add_stoploss_on_exchange(mocker, default_conf_usdt, limit_order, 
         get_fee=fee,
     )
     order = limit_order[entry_side(is_short)]
-    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_trade', get_mock_coro(return_value=True))
+    mocker.patch('freqtrade.freqtradebot.FreqtradeBot.handle_trade',
+                 get_mock_coro(return_value=True))
     mocker.patch(f'{EXMS}.fetch_order', return_value=order)
     mocker.patch(f'{EXMS}.get_trades_for_order', return_value=[])
 
@@ -184,7 +186,7 @@ async def test_handle_stoploss_on_exchange(mocker, default_conf_usdt, fee, caplo
 
 @pytest.mark.parametrize("is_short", [False, True])
 async def test_handle_stoploss_on_exchange_emergency(mocker, default_conf_usdt, fee, is_short,
-                                               limit_order) -> None:
+                                                     limit_order) -> None:
     stop_order_dict = {'id': "13434334"}
     stoploss = get_mock_coro(return_value=stop_order_dict)
     enter_order = limit_order[entry_side(is_short)]

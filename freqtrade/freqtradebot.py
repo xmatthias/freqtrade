@@ -95,7 +95,6 @@ class FreqtradeBot(LoggingMixin):
         PairLocks.timeframe = self.config['timeframe']
 
         self.pairlists = PairListManager(self.exchange, self.config)
-        self.trading_mode: TradingMode = self.config.get('trading_mode', TradingMode.SPOT)
         self.last_process: Optional[datetime] = None
 
         # RPC runs in separate threads, can start handling external commands just after
@@ -1325,7 +1324,7 @@ class FreqtradeBot(LoggingMixin):
         ):
             if (
                  await self.create_stoploss_order(
-                 trade=trade, stop_price=trade.stoploss_or_liquidation)
+                     trade=trade, stop_price=trade.stoploss_or_liquidation)
             ):
                 return False
             else:
@@ -1391,7 +1390,7 @@ class FreqtradeBot(LoggingMixin):
                 else:
                     await self.replace_order(order, open_order, trade)
 
-                fully_cancelled = self.update_trade_state(trade, open_order.order_id, order)
+                fully_cancelled = await self.update_trade_state(trade, open_order.order_id, order)
                 not_closed = order['status'] == 'open' or fully_cancelled
 
                 if not_closed:
@@ -1402,13 +1401,14 @@ class FreqtradeBot(LoggingMixin):
                             )
                         )
                     ):
-                        self.handle_cancel_order(
+                        await self.handle_cancel_order(
                             order, open_order, trade, constants.CANCEL_REASON['TIMEOUT']
                         )
                     else:
-                        self.replace_order(order, open_order, trade)
+                        await self.replace_order(order, open_order, trade)
 
-    async def handle_cancel_order(self, order: Dict, order_obj: Order, trade: Trade, reason: str) -> None:
+    async def handle_cancel_order(
+            self, order: Dict, order_obj: Order, trade: Trade, reason: str) -> None:
         """
         Check if current analyzed order timed out and cancel if necessary.
         :param order: Order dict grabbed with exchange.fetch_order()

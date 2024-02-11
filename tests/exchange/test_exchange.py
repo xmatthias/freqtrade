@@ -3114,7 +3114,8 @@ async def test__async_get_trade_history_id(default_conf, mocker, exchange_name,
     ('170544369512007228555', True),
 ])
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
-async def test__valid_trade_pagination_id(mocker, default_conf_usdt, exchange_name, trade_id, expected):
+async def test__valid_trade_pagination_id(
+        mocker, default_conf_usdt, exchange_name, trade_id, expected):
     if exchange_name == 'kraken':
         pytest.skip("Kraken has a different pagination id format, and an explicit test.")
     exchange = await get_patched_exchange(mocker, default_conf_usdt, id=exchange_name)
