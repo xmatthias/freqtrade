@@ -1390,23 +1390,6 @@ class FreqtradeBot(LoggingMixin):
                 else:
                     await self.replace_order(order, open_order, trade)
 
-                fully_cancelled = await self.update_trade_state(trade, open_order.order_id, order)
-                not_closed = order['status'] == 'open' or fully_cancelled
-
-                if not_closed:
-                    if (
-                        fully_cancelled or (
-                            open_order and self.strategy.ft_check_timed_out(
-                                trade, open_order, datetime.now(timezone.utc)
-                            )
-                        )
-                    ):
-                        await self.handle_cancel_order(
-                            order, open_order, trade, constants.CANCEL_REASON['TIMEOUT']
-                        )
-                    else:
-                        await self.replace_order(order, open_order, trade)
-
     async def handle_cancel_order(
             self, order: Dict, order_obj: Order, trade: Trade, reason: str) -> None:
         """
