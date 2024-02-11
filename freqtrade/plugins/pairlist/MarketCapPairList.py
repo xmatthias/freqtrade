@@ -90,7 +90,7 @@ class MarketCapPairList(IPairList):
             }
         }
 
-    def gen_pairlist(self, tickers: Tickers) -> List[str]:
+    async def gen_pairlist(self, tickers: Tickers) -> List[str]:
         """
         Generate the pairlist
         :param tickers: Tickers (from exchange.get_tickers). May be cached.
@@ -111,12 +111,12 @@ class MarketCapPairList(IPairList):
             # No point in testing for blacklisted pairs...
             _pairlist = self.verify_blacklist(_pairlist, logger.info)
 
-            pairlist = self.filter_pairlist(_pairlist, tickers)
+            pairlist = await self.filter_pairlist(_pairlist, tickers)
             self._marketcap_cache['pairlist_mc'] = pairlist.copy()
 
         return pairlist
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Filters and sorts pairlist and returns the whitelist again.
         Called on each bot iteration - please use internal caching if necessary
