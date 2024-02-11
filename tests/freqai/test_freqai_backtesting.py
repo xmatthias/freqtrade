@@ -107,6 +107,7 @@ def test_freqai_backtest_live_models_model_not_found(freqai_conf, mocker, testda
 
 
 async def test_freqai_backtest_consistent_timerange(mocker, freqai_conf):
+    freqai_conf['runmode'] = 'backtest'
     mocker.patch('freqtrade.plugins.pairlistmanager.PairListManager.whitelist',
                  PropertyMock(return_value=['XRP/USDT:USDT']))
 

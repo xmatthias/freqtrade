@@ -89,6 +89,8 @@ class Order(ModelBase):
     funding_fee: Mapped[Optional[float]] = mapped_column(Float(), nullable=True)
 
     ft_fee_base: Mapped[Optional[float]] = mapped_column(Float(), nullable=True)
+    ft_order_tag: Mapped[Optional[str]] = mapped_column(String(CUSTOM_TAG_MAX_LENGTH),
+                                                        nullable=True)
 
     @property
     def order_date_utc(self) -> datetime:
@@ -105,6 +107,11 @@ class Order(ModelBase):
     @property
     def safe_amount(self) -> float:
         return self.amount or self.ft_amount
+
+    @property
+    def safe_placement_price(self) -> float:
+        """Price at which the order was placed"""
+        return self.price or self.stop_price or self.ft_price
 
     @property
     def safe_price(self) -> float:
@@ -170,6 +177,8 @@ class Order(ModelBase):
         order_date = safe_value_fallback(order, 'timestamp')
         if order_date:
             self.order_date = datetime.fromtimestamp(order_date / 1000, tz=timezone.utc)
+        elif not self.order_date:
+            self.order_date = dt_now()
 
         self.ft_is_open = True
         if self.status in NON_OPEN_EXCHANGE_STATES:
@@ -207,6 +216,10 @@ class Order(ModelBase):
         return order
 
     def to_json(self, entry_side: str, minified: bool = False) -> Dict[str, Any]:
+        """
+        :param minified: If True, only return a subset of the data is returned.
+                         Only used for backtesting.
+        """
         resp = {
             'amount': self.safe_amount,
             'safe_price': self.safe_price,
@@ -214,6 +227,7 @@ class Order(ModelBase):
             'order_filled_timestamp': int(self.order_filled_date.replace(
                 tzinfo=timezone.utc).timestamp() * 1000) if self.order_filled_date else None,
             'ft_is_entry': self.ft_order_side == entry_side,
+            'ft_order_tag': self.ft_order_tag,
         }
         if not minified:
             resp.update({
@@ -364,10 +378,6 @@ class LocalTrade:
     # percentage value of the initial stop loss
     initial_stop_loss_pct: Optional[float] = None
     is_stop_loss_trailing: bool = False
-    # stoploss order id which is on exchange
-    stoploss_order_id: Optional[str] = None
-    # last update time of the stoploss order on exchange
-    stoploss_last_update: Optional[datetime] = None
     # absolute value of the highest reached price
     max_rate: Optional[float] = None
     # Lowest price reached
@@ -457,8 +467,8 @@ class LocalTrade:
 
     @property
     def stoploss_last_update_utc(self):
-        if self.stoploss_last_update:
-            return self.stoploss_last_update.replace(tzinfo=timezone.utc)
+        if self.has_open_sl_orders:
+            return max(o.order_date_utc for o in self.open_sl_orders)
         return None
 
     @property
@@ -514,7 +524,7 @@ class LocalTrade:
         return [o for o in self.orders if o.ft_is_open and o.ft_order_side != 'stoploss']
 
     @property
-    def has_open_orders(self) -> int:
+    def has_open_orders(self) -> bool:
         """
         True if there are open orders for this trade excluding stoploss orders
         """
@@ -523,6 +533,37 @@ class LocalTrade:
             if o.ft_order_side not in ['stoploss'] and o.ft_is_open
         ]
         return len(open_orders_wo_sl) > 0
+
+    @property
+    def open_sl_orders(self) -> List[Order]:
+        """
+        All open stoploss orders for this trade
+        """
+        return [
+            o for o in self.orders
+            if o.ft_order_side in ['stoploss'] and o.ft_is_open
+        ]
+
+    @property
+    def has_open_sl_orders(self) -> bool:
+        """
+        True if there are open stoploss orders for this trade
+        """
+        open_sl_orders = [
+            o for o in self.orders
+            if o.ft_order_side in ['stoploss'] and o.ft_is_open
+        ]
+        return len(open_sl_orders) > 0
+
+    @property
+    def sl_orders(self) -> List[Order]:
+        """
+        All stoploss orders for this trade
+        """
+        return [
+            o for o in self.orders
+            if o.ft_order_side in ['stoploss']
+        ]
 
     @property
     def open_orders_ids(self) -> List[str]:
@@ -553,6 +594,11 @@ class LocalTrade:
         )
 
     def to_json(self, minified: bool = False) -> Dict[str, Any]:
+        """
+        :param minified: If True, only return a subset of the data is returned.
+                         Only used for backtesting.
+        :return: Dictionary with trade data
+        """
         filled_or_open_orders = self.select_filled_or_open_orders()
         orders_json = [order.to_json(self.entry_side, minified) for order in filled_or_open_orders]
 
@@ -611,11 +657,10 @@ class LocalTrade:
             'stop_loss_abs': self.stop_loss,
             'stop_loss_ratio': self.stop_loss_pct if self.stop_loss_pct else None,
             'stop_loss_pct': (self.stop_loss_pct * 100) if self.stop_loss_pct else None,
-            'stoploss_order_id': self.stoploss_order_id,
-            'stoploss_last_update': (self.stoploss_last_update.strftime(DATETIME_PRINT_FORMAT)
-                                     if self.stoploss_last_update else None),
-            'stoploss_last_update_timestamp': int(self.stoploss_last_update.replace(
-                tzinfo=timezone.utc).timestamp() * 1000) if self.stoploss_last_update else None,
+            'stoploss_last_update': (self.stoploss_last_update_utc.strftime(DATETIME_PRINT_FORMAT)
+                                     if self.stoploss_last_update_utc else None),
+            'stoploss_last_update_timestamp': int(self.stoploss_last_update_utc.timestamp() * 1000
+                                                  ) if self.stoploss_last_update_utc else None,
             'initial_stop_loss_abs': self.initial_stop_loss,
             'initial_stop_loss_ratio': (self.initial_stop_loss_pct
                                         if self.initial_stop_loss_pct else None),
@@ -776,7 +821,6 @@ class LocalTrade:
                 logger.info(f'{order.order_type.upper()}_{payment} has been fulfilled for {self}.')
 
         elif order.ft_order_side == 'stoploss' and order.status not in ('open', ):
-            self.stoploss_order_id = None
             self.close_rate_requested = self.stop_loss
             self.exit_reason = ExitType.STOPLOSS_ON_EXCHANGE.value
             if self.is_open and order.safe_filled > 0:
@@ -1353,11 +1397,6 @@ class LocalTrade:
             exit_order_status=data["exit_order_status"],
             stop_loss=data["stop_loss_abs"],
             stop_loss_pct=data["stop_loss_ratio"],
-            stoploss_order_id=data["stoploss_order_id"],
-            stoploss_last_update=(
-                datetime.fromtimestamp(data["stoploss_last_update_timestamp"] // 1000,
-                                       tz=timezone.utc)
-                if data["stoploss_last_update_timestamp"] else None),
             initial_stop_loss=data["initial_stop_loss_abs"],
             initial_stop_loss_pct=data["initial_stop_loss_ratio"],
             min_rate=data["min_rate"],
@@ -1395,6 +1434,7 @@ class LocalTrade:
                 ft_price=order["price"],
                 remaining=order["remaining"],
                 funding_fee=order.get("funding_fee", None),
+                ft_order_tag=order.get("ft_order_tag", None),
             )
             trade.orders.append(order_obj)
 
@@ -1463,11 +1503,6 @@ class Trade(ModelBase, LocalTrade):
         Float(), nullable=True)  # type: ignore
     is_stop_loss_trailing: Mapped[bool] = mapped_column(
         nullable=False, default=False)  # type: ignore
-    # stoploss order id which is on exchange
-    stoploss_order_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, index=True)  # type: ignore
-    # last update time of the stoploss order on exchange
-    stoploss_last_update: Mapped[Optional[datetime]] = mapped_column(nullable=True)  # type: ignore
     # absolute value of the highest reached price
     max_rate: Mapped[Optional[float]] = mapped_column(
         Float(), nullable=True, default=0.0)  # type: ignore
@@ -1637,7 +1672,7 @@ class Trade(ModelBase, LocalTrade):
         Retrieves total realized profit
         """
         if Trade.use_db:
-            total_profit: float = Trade.session.execute(
+            total_profit = Trade.session.execute(
                 select(func.sum(Trade.close_profit_abs)).filter(Trade.is_open.is_(False))
             ).scalar_one()
         else:
@@ -1845,4 +1880,4 @@ class Trade(ModelBase, LocalTrade):
                 Order.order_filled_date >= start_date,
                 Order.status == 'closed'
             )).scalar_one()
-        return trading_volume
+        return trading_volume or 0.0

@@ -26,13 +26,13 @@ from freqtrade.exceptions import ExchangeError, PricingError
 from freqtrade.exchange import timeframe_to_minutes, timeframe_to_msecs
 from freqtrade.exchange.types import Tickers
 from freqtrade.loggers import bufferHandler
-from freqtrade.misc import decimals_per_coin
 from freqtrade.persistence import KeyStoreKeys, KeyValueStore, PairLocks, Trade
 from freqtrade.persistence.models import PairLock
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
 from freqtrade.rpc.fiat_convert import CryptoToFiatConverter
 from freqtrade.rpc.rpc_types import RPCSendMsg
-from freqtrade.util import dt_humanize, dt_now, dt_ts_def, format_date, shorten_date
+from freqtrade.util import (decimals_per_coin, dt_humanize, dt_now, dt_ts_def, format_date,
+                            shorten_date)
 from freqtrade.wallets import PositionWallet, Wallet
 
 
@@ -1033,15 +1033,17 @@ class RPC:
             except (ExchangeError):
                 pass
 
-        # cancel stoploss on exchange ...
-        if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
-                and trade.stoploss_order_id):
-            try:
-                await self._freqtrade.exchange.cancel_stoploss_order(trade.stoploss_order_id,
-                                                                        trade.pair)
-                c_count += 1
-            except (ExchangeError):
-                pass
+            # cancel stoploss on exchange orders ...
+            if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
+                    and trade.has_open_sl_orders):
+
+                for oslo in trade.open_sl_orders:
+                    try:
+                        await self._freqtrade.exchange.cancel_stoploss_order(
+                            oslo.order_id, trade.pair)
+                        c_count += 1
+                    except (ExchangeError):
+                        pass
 
         trade.delete()
         await self._freqtrade.wallets.update()

@@ -76,7 +76,7 @@ async def test_filter_features(mocker, freqai_conf):
     freqai, unfiltered_dataframe = await make_unfiltered_dataframe(mocker, freqai_conf)
     freqai.dk.find_features(unfiltered_dataframe)
 
-    filtered_df, labels = freqai.dk.filter_features(
+    filtered_df, _labels = freqai.dk.filter_features(
             unfiltered_dataframe,
             freqai.dk.training_features_list,
             freqai.dk.label_list,
@@ -157,6 +157,7 @@ async def test_get_pair_data_for_features_with_prealoaded_data(mocker, freqai_co
 
 async def test_get_pair_data_for_features_without_preloaded_data(mocker, freqai_conf):
     freqai_conf.update({"timerange": "20180115-20180130"})
+    freqai_conf['runmode'] = 'backtest'
 
     strategy = await get_patched_freqai_strategy(mocker, freqai_conf)
     exchange = await get_patched_exchange(mocker, freqai_conf)

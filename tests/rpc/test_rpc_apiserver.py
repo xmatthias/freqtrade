@@ -113,7 +113,7 @@ def assert_response(response, expected_code=200, needs_cors=True):
 
 
 def test_api_not_found(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/invalid_url")
     assert_response(rc, 404)
@@ -121,7 +121,7 @@ def test_api_not_found(botclient):
 
 
 def test_api_ui_fallback(botclient, mocker):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, "/favicon.ico")
     assert rc.status_code == 200
@@ -151,7 +151,7 @@ def test_api_ui_fallback(botclient, mocker):
 
 
 def test_api_ui_version(botclient, mocker):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     mocker.patch('freqtrade.commands.deploy_commands.read_ui_version', return_value='0.1.2')
     rc = client_get(client, "/ui_version")
@@ -231,7 +231,7 @@ def test_api_unauthorized(botclient):
 
 
 def test_api_token_login(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
     rc = client.post(f"{BASE_URI}/token/login",
                      data=None,
                      headers={'Authorization': _basic_auth_str('WRONG_USER', 'WRONG_PASS'),
@@ -250,7 +250,7 @@ def test_api_token_login(botclient):
 
 
 def test_api_token_refresh(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
     rc = client_post(client, f"{BASE_URI}/token/login")
     assert_response(rc)
     rc = client.post(f"{BASE_URI}/token/refresh",
@@ -545,7 +545,7 @@ def test_api_count(botclient, mocker, ticker, fee, markets, is_short):
 
 
 def test_api_locks(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/locks")
     assert_response(rc)
@@ -825,7 +825,7 @@ def test_api_trade_reload_trade(botclient, mocker, fee, markets, ticker, is_shor
 
 
 def test_api_logs(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
     rc = client_get(client, f"{BASE_URI}/logs")
     assert_response(rc)
     assert len(rc.json()) == 2
@@ -1178,7 +1178,6 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'stop_loss_abs': ANY,
         'stop_loss_pct': ANY,
         'stop_loss_ratio': ANY,
-        'stoploss_order_id': None,
         'stoploss_last_update': ANY,
         'stoploss_last_update_timestamp': ANY,
         'initial_stop_loss_abs': 0.0,
@@ -1232,7 +1231,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
 
 
 def test_api_version(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/version")
     assert_response(rc)
@@ -1240,7 +1239,7 @@ def test_api_version(botclient):
 
 
 def test_api_blacklist(botclient, mocker):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/blacklist")
     assert_response(rc)
@@ -1307,7 +1306,7 @@ def test_api_blacklist(botclient, mocker):
 
 
 def test_api_whitelist(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/whitelist")
     assert_response(rc)
@@ -1382,7 +1381,6 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
         'stop_loss_abs': None,
         'stop_loss_pct': None,
         'stop_loss_ratio': None,
-        'stoploss_order_id': None,
         'stoploss_last_update': None,
         'stoploss_last_update_timestamp': None,
         'initial_stop_loss_abs': None,
@@ -1562,7 +1560,7 @@ def test_api_pair_candles(botclient, ohlcv_history):
 
 
 def test_api_pair_history(botclient, mocker):
-    ftbot, client = botclient
+    _ftbot, client = botclient
     timeframe = '5m'
     lfm = mocker.patch('freqtrade.strategy.interface.IStrategy.load_freqAI_model')
     # No pair
@@ -1607,9 +1605,9 @@ def test_api_pair_history(botclient, mocker):
     assert 'data' in result
     data = result['data']
     assert len(data) == 289
-    # analyed DF has 28 columns
-    assert len(result['columns']) == 28
-    assert len(data[0]) == 28
+    # analyed DF has 30 columns
+    assert len(result['columns']) == 30
+    assert len(data[0]) == 30
     date_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'date'][0]
     rsi_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'rsi'][0]
 
@@ -1702,7 +1700,7 @@ def test_api_strategies(botclient, tmp_path):
 
 
 def test_api_strategy(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/strategy/{CURRENT_TEST_STRATEGY}")
 
@@ -1721,7 +1719,7 @@ def test_api_strategy(botclient):
 
 
 def test_api_exchanges(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/exchanges")
     assert_response(rc)
@@ -1958,7 +1956,7 @@ def test_list_available_pairs(botclient):
 
 
 def test_sysinfo(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/sysinfo")
     assert_response(rc)
@@ -2238,7 +2236,7 @@ def test_api_patch_backtest_history_entry(botclient, tmp_path: Path):
 
 
 def test_health(botclient):
-    ftbot, client = botclient
+    _ftbot, client = botclient
 
     rc = client_get(client, f"{BASE_URI}/health")
 
@@ -2249,7 +2247,7 @@ def test_health(botclient):
 
 
 def test_api_ws_subscribe(botclient, mocker):
-    ftbot, client = botclient
+    _ftbot, client = botclient
     ws_url = f"/api/v1/message/ws?token={_TEST_WS_TOKEN}"
 
     sub_mock = mocker.patch('freqtrade.rpc.api_server.ws.WebSocketChannel.set_subscriptions')
@@ -2272,7 +2270,7 @@ def test_api_ws_subscribe(botclient, mocker):
 def test_api_ws_requests(botclient, caplog):
     caplog.set_level(logging.DEBUG)
 
-    ftbot, client = botclient
+    _ftbot, client = botclient
     ws_url = f"/api/v1/message/ws?token={_TEST_WS_TOKEN}"
 
     # Test whitelist request

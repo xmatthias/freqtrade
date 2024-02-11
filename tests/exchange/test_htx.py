@@ -14,7 +14,7 @@ from tests.exchange.test_exchange import async_ccxt_exception
     (0.99, 220 * 0.99, "sell"),
     (0.98, 220 * 0.98, "sell"),
 ])
-async def test_create_stoploss_order_huobi(default_conf, mocker, limitratio, expected, side):
+async def test_create_stoploss_order_htx(default_conf, mocker, limitratio, expected, side):
     api_mock = MagicMock()
     order_id = f'test_prod_buy_{randint(0, 10 ** 6)}'
     order_type = 'stop-limit'
@@ -29,7 +29,7 @@ async def test_create_stoploss_order_huobi(default_conf, mocker, limitratio, exp
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
     mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y, **kwargs: y)
 
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'htx')
 
     with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
@@ -58,8 +58,8 @@ async def test_create_stoploss_order_huobi(default_conf, mocker, limitratio, exp
 
     # test exception handling
     with pytest.raises(DependencyException):
-        api_mock.create_order = get_mock_coro(side_effect=ccxt.InsufficientFunds("0 balance"))
-        exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
+        api_mock.create_order = MagicMock(side_effect=ccxt.InsufficientFunds("0 balance"))
+        exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'htx')
         await exchange.create_stoploss(pair='ETH/BTC', amount=1, stop_price=220,
                                        order_types={},  side=side, leverage=1.0)
 
@@ -70,7 +70,7 @@ async def test_create_stoploss_order_huobi(default_conf, mocker, limitratio, exp
         await exchange.create_stoploss(pair='ETH/BTC', amount=1, stop_price=220,
                                        order_types={},  side=side, leverage=1.0)
 
-    await async_ccxt_exception(mocker, default_conf, api_mock, "huobi",
+    await async_ccxt_exception(mocker, default_conf, api_mock, "htx",
                                "create_stoploss", "create_order", retries=1,
                                pair='ETH/BTC', amount=1, stop_price=220, order_types={},
                                side=side, leverage=1.0)
@@ -83,7 +83,7 @@ async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
     mocker.patch(f'{EXMS}.amount_to_precision', lambda s, x, y: y)
     mocker.patch(f'{EXMS}.price_to_precision', lambda s, x, y, **kwargs: y)
 
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'huobi')
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, 'htx')
 
     with pytest.raises(InvalidOrderException):
         order = await exchange.create_stoploss(
@@ -105,8 +105,8 @@ async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
     assert order['amount'] == 1
 
 
-async def test_stoploss_adjust_huobi(mocker, default_conf):
-    exchange = await get_patched_exchange(mocker, default_conf, id='huobi')
+async def test_stoploss_adjust_htx(mocker, default_conf):
+    exchange = await get_patched_exchange(mocker, default_conf, id='htx')
     order = {
         'type': 'stop',
         'price': 1500,

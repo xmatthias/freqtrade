@@ -9,7 +9,7 @@ import ccxt
 import pytest
 from pandas import DataFrame
 
-from freqtrade.enums import CandleType, MarginMode, TradingMode
+from freqtrade.enums import CandleType, MarginMode, RunMode, TradingMode
 from freqtrade.exceptions import (DDosProtection, DependencyException, ExchangeError,
                                   InsufficientFundsError, InvalidOrderException,
                                   OperationalException, PricingError, TemporaryError)
@@ -55,7 +55,7 @@ get_entry_rate_data = [
     ('bid', 6, 5, None, 0, 5),  # last not available - uses bid
 ]
 
-get_sell_rate_data = [
+get_exit_rate_data = [
     ('bid', 12.0, 11.0, 11.5, 0.0, 11.0),  # full bid side
     ('bid', 12.0, 11.0, 11.5, 1.0, 11.5),  # full last side
     ('bid', 12.0, 11.0, 11.5, 0.5, 11.25),  # between bid and lat
@@ -798,7 +798,9 @@ async def test_validate_timeframes_failed(default_conf, mocker):
 
     mocker.patch(f'{EXMS}._init_ccxt', get_mock_coro(return_value=api_mock))
     mocker.patch(f'{EXMS}.load_markets')
-    mocker.patch(f'{EXMS}.validate_pairs', MagicMock())
+    mocker.patch(f'{EXMS}.validate_pairs')
+    mocker.patch(f'{EXMS}.validate_stakecurrency')
+    mocker.patch(f'{EXMS}.validate_pricing')
     with pytest.raises(OperationalException,
                        match=r"Invalid timeframe '3m'. This exchange supports.*"):
         ex = Exchange(default_conf)
@@ -810,6 +812,10 @@ async def test_validate_timeframes_failed(default_conf, mocker):
                        match=r"Timeframes < 1m are currently not supported by Freqtrade."):
         ex = Exchange(default_conf)
         await ex.init_exchange()
+
+    # Will not raise an exception in util mode.
+    default_conf['runmode'] = RunMode.UTIL_EXCHANGE
+    Exchange(default_conf)
 
 
 async def test_validate_timeframes_emulated_ohlcv_1(default_conf, mocker):
@@ -2622,8 +2628,10 @@ async def test_fetch_l2_order_book(default_conf, mocker, order_book_l2, exchange
 
 @pytest.mark.parametrize("side,ask,bid,last,last_ab,expected", get_entry_rate_data)
 async def test_get_entry_rate(mocker, default_conf, caplog, side, ask, bid,
-                              last, last_ab, expected) -> None:
+                              last, last_ab, expected, time_machine) -> None:
     caplog.set_level(logging.DEBUG)
+    start_dt = datetime(2023, 12, 1, 0, 10, 0, tzinfo=timezone.utc)
+    time_machine.move_to(start_dt, tick=False)
     if last_ab is None:
         del default_conf['entry_pricing']['price_last_balance']
     else:
@@ -2631,42 +2639,69 @@ async def test_get_entry_rate(mocker, default_conf, caplog, side, ask, bid,
     default_conf['entry_pricing']['price_side'] = side
     exchange = await get_patched_exchange(mocker, default_conf)
     mocker.patch(f'{EXMS}.fetch_ticker', return_value={'ask': ask, 'last': last, 'bid': bid})
+    log_msg = "Using cached entry rate for ETH/BTC."
 
     assert await exchange.get_rate(
         'ETH/BTC', side="entry", is_short=False, refresh=True) == expected
-    assert not log_has("Using cached entry rate for ETH/BTC.", caplog)
+    assert not log_has(log_msg, caplog)
 
+    time_machine.move_to(start_dt + timedelta(minutes=4), tick=False)
+    # Running a 2nd time without Refresh!
+    caplog.clear()
     assert await exchange.get_rate(
         'ETH/BTC', side="entry", is_short=False, refresh=False) == expected
-    assert log_has("Using cached entry rate for ETH/BTC.", caplog)
+    assert log_has(log_msg, caplog)
+
+    time_machine.move_to(start_dt + timedelta(minutes=6), tick=False)
+    # Running a 2nd time - forces refresh due to ttl timeout
+    caplog.clear()
+    assert await exchange.get_rate(
+        'ETH/BTC', side="entry", is_short=False, refresh=False) == expected
+    assert not log_has(log_msg, caplog)
+
     # Running a 2nd time with Refresh on!
     caplog.clear()
     assert await exchange.get_rate(
         'ETH/BTC', side="entry", is_short=False, refresh=True) == expected
-    assert not log_has("Using cached entry rate for ETH/BTC.", caplog)
+    assert not log_has(log_msg, caplog)
 
 
-@pytest.mark.parametrize('side,ask,bid,last,last_ab,expected', get_sell_rate_data)
+@pytest.mark.parametrize('side,ask,bid,last,last_ab,expected', get_exit_rate_data)
 async def test_get_exit_rate(default_conf, mocker, caplog, side, bid, ask,
-                             last, last_ab, expected) -> None:
+                             last, last_ab, expected, time_machine) -> None:
     caplog.set_level(logging.DEBUG)
+    start_dt = datetime(2023, 12, 1, 0, 10, 0, tzinfo=timezone.utc)
+    time_machine.move_to(start_dt, tick=False)
 
     default_conf['exit_pricing']['price_side'] = side
     if last_ab is not None:
         default_conf['exit_pricing']['price_last_balance'] = last_ab
     mocker.patch(f'{EXMS}.fetch_ticker', return_value={'ask': ask, 'bid': bid, 'last': last})
     pair = "ETH/BTC"
+    log_msg = "Using cached exit rate for ETH/BTC."
 
     # Test regular mode
     exchange = await get_patched_exchange(mocker, default_conf)
     rate = await exchange.get_rate(pair, side="exit", is_short=False, refresh=True)
-    assert not log_has("Using cached exit rate for ETH/BTC.", caplog)
+    assert not log_has(log_msg, caplog)
     assert isinstance(rate, float)
     assert rate == expected
     # Use caching
-    rate = await exchange.get_rate(pair, side="exit", is_short=False, refresh=False)
-    assert rate == expected
-    assert log_has("Using cached exit rate for ETH/BTC.", caplog)
+    caplog.clear()
+    assert await exchange.get_rate(pair, side="exit", is_short=False, refresh=False) == expected
+    assert log_has(log_msg, caplog)
+
+    time_machine.move_to(start_dt + timedelta(minutes=4), tick=False)
+    # Caching still active - TTL didn't expire
+    caplog.clear()
+    assert await exchange.get_rate(pair, side="exit", is_short=False, refresh=False) == expected
+    assert log_has(log_msg, caplog)
+
+    time_machine.move_to(start_dt + timedelta(minutes=6), tick=False)
+    # Caching expired - refresh forced
+    caplog.clear()
+    assert await exchange.get_rate(pair, side="exit", is_short=False, refresh=False) == expected
+    assert not log_has(log_msg, caplog)
 
 
 @pytest.mark.parametrize("entry,is_short,side,ask,bid,last,last_ab,expected", [
@@ -2766,9 +2801,9 @@ async def test_get_exit_rate_exception(default_conf, mocker, is_short):
 @pytest.mark.parametrize("side,ask,bid,last,last_ab,expected", get_entry_rate_data)
 @pytest.mark.parametrize("side2", ['bid', 'ask'])
 @pytest.mark.parametrize("use_order_book", [True, False])
-async def test_get_rates_testing_buy(mocker, default_conf, caplog, side, ask, bid,
-                                     last, last_ab, expected,
-                                     side2, use_order_book, order_book_l2) -> None:
+async def test_get_rates_testing_entry(mocker, default_conf, caplog, side, ask, bid,
+                                       last, last_ab, expected,
+                                       side2, use_order_book, order_book_l2) -> None:
     caplog.set_level(logging.DEBUG)
     if last_ab is None:
         del default_conf['entry_pricing']['price_last_balance']
@@ -2802,10 +2837,10 @@ async def test_get_rates_testing_buy(mocker, default_conf, caplog, side, ask, bi
     assert api_mock.fetch_ticker.call_count == 1
 
 
-@pytest.mark.parametrize('side,ask,bid,last,last_ab,expected', get_sell_rate_data)
+@pytest.mark.parametrize('side,ask,bid,last,last_ab,expected', get_exit_rate_data)
 @pytest.mark.parametrize("side2", ['bid', 'ask'])
 @pytest.mark.parametrize("use_order_book", [True, False])
-async def test_get_rates_testing_sell(default_conf, mocker, caplog, side, bid, ask,
+async def test_get_rates_testing_exit(default_conf, mocker, caplog, side, bid, ask,
                                       last, last_ab, expected,
                                       side2, use_order_book, order_book_l2) -> None:
     caplog.set_level(logging.DEBUG)
@@ -2932,10 +2967,17 @@ async def test__async_fetch_trades(default_conf, mocker, caplog, exchange_name,
     exchange._api_async.fetch_trades = get_mock_coro(fetch_trades_result)
 
     pair = 'ETH/BTC'
-    res = await exchange._async_fetch_trades(pair, since=None, params=None)
+    res, pagid = await exchange._async_fetch_trades(pair, since=None, params=None)
     assert isinstance(res, list)
     assert isinstance(res[0], list)
     assert isinstance(res[1], list)
+    if exchange._trades_pagination == 'id':
+        if exchange_name == 'kraken':
+            assert pagid == 1565798399872512133
+        else:
+            assert pagid == '126181333'
+    else:
+        assert pagid == 1565798399872
 
     assert exchange._api_async.fetch_trades.call_count == 1
     assert exchange._api_async.fetch_trades.call_args[0][0] == pair
@@ -2944,11 +2986,20 @@ async def test__async_fetch_trades(default_conf, mocker, caplog, exchange_name,
     assert log_has_re(f"Fetching trades for pair {pair}, since .*", caplog)
     caplog.clear()
     exchange._api_async.fetch_trades.reset_mock()
-    res = await exchange._async_fetch_trades(pair, since=None, params={'from': '123'})
+    res, pagid = await exchange._async_fetch_trades(pair, since=None, params={'from': '123'})
     assert exchange._api_async.fetch_trades.call_count == 1
     assert exchange._api_async.fetch_trades.call_args[0][0] == pair
     assert exchange._api_async.fetch_trades.call_args[1]['limit'] == 1000
     assert exchange._api_async.fetch_trades.call_args[1]['params'] == {'from': '123'}
+
+    if exchange._trades_pagination == 'id':
+        if exchange_name == 'kraken':
+            assert pagid == 1565798399872512133
+        else:
+            assert pagid == '126181333'
+    else:
+        assert pagid == 1565798399872
+
     assert log_has_re(f"Fetching trades for pair {pair}, params: .*", caplog)
     await exchange.close()
 
@@ -3004,8 +3055,9 @@ async def test__async_fetch_trades_contract_size(default_conf, mocker, caplog, e
     )
 
     pair = 'ETH/USDT:USDT'
-    res = await exchange._async_fetch_trades(pair, since=None, params=None)
+    res, pagid = await exchange._async_fetch_trades(pair, since=None, params=None)
     assert res[0][5] == 300
+    assert pagid is not None
     await exchange.close()
 
 
@@ -3015,13 +3067,17 @@ async def test__async_get_trade_history_id(default_conf, mocker, exchange_name,
                                            fetch_trades_result):
 
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
+    if exchange._trades_pagination != 'id':
+        await exchange.close()
+        pytest.skip("Exchange does not support pagination by trade id")
     pagination_arg = exchange._trades_pagination_arg
 
     async def mock_get_trade_hist(pair, *args, **kwargs):
         if 'since' in kwargs:
             # Return first 3
             return fetch_trades_result[:-2]
-        elif kwargs.get('params', {}).get(pagination_arg) == fetch_trades_result[-3]['id']:
+        elif kwargs.get('params', {}).get(pagination_arg) in (
+                fetch_trades_result[-3]['id'], 1565798399752):
             # Return 2
             return fetch_trades_result[-3:-1]
         else:
@@ -3037,7 +3093,8 @@ async def test__async_get_trade_history_id(default_conf, mocker, exchange_name,
     assert isinstance(ret, tuple)
     assert ret[0] == pair
     assert isinstance(ret[1], list)
-    assert len(ret[1]) == len(fetch_trades_result)
+    if exchange_name != 'kraken':
+        assert len(ret[1]) == len(fetch_trades_result)
     assert exchange._api_async.fetch_trades.call_count == 3
     fetch_trades_cal = exchange._api_async.fetch_trades.call_args_list
     # first call (using since, not fromId)
@@ -3050,6 +3107,22 @@ async def test__async_get_trade_history_id(default_conf, mocker, exchange_name,
     assert exchange._ft_has['trades_pagination_arg'] in fetch_trades_cal[1][1]['params']
 
 
+@pytest.mark.parametrize('trade_id, expected', [
+    ('1234', True),
+    ('170544369512007228', True),
+    ('1705443695120072285', True),
+    ('170544369512007228555', True),
+])
+@pytest.mark.parametrize("exchange_name", EXCHANGES)
+async def test__valid_trade_pagination_id(mocker, default_conf_usdt, exchange_name, trade_id, expected):
+    if exchange_name == 'kraken':
+        pytest.skip("Kraken has a different pagination id format, and an explicit test.")
+    exchange = await get_patched_exchange(mocker, default_conf_usdt, id=exchange_name)
+
+    assert exchange._valid_trade_pagination_id('XRP/USDT', trade_id) == expected
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test__async_get_trade_history_time(default_conf, mocker, caplog, exchange_name,
                                              fetch_trades_result):
@@ -3064,6 +3137,9 @@ async def test__async_get_trade_history_time(default_conf, mocker, caplog, excha
 
     caplog.set_level(logging.DEBUG)
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
+    if exchange._trades_pagination != 'time':
+        await exchange.close()
+        pytest.skip("Exchange does not support pagination by timestamp")
     # Monkey-patch async function
     exchange._api_async.fetch_trades = MagicMock(side_effect=mock_get_trade_hist)
     pair = 'ETH/BTC'
@@ -3095,9 +3171,9 @@ async def test__async_get_trade_history_time_empty(default_conf, mocker, caplog,
 
     async def mock_get_trade_hist(pair, *args, **kwargs):
         if kwargs['since'] == trades_history[0][0]:
-            return trades_history[:-1]
+            return trades_history[:-1], trades_history[:-1][-1][0]
         else:
-            return []
+            return [], None
 
     caplog.set_level(logging.DEBUG)
     exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
@@ -5021,8 +5097,8 @@ async def test_get_maintenance_ratio_and_amt_exceptions(mocker, default_conf, le
 
 
 @pytest.mark.parametrize('pair,value,mmr,maintAmt', [
-    ('ADA/BUSD:BUSD', 500, 0.025, 0.0),
-    ('ADA/BUSD:BUSD', 20000000, 0.5, 1527500.0),
+    ('ADA/USDT:USDT', 500, 0.025, 0.0),
+    ('ADA/USDT:USDT', 20000000, 0.5, 1527500.0),
     ('ZEC/USDT:USDT', 500, 0.01, 0.0),
     ('ZEC/USDT:USDT', 20000000, 0.5, 654500.0),
 ])
@@ -5057,10 +5133,10 @@ async def test_get_max_leverage_futures(default_conf, mocker, leverage_tiers):
 
     exchange._leverage_tiers = leverage_tiers
 
-    assert exchange.get_max_leverage("BNB/BUSD:BUSD", 1.0) == 20.0
+    assert exchange.get_max_leverage("XRP/USDT:USDT", 1.0) == 20.0
     assert exchange.get_max_leverage("BNB/USDT:USDT", 100.0) == 75.0
     assert exchange.get_max_leverage("BTC/USDT:USDT", 170.30) == 125.0
-    assert pytest.approx(exchange.get_max_leverage("BNB/BUSD:BUSD", 99999.9)) == 5.000005
+    assert pytest.approx(exchange.get_max_leverage("XRP/USDT:USDT", 99999.9)) == 5.000005
     assert pytest.approx(exchange.get_max_leverage("BNB/USDT:USDT", 1500)) == 33.333333333333333
     assert exchange.get_max_leverage("BTC/USDT:USDT", 300000000) == 2.0
     assert exchange.get_max_leverage("BTC/USDT:USDT", 600000000) == 1.0  # Last tier
@@ -5412,4 +5488,5 @@ async def test_price_to_precision_with_default_conf(default_conf, mocker):
     conf = copy.deepcopy(default_conf)
     patched_ex = await get_patched_exchange(mocker, conf)
     prec_price = patched_ex.price_to_precision("XRP/USDT", 1.0000000101)
+    assert prec_price == 1.00000001
     assert prec_price == 1.00000001

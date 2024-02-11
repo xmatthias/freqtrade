@@ -261,6 +261,7 @@ class OrderSchema(BaseModel):
     order_timestamp: Optional[int] = None
     order_filled_timestamp: Optional[int] = None
     ft_fee_base: Optional[float] = None
+    ft_order_tag: Optional[str] = None
 
 
 class TradeSchema(BaseModel):
@@ -314,7 +315,6 @@ class TradeSchema(BaseModel):
     stop_loss_abs: Optional[float] = None
     stop_loss_ratio: Optional[float] = None
     stop_loss_pct: Optional[float] = None
-    stoploss_order_id: Optional[str] = None
     stoploss_last_update: Optional[str] = None
     stoploss_last_update_timestamp: Optional[int] = None
     initial_stop_loss_abs: Optional[float] = None
@@ -397,7 +397,7 @@ class ForceEnterPayload(BaseModel):
 
 
 class ForceExitPayload(BaseModel):
-    tradeid: str
+    tradeid: Union[str, int]
     ordertype: Optional[OrderTypeValues] = None
     amount: Optional[float] = None
 

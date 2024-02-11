@@ -22,7 +22,7 @@ from freqtrade.constants import (DEFAULT_AMOUNT_RESERVE_PERCENT, NON_OPEN_EXCHAN
                                  BuySell, Config, EntryExit, ExchangeConfig,
                                  ListPairsWithTimeframes, MakerTaker, OBLiteral, PairWithTimeframe)
 from freqtrade.data.converter import clean_ohlcv_dataframe, ohlcv_to_dataframe, trades_dict_to_list
-from freqtrade.enums import OPTIMIZE_MODES, CandleType, MarginMode, PriceType, TradingMode
+from freqtrade.enums import OPTIMIZE_MODES, CandleType, MarginMode, PriceType, RunMode, TradingMode
 from freqtrade.exceptions import (DDosProtection, ExchangeError, InsufficientFundsError,
                                   InvalidOrderException, OperationalException, PricingError,
                                   RetryableOrderError, TemporaryError)
@@ -79,6 +79,7 @@ class Exchange:
         "l2_limit_range_required": True,  # Allow Empty L2 limit (kucoin)
         "mark_ohlcv_price": "mark",
         "mark_ohlcv_timeframe": "8h",
+        "funding_fee_timeframe": "8h",
         "ccxt_futures_name": "swap",
         "needs_trading_fees": False,  # use fetch_trading_fees to cache fees
         "order_props_in_contracts": ['amount', 'filled', 'remaining'],
@@ -116,11 +117,12 @@ class Exchange:
         # Cache for 10 minutes ...
         self._cache_lock = Lock()
         self._fetch_tickers_cache: TTLCache = TTLCache(maxsize=2, ttl=60 * 10)
-        # Cache values for 1800 to avoid frequent polling of the exchange for prices
+        # Cache values for 300 to avoid frequent polling of the exchange for prices
         # Caching only applies to RPC methods, so prices for open trades are still
         # refreshed once every iteration.
-        self._exit_rate_cache: TTLCache = TTLCache(maxsize=100, ttl=1800)
-        self._entry_rate_cache: TTLCache = TTLCache(maxsize=100, ttl=1800)
+        # Shouldn't be too high either, as it'll freeze UI updates in case of open orders.
+        self._exit_rate_cache: TTLCache = TTLCache(maxsize=100, ttl=300)
+        self._entry_rate_cache: TTLCache = TTLCache(maxsize=100, ttl=300)
 
         # Holds candles
         self._klines: Dict[PairWithTimeframe, DataFrame] = {}
@@ -584,7 +586,11 @@ class Exchange:
             raise OperationalException(
                 f"Invalid timeframe '{timeframe}'. This exchange supports: {self.timeframes}")
 
-        if timeframe and timeframe_to_minutes(timeframe) < 1:
+        if (
+            timeframe
+            and self._config['runmode'] != RunMode.UTIL_EXCHANGE
+            and timeframe_to_minutes(timeframe) < 1
+        ):
             raise OperationalException("Timeframes < 1m are currently not supported by Freqtrade.")
 
     def validate_ordertypes(self, order_types: Dict) -> None:
@@ -2254,13 +2260,13 @@ class Exchange:
     @retrier_async
     async def _async_fetch_trades(self, pair: str,
                                   since: Optional[int] = None,
-                                  params: Optional[dict] = None) -> List[List]:
+                                  params: Optional[dict] = None) -> Tuple[List[List], Any]:
         """
         Asyncronously gets trade history using fetch_trades.
         Handles exchange errors, does one call to the exchange.
         :param pair: Pair to fetch trade data for
         :param since: Since as integer timestamp in milliseconds
-        returns: List of dicts containing trades
+        returns: List of dicts containing trades, the next iteration value (new "since" or trade_id)
         """
         try:
             # fetch trades asynchronously
@@ -2275,7 +2281,8 @@ class Exchange:
                 )
                 trades = await self._api_async.fetch_trades(pair, since=since, limit=1000)
             trades = self._trades_contracts_to_amount(trades)
-            return trades_dict_to_list(trades)
+            pagination_value = self._get_trade_pagination_next_value(trades)
+            return trades_dict_to_list(trades), pagination_value
         except ccxt.NotSupported as e:
             raise OperationalException(
                 f'Exchange {self.name} does not support fetching historical trade data.'
@@ -2287,6 +2294,25 @@ class Exchange:
                                  f'Message: {e}') from e
         except ccxt.BaseError as e:
             raise OperationalException(f'Could not fetch trade data. Msg: {e}') from e
+
+    def _valid_trade_pagination_id(self, pair: str, from_id: str) -> bool:
+        """
+        Verify trade-pagination id is valid.
+        Workaround for odd Kraken issue where ID is sometimes wrong.
+        """
+        return True
+
+    def _get_trade_pagination_next_value(self, trades: List[Dict]):
+        """
+        Extract pagination id for the next "from_id" value
+        Applies only to fetch_trade_history by id.
+        """
+        if not trades:
+            return None
+        if self._trades_pagination == 'id':
+            return trades[-1].get('id')
+        else:
+            return trades[-1].get('timestamp')
 
     async def _async_get_trade_history_id(self, pair: str,
                                           until: int,
@@ -2303,33 +2329,35 @@ class Exchange:
         """
 
         trades: List[List] = []
+        # DEFAULT_TRADES_COLUMNS: 0 -> timestamp
+        # DEFAULT_TRADES_COLUMNS: 1 -> id
+        has_overlap = self._ft_has.get('trades_pagination_overlap', True)
+        # Skip last trade by default since its the key for the next call
+        x = slice(None, -1) if has_overlap else slice(None)
 
-        if not from_id:
+        if not from_id or not self._valid_trade_pagination_id(pair, from_id):
             # Fetch first elements using timebased method to get an ID to paginate on
             # Depending on the Exchange, this can introduce a drift at the start of the interval
             # of up to an hour.
             # e.g. Binance returns the "last 1000" candles within a 1h time interval
             # - so we will miss the first trades.
-            t = await self._async_fetch_trades(pair, since=since)
-            # DEFAULT_TRADES_COLUMNS: 0 -> timestamp
-            # DEFAULT_TRADES_COLUMNS: 1 -> id
-            from_id = t[-1][1]
-            trades.extend(t[:-1])
+            t, from_id = await self._async_fetch_trades(pair, since=since)
+            trades.extend(t[x])
         while True:
             try:
-                t = await self._async_fetch_trades(pair,
-                                                   params={self._trades_pagination_arg: from_id})
+                t, from_id_next = await self._async_fetch_trades(
+                    pair, params={self._trades_pagination_arg: from_id})
                 if t:
-                    # Skip last id since its the key for the next call
-                    trades.extend(t[:-1])
-                    if from_id == t[-1][1] or t[-1][0] > until:
+                    trades.extend(t[x])
+                    if from_id == from_id_next or t[-1][0] > until:
                         logger.debug(f"Stopping because from_id did not change. "
                                      f"Reached {t[-1][0]} > {until}")
                         # Reached the end of the defined-download period - add last trade as well.
-                        trades.extend(t[-1:])
+                        if has_overlap:
+                            trades.extend(t[-1:])
                         break
 
-                    from_id = t[-1][1]
+                    from_id = from_id_next
                 else:
                     logger.debug("Stopping as no more trades were returned.")
                     break
@@ -2355,19 +2383,19 @@ class Exchange:
         # DEFAULT_TRADES_COLUMNS: 1 -> id
         while True:
             try:
-                t = await self._async_fetch_trades(pair, since=since)
+                t, since_next = await self._async_fetch_trades(pair, since=since)
                 if t:
                     # No more trades to download available at the exchange,
                     # So we repeatedly get the same trade over and over again.
-                    if since == t[-1][0] and len(t) == 1:
+                    if since == since_next and len(t) == 1:
                         logger.debug("Stopping because no more trades are available.")
                         break
-                    since = t[-1][0]
+                    since = since_next
                     trades.extend(t)
                     # Reached the end of the defined-download period
-                    if until and t[-1][0] > until:
+                    if until and since_next > until:
                         logger.debug(
-                            f"Stopping because until was reached. {t[-1][0]} > {until}")
+                            f"Stopping because until was reached. {since_next} > {until}")
                         break
                 else:
                     logger.debug("Stopping as no more trades were returned.")
@@ -2760,17 +2788,16 @@ class Exchange:
             # Only really relevant for trades very close to the full hour
             open_date = timeframe_to_prev_date('1h', open_date)
         timeframe = self._ft_has['mark_ohlcv_timeframe']
-        timeframe_ff = self._ft_has.get('funding_fee_timeframe',
-                                        self._ft_has['mark_ohlcv_timeframe'])
+        timeframe_ff = self._ft_has['funding_fee_timeframe']
+        mark_price_type = CandleType.from_string(self._ft_has["mark_ohlcv_price"])
 
         if not close_date:
             close_date = datetime.now(timezone.utc)
         since_ms = int(timeframe_to_prev_date(timeframe, open_date).timestamp()) * 1000
 
-        mark_comb: PairWithTimeframe = (
-            pair, timeframe, CandleType.from_string(self._ft_has["mark_ohlcv_price"]))
-
+        mark_comb: PairWithTimeframe = (pair, timeframe, mark_price_type)
         funding_comb: PairWithTimeframe = (pair, timeframe_ff, CandleType.FUNDING_RATE)
+
         candle_histories = await self.refresh_latest_ohlcv(
             [mark_comb, funding_comb],
             since_ms=since_ms,
