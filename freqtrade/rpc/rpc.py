@@ -1033,17 +1033,17 @@ class RPC:
             except (ExchangeError):
                 pass
 
-            # cancel stoploss on exchange orders ...
-            if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
-                    and trade.has_open_sl_orders):
+        # cancel stoploss on exchange orders ...
+        if (self._freqtrade.strategy.order_types.get('stoploss_on_exchange')
+                and trade.has_open_sl_orders):
 
-                for oslo in trade.open_sl_orders:
-                    try:
-                        await self._freqtrade.exchange.cancel_stoploss_order(
-                            oslo.order_id, trade.pair)
-                        c_count += 1
-                    except (ExchangeError):
-                        pass
+            for oslo in trade.open_sl_orders:
+                try:
+                    await self._freqtrade.exchange.cancel_stoploss_order(
+                        oslo.order_id, trade.pair)
+                    c_count += 1
+                except (ExchangeError):
+                    pass
 
         trade.delete()
         await self._freqtrade.wallets.update()
