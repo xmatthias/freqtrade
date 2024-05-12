@@ -31,7 +31,7 @@ async def test_dp_ohlcv(mocker, default_conf, ohlcv_history, candle_type):
     assert dp.ohlcv("UNITTEST/BTC", timeframe, candle_type=candletype) is not ohlcv_history
     assert dp.ohlcv("UNITTEST/BTC", timeframe, copy=False, candle_type=candletype) is ohlcv_history
     assert not dp.ohlcv("UNITTEST/BTC", timeframe, candle_type=candletype).empty
-    assert dp.ohlcv("NONESENSE/AAA", timeframe, candle_type=candletype).empty
+    assert dp.ohlcv("NONSENSE/AAA", timeframe, candle_type=candletype).empty
 
     # Test with and without parameter
     assert dp.ohlcv(
@@ -65,9 +65,12 @@ def test_historic_ohlcv(mocker, default_conf, ohlcv_history):
 async def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     hdf5loadmock = MagicMock(return_value=ohlcv_history)
     featherloadmock = MagicMock(return_value=ohlcv_history)
-    mocker.patch("freqtrade.data.history.hdf5datahandler.HDF5DataHandler._ohlcv_load", hdf5loadmock)
-    mocker.patch("freqtrade.data.history.featherdatahandler.FeatherDataHandler._ohlcv_load",
-                 featherloadmock)
+    mocker.patch(
+        "freqtrade.data.history.datahandlers.hdf5datahandler.HDF5DataHandler._ohlcv_load",
+        hdf5loadmock)
+    mocker.patch(
+        "freqtrade.data.history.datahandlers.featherdatahandler.FeatherDataHandler._ohlcv_load",
+        featherloadmock)
 
     default_conf["runmode"] = RunMode.BACKTEST
     exchange = await get_patched_exchange(mocker, default_conf)
@@ -112,7 +115,7 @@ async def test_get_pair_dataframe(mocker, default_conf, ohlcv_history, candle_ty
     assert dp.get_pair_dataframe("UNITTEST/BTC", timeframe,
                                  candle_type=candle_type) is not ohlcv_history
     assert not dp.get_pair_dataframe("UNITTEST/BTC", timeframe, candle_type=candle_type).empty
-    assert dp.get_pair_dataframe("NONESENSE/AAA", timeframe, candle_type=candle_type).empty
+    assert dp.get_pair_dataframe("NONSENSE/AAA", timeframe, candle_type=candle_type).empty
 
     # Test with and without parameter
     assert dp.get_pair_dataframe("UNITTEST/BTC", timeframe, candle_type=candle_type)\
@@ -123,7 +126,7 @@ async def test_get_pair_dataframe(mocker, default_conf, ohlcv_history, candle_ty
     assert dp.runmode == RunMode.LIVE
     assert isinstance(dp.get_pair_dataframe(
         "UNITTEST/BTC", timeframe, candle_type=candle_type), DataFrame)
-    assert dp.get_pair_dataframe("NONESENSE/AAA", timeframe, candle_type=candle_type).empty
+    assert dp.get_pair_dataframe("NONSENSE/AAA", timeframe, candle_type=candle_type).empty
 
     historymock = MagicMock(return_value=ohlcv_history)
     mocker.patch("freqtrade.data.dataprovider.load_pair_history", historymock)

@@ -6,7 +6,8 @@ import pandas as pd
 from freqtrade.constants import DATETIME_PRINT_FORMAT, DEFAULT_TRADES_COLUMNS, Config
 from freqtrade.data.converter.trade_converter import (trades_convert_types,
                                                       trades_df_remove_duplicates)
-from freqtrade.data.history.idatahandler import get_datahandler
+from freqtrade.data.history import get_datahandler
+from freqtrade.enums import TradingMode
 from freqtrade.exceptions import OperationalException
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
 from freqtrade.resolvers import ExchangeResolver
@@ -48,11 +49,13 @@ async def import_kraken_trades_from_csv(config: Config, convert_to: str):
     logger.info(f"Converting pairs: {', '.join(m[0] for m in markets)}.")
 
     for pair, name in markets:
+        logger.debug(f"Converting pair {pair}, files */{name}.csv")
         dfs = []
         # Load and combine all csv files for this pair
         for f in tradesdir.rglob(f"{name}.csv"):
             df = pd.read_csv(f, names=KRAKEN_CSV_TRADE_COLUMNS)
-            dfs.append(df)
+            if not df.empty:
+                dfs.append(df)
 
         # Load existing trades data
         if not dfs:
@@ -77,4 +80,4 @@ async def import_kraken_trades_from_csv(config: Config, convert_to: str):
                     f"{trades_df['date'].min():{DATETIME_PRINT_FORMAT}} to "
                     f"{trades_df['date'].max():{DATETIME_PRINT_FORMAT}}")
 
-        data_handler.trades_store(pair, trades_df)
+        data_handler.trades_store(pair, trades_df, TradingMode.SPOT)

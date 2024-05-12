@@ -107,7 +107,7 @@ tc5 = BTContainer(data=[
     trades=[BTrade(exit_reason=ExitType.ROI, open_tick=1, close_tick=3)]
 )
 
-# Test 6: Drops 3% / Recovers 6% Positive / Closes 1% positve, Stop-Loss triggers 2% Loss
+# Test 6: Drops 3% / Recovers 6% Positive / Closes 1% positive, Stop-Loss triggers 2% Loss
 # stop-loss: 2% ROI: 5%
 tc6 = BTContainer(data=[
     # D   O     H     L     C    V    EL XL ES Xs  BT
@@ -121,7 +121,7 @@ tc6 = BTContainer(data=[
     trades=[BTrade(exit_reason=ExitType.STOP_LOSS, open_tick=1, close_tick=2)]
 )
 
-# Test 7: 6% Positive / 1% Negative / Close 1% Positve, ROI Triggers 3% Gain
+# Test 7: 6% Positive / 1% Negative / Close 1% Positive, ROI Triggers 3% Gain
 # stop-loss: 2% ROI: 3%
 tc7 = BTContainer(data=[
     # D   O     H     L     C    V    EL XL ES Xs  BT
@@ -921,12 +921,12 @@ def test_backtest_results(default_conf, mocker, caplog, data: BTContainer) -> No
     default_conf["use_exit_signal"] = data.use_exit_signal
     default_conf["max_open_trades"] = 10
 
+    patch_exchange(mocker)
     mocker.patch(f"{EXMS}.get_fee", return_value=0.0)
     mocker.patch(f"{EXMS}.get_min_pair_stake_amount", return_value=0.00001)
     mocker.patch(f"{EXMS}.get_max_pair_stake_amount", return_value=float('inf'))
     mocker.patch(f"{EXMS}.get_max_leverage", return_value=100)
     mocker.patch(f"{EXMS}.calculate_funding_fees", return_value=0)
-    patch_exchange(mocker)
     frame = _build_backtest_dataframe(data.data)
     backtesting = Backtesting(default_conf)
     # TODO: Should we initialize this properly??

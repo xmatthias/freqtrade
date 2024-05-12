@@ -51,10 +51,10 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "longrun: mark test that is running slowly and should not be run regularily"
+        "markers", "longrun: mark test that is running slowly and should not be run regularly"
     )
     if not config.option.longrun:
-        setattr(config.option, 'markexpr', 'not longrun')
+        config.option.markexpr = 'not longrun'
 
 
 class FixtureScheduler(LoadScopeScheduling):
@@ -144,8 +144,8 @@ def generate_trades_history(n_rows, start_date: Optional[datetime] = None, days=
     return df
 
 
-def generate_test_data(timeframe: str, size: int, start: str = '2020-07-05'):
-    np.random.seed(42)
+def generate_test_data(timeframe: str, size: int, start: str = '2020-07-05', random_seed=42):
+    np.random.seed(random_seed)
 
     base = np.random.normal(20, 2, size=size)
     if timeframe == '1y':
@@ -176,10 +176,10 @@ def generate_test_data(timeframe: str, size: int, start: str = '2020-07-05'):
     return df
 
 
-def generate_test_data_raw(timeframe: str, size: int, start: str = '2020-07-05'):
+def generate_test_data_raw(timeframe: str, size: int, start: str = '2020-07-05', random_seed=42):
     """ Generates data in the ohlcv format used by ccxt """
-    df = generate_test_data(timeframe, size, start)
-    df['date'] = df.loc[:, 'date'].view(np.int64) // 1000 // 1000
+    df = generate_test_data(timeframe, size, start, random_seed)
+    df['date'] = df.loc[:, 'date'].astype(np.int64) // 1000 // 1000
     return list(list(x) for x in zip(*(df[x].values.tolist() for x in df.columns)))
 
 
@@ -223,6 +223,8 @@ def patch_exchange(
     mocker.patch(f'{EXMS}.id', PropertyMock(return_value=id))
     mocker.patch(f'{EXMS}.name', PropertyMock(return_value=id.title()))
     mocker.patch(f'{EXMS}.precisionMode', PropertyMock(return_value=2))
+    # Temporary patch ...
+    mocker.patch('freqtrade.exchange.bybit.Bybit.cache_leverage_tiers')
 
     if mock_markets:
         mocker.patch(f'{EXMS}.load_markets', get_mock_coro())
@@ -244,6 +246,7 @@ def patch_exchange(
     if api_mock:
         mocker.patch(f'{EXMS}._init_ccxt', get_mock_coro(return_value=api_mock))
     else:
+        mocker.patch(f'{EXMS}.get_fee', return_value=0.0025)
         mocker.patch(f'{EXMS}._init_ccxt', get_mock_coro(return_value=MagicMock()))
         mocker.patch(f'{EXMS}.timeframes', PropertyMock(
                 return_value=['5m', '15m', '1h', '1d']))
@@ -519,10 +522,10 @@ def user_dir(mocker, tmp_path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def patch_coingekko(mocker) -> None:
+def patch_coingecko(mocker) -> None:
     """
-    Mocker to coingekko to speed up tests
-    :param mocker: mocker to patch coingekko class
+    Mocker to coingecko to speed up tests
+    :param mocker: mocker to patch coingecko class
     :return: None
     """
 

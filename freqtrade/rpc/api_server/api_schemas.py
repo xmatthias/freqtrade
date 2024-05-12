@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, RootModel, SerializeAsAny
+from pydantic import AwareDatetime, BaseModel, RootModel, SerializeAsAny
 
 from freqtrade.constants import IntOrInf
 from freqtrade.enums import MarginMode, OrderTypeValues, SignalDirection, TradingMode
@@ -44,6 +44,7 @@ class BackgroundTaskStatus(BaseModel):
     status: str
     running: bool
     progress: Optional[float] = None
+    error: Optional[str] = None
 
 
 class BackgroundTaskResult(BaseModel):
@@ -288,6 +289,8 @@ class TradeSchema(BaseModel):
 
     open_date: str
     open_timestamp: int
+    open_fill_date: Optional[str]
+    open_fill_timestamp: Optional[int]
     open_rate: float
     open_rate_requested: Optional[float] = None
     open_trade_value: float
@@ -374,6 +377,13 @@ class LockModel(BaseModel):
 class Locks(BaseModel):
     lock_count: int
     locks: List[LockModel]
+
+
+class LocksPayload(BaseModel):
+    pair: str
+    side: str = '*'  # Default to both sides
+    until: AwareDatetime
+    reason: Optional[str] = None
 
 
 class DeleteLockRequest(BaseModel):
@@ -480,12 +490,26 @@ class AvailablePairs(BaseModel):
     pair_interval: List[List[str]]
 
 
+class PairCandlesRequest(BaseModel):
+    pair: str
+    timeframe: str
+    limit: Optional[int] = None
+    columns: Optional[List[str]] = None
+
+
+class PairHistoryRequest(PairCandlesRequest):
+    timerange: str
+    strategy: str
+    freqaimodel: Optional[str] = None
+
+
 class PairHistory(BaseModel):
     strategy: str
     pair: str
     timeframe: str
     timeframe_ms: int
     columns: List[str]
+    all_columns: List[str] = []
     data: SerializeAsAny[List[Any]]
     length: int
     buy_signals: int
@@ -549,6 +573,12 @@ class BacktestMetadataUpdate(BaseModel):
     notes: str = ''
 
 
+class BacktestMarketChange(BaseModel):
+    columns: List[str]
+    length: int
+    data: List[List[Any]]
+
+
 class SysInfo(BaseModel):
     cpu_pct: List[float]
     ram_pct: float
@@ -557,3 +587,7 @@ class SysInfo(BaseModel):
 class Health(BaseModel):
     last_process: Optional[datetime] = None
     last_process_ts: Optional[int] = None
+    bot_start: Optional[datetime] = None
+    bot_start_ts: Optional[int] = None
+    bot_startup: Optional[datetime] = None
+    bot_startup_ts: Optional[int] = None

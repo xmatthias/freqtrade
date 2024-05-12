@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 
 from freqtrade import __version__
 from freqtrade.configuration.timerange import TimeRange
-from freqtrade.constants import CANCEL_REASON, Config
+from freqtrade.constants import CANCEL_REASON, DEFAULT_DATAFRAME_COLUMNS, Config
 from freqtrade.data.history import load_data
 from freqtrade.data.metrics import calculate_expectancy, calculate_max_drawdown
 from freqtrade.enums import (CandleType, ExitCheckTuple, ExitType, MarketDirection, SignalDirection,
@@ -31,8 +31,8 @@ from freqtrade.persistence.models import PairLock
 from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
 from freqtrade.rpc.fiat_convert import CryptoToFiatConverter
 from freqtrade.rpc.rpc_types import RPCSendMsg
-from freqtrade.util import (decimals_per_coin, dt_humanize, dt_now, dt_ts_def, format_date,
-                            shorten_date)
+from freqtrade.util import decimals_per_coin, dt_now, dt_ts_def, format_date, shorten_date
+from freqtrade.util.datetime_helpers import dt_humanize_delta
 from freqtrade.wallets import PositionWallet, Wallet
 
 
@@ -171,7 +171,7 @@ class RPC:
         }
         return val
 
-    def _rpc_trade_status(self, trade_ids: List[int] = []) -> List[Dict[str, Any]]:
+    def _rpc_trade_status(self, trade_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
         """
         Below follows the RPC backend it is prefixed with rpc_ to raise awareness that it is
         a remotely exposed function
@@ -307,19 +307,23 @@ class RPC:
                         profit_str += f" ({fiat_profit:.2f})"
                         fiat_profit_sum = fiat_profit if isnan(fiat_profit_sum) \
                             else fiat_profit_sum + fiat_profit
+                else:
+                    profit_str += f" ({trade_profit:.2f})"
+                    fiat_profit_sum = trade_profit if isnan(fiat_profit_sum) \
+                        else fiat_profit_sum + trade_profit
 
                 active_attempt_side_symbols = [
                     '*' if (oo and oo.ft_order_side == trade.entry_side) else '**'
                     for oo in trade.open_orders
                 ]
 
-                # exemple: '*.**.**' trying to enter, exit and exit with 3 different orders
+                # example: '*.**.**' trying to enter, exit and exit with 3 different orders
                 active_attempt_side_symbols_str = '.'.join(active_attempt_side_symbols)
 
                 detail_trade = [
                     f'{trade.id} {direction_str}',
                     trade.pair + active_attempt_side_symbols_str,
-                    shorten_date(dt_humanize(trade.open_date, only_distance=True)),
+                    shorten_date(dt_humanize_delta(trade.open_date_utc)),
                     profit_str
                 ]
 
@@ -333,6 +337,8 @@ class RPC:
             profitcol = "Profit"
             if self._fiat_converter:
                 profitcol += " (" + fiat_display_currency + ")"
+            else:
+                profitcol += " (" + stake_currency + ")"
 
             columns = [
                 'ID L/S' if nonspot else 'ID',
@@ -470,8 +476,11 @@ class RPC:
 
     def _rpc_trade_statistics(
             self, stake_currency: str, fiat_display_currency: str,
-            start_date: datetime = datetime.fromtimestamp(0)) -> Dict[str, Any]:
+            start_date: Optional[datetime] = None) -> Dict[str, Any]:
         """ Returns cumulative profit statistics """
+
+        start_date = datetime.fromtimestamp(0) if start_date is None else start_date
+
         trade_filter = ((Trade.is_open.is_(False) & (Trade.close_date >= start_date)) |
                         Trade.is_open.is_(True))
         trades: Sequence[Trade] = Trade.session.scalars(Trade.get_trades_query(
@@ -506,19 +515,21 @@ class RPC:
                     losing_profit += profit_abs
             else:
                 # Get current rate
+                if len(trade.select_filled_orders(trade.entry_side)) == 0:
+                    # Skip trades with no filled orders
+                    continue
                 try:
                     current_rate = self._run_async(self._freqtrade.exchange.get_rate(
                         trade.pair, side='exit', is_short=trade.is_short, refresh=False))
                 except (PricingError, ExchangeError):
                     current_rate = NAN
-                if isnan(current_rate):
                     profit_ratio = NAN
                     profit_abs = NAN
                 else:
-                    profit = trade.calculate_profit(trade.close_rate or current_rate)
+                    _profit = trade.calculate_profit(trade.close_rate or current_rate)
 
-                    profit_ratio = profit.profit_ratio
-                    profit_abs = profit.total_profit
+                    profit_ratio = _profit.profit_ratio
+                    profit_abs = _profit.total_profit
 
             profit_all_coin.append(profit_abs)
             profit_all_ratio.append(profit_ratio)
@@ -606,10 +617,10 @@ class RPC:
             'trade_count': len(trades),
             'closed_trade_count': closed_trade_count,
             'first_trade_date': format_date(first_date),
-            'first_trade_humanized': dt_humanize(first_date) if first_date else '',
+            'first_trade_humanized': dt_humanize_delta(first_date) if first_date else '',
             'first_trade_timestamp': dt_ts_def(first_date, 0),
             'latest_trade_date': format_date(last_date),
-            'latest_trade_humanized': dt_humanize(last_date) if last_date else '',
+            'latest_trade_humanized': dt_humanize_delta(last_date) if last_date else '',
             'latest_trade_timestamp': dt_ts_def(last_date, 0),
             'avg_duration': str(timedelta(seconds=sum(durations) / num)).split('.')[0],
             'best_pair': best_pair[0] if best_pair else '',
@@ -974,9 +985,9 @@ class RPC:
                                                is_short=is_short,
                                                enter_tag=enter_tag,
                                                leverage_=leverage,
+                                               mode='pos_adjust' if trade else 'initial'
                                                ):
             Trade.commit()
-            logger.info("after commit")
             trade = Trade.get_trades([Trade.is_open.is_(True), Trade.pair == pair]).first()
             return trade
         else:
@@ -1054,6 +1065,32 @@ class RPC:
             'cancel_order_count': c_count,
         }
 
+    def _rpc_list_custom_data(self, trade_id: int, key: Optional[str]) -> List[Dict[str, Any]]:
+        # Query for trade
+        trade = Trade.get_trades(trade_filter=[Trade.id == trade_id]).first()
+        if trade is None:
+            return []
+        # Query custom_data
+        custom_data = []
+        if key:
+            data = trade.get_custom_data(key=key)
+            if data:
+                custom_data = [data]
+        else:
+            custom_data = trade.get_all_custom_data()
+        return [
+            {
+                'id': data_entry.id,
+                'ft_trade_id': data_entry.ft_trade_id,
+                'cd_key': data_entry.cd_key,
+                'cd_type': data_entry.cd_type,
+                'cd_value': data_entry.cd_value,
+                'created_at': data_entry.created_at,
+                'updated_at': data_entry.updated_at
+            }
+            for data_entry in custom_data
+        ]
+
     def _rpc_performance(self) -> List[Dict[str, Any]]:
         """
         Handler for performance.
@@ -1125,6 +1162,16 @@ class RPC:
         Trade.commit()
 
         return self._rpc_locks()
+
+    def _rpc_add_lock(
+            self, pair: str, until: datetime, reason: Optional[str], side: str) -> PairLock:
+        lock = PairLocks.lock_pair(
+            pair=pair,
+            until=until,
+            reason=reason,
+            side=side,
+        )
+        return lock
 
     def _rpc_whitelist(self) -> Dict:
         """ Returns the currently active whitelist"""
@@ -1199,9 +1246,11 @@ class RPC:
         return self._freqtrade.edge.accepted_pairs()
 
     @staticmethod
-    def _convert_dataframe_to_dict(strategy: str, pair: str, timeframe: str, dataframe: DataFrame,
-                                   last_analyzed: datetime) -> Dict[str, Any]:
+    def _convert_dataframe_to_dict(
+            strategy: str, pair: str, timeframe: str, dataframe: DataFrame,
+            last_analyzed: datetime, selected_cols: Optional[List[str]]) -> Dict[str, Any]:
         has_content = len(dataframe) != 0
+        dataframe_columns = list(dataframe.columns)
         signals = {
             'enter_long': 0,
             'exit_long': 0,
@@ -1209,8 +1258,13 @@ class RPC:
             'exit_short': 0,
         }
         if has_content:
+            if selected_cols is not None:
+                # Ensure OHLCV columns are always present
+                cols_set = set(DEFAULT_DATAFRAME_COLUMNS + list(signals.keys()) + selected_cols)
+                df_cols = [col for col in dataframe_columns if col in cols_set]
+                dataframe = dataframe.loc[:, df_cols]
 
-            dataframe.loc[:, '__date_ts'] = dataframe.loc[:, 'date'].view(int64) // 1000 // 1000
+            dataframe.loc[:, '__date_ts'] = dataframe.loc[:, 'date'].astype(int64) // 1000 // 1000
             # Move signal close to separate column when signal for easy plotting
             for sig_type in signals.keys():
                 if sig_type in dataframe.columns:
@@ -1233,6 +1287,7 @@ class RPC:
             'timeframe': timeframe,
             'timeframe_ms': timeframe_to_msecs(timeframe),
             'strategy': strategy,
+            'all_columns': dataframe_columns,
             'columns': list(dataframe.columns),
             'data': dataframe.values.tolist(),
             'length': len(dataframe),
@@ -1258,13 +1313,16 @@ class RPC:
             })
         return res
 
-    def _rpc_analysed_dataframe(self, pair: str, timeframe: str,
-                                limit: Optional[int]) -> Dict[str, Any]:
+    def _rpc_analysed_dataframe(
+            self, pair: str, timeframe: str, limit: Optional[int],
+            selected_cols: Optional[List[str]]) -> Dict[str, Any]:
         """ Analyzed dataframe in Dict form """
 
         _data, last_analyzed = self.__rpc_analysed_dataframe_raw(pair, timeframe, limit)
-        return RPC._convert_dataframe_to_dict(self._freqtrade.config['strategy'],
-                                              pair, timeframe, _data, last_analyzed)
+        return RPC._convert_dataframe_to_dict(
+            self._freqtrade.config['strategy'], pair, timeframe, _data, last_analyzed,
+            selected_cols
+        )
 
     def __rpc_analysed_dataframe_raw(
         self,
@@ -1331,7 +1389,7 @@ class RPC:
 
     @staticmethod
     def _rpc_analysed_history_full(config: Config, pair: str, timeframe: str,
-                                   exchange) -> Dict[str, Any]:
+                                   exchange, selected_cols: Optional[List[str]]) -> Dict[str, Any]:
         timerange_parsed = TimeRange.parse_timerange(config.get('timerange'))
 
         from freqtrade.data.converter import trim_dataframe
@@ -1362,7 +1420,8 @@ class RPC:
         df_analyzed = trim_dataframe(df_analyzed, timerange_parsed, startup_candles=startup_candles)
 
         return RPC._convert_dataframe_to_dict(strategy.get_strategy_name(), pair, timeframe,
-                                              df_analyzed.copy(), dt_now())
+                                              df_analyzed.copy(), dt_now(),
+                                              selected_cols)
 
     def _rpc_plot_config(self) -> Dict[str, Any]:
         if (self._freqtrade.strategy.plot_config and
@@ -1389,18 +1448,39 @@ class RPC:
 
     def health(self) -> Dict[str, Optional[Union[str, int]]]:
         last_p = self._freqtrade.last_process
-        if last_p is None:
-            return {
-                "last_process": None,
-                "last_process_loc": None,
-                "last_process_ts": None,
-            }
-
-        return {
-            "last_process": str(last_p),
-            "last_process_loc": format_date(last_p.astimezone(tzlocal())),
-            "last_process_ts": int(last_p.timestamp()),
+        res: Dict[str, Union[None, str, int]] = {
+            "last_process": None,
+            "last_process_loc": None,
+            "last_process_ts": None,
+            "bot_start": None,
+            "bot_start_loc": None,
+            "bot_start_ts": None,
+            "bot_startup": None,
+            "bot_startup_loc": None,
+            "bot_startup_ts": None,
         }
+
+        if last_p is not None:
+            res.update({
+                "last_process": str(last_p),
+                "last_process_loc": format_date(last_p.astimezone(tzlocal())),
+                "last_process_ts": int(last_p.timestamp()),
+            })
+
+        if (bot_start := KeyValueStore.get_datetime_value(KeyStoreKeys.BOT_START_TIME)):
+            res.update({
+                "bot_start": str(bot_start),
+                "bot_start_loc": format_date(bot_start.astimezone(tzlocal())),
+                "bot_start_ts": int(bot_start.timestamp()),
+            })
+        if (bot_startup := KeyValueStore.get_datetime_value(KeyStoreKeys.STARTUP_TIME)):
+            res.update({
+                "bot_startup": str(bot_startup),
+                "bot_startup_loc": format_date(bot_startup.astimezone(tzlocal())),
+                "bot_startup_ts": int(bot_startup.timestamp()),
+            })
+
+        return res
 
     def _update_market_direction(self, direction: MarketDirection) -> None:
         self._freqtrade.strategy.market_direction = direction

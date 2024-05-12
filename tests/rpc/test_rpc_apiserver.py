@@ -23,12 +23,13 @@ from freqtrade.enums import CandleType, RunMode, State, TradingMode
 from freqtrade.exceptions import DependencyException, ExchangeError, OperationalException
 from freqtrade.loggers import setup_logging, setup_logging_pre
 from freqtrade.optimize.backtesting import Backtesting
-from freqtrade.persistence import PairLocks, Trade
+from freqtrade.persistence import Trade
 from freqtrade.rpc import RPC
 from freqtrade.rpc.api_server import ApiServer
 from freqtrade.rpc.api_server.api_auth import create_token, get_user_from_token
 from freqtrade.rpc.api_server.uvicorn_threaded import UvicornServer
 from freqtrade.rpc.api_server.webserver_bgwork import ApiBG
+from freqtrade.util.datetime_helpers import format_date
 from tests.conftest import (CURRENT_TEST_STRATEGY, EXMS, create_mock_trades, get_mock_coro,
                             get_patched_freqtradebot, get_patched_freqtradebot_thread, log_has,
                             log_has_re, patch_get_signal)
@@ -72,8 +73,10 @@ async def botclient(default_conf, mocker):
         ApiServer.shutdown()
 
 
-def client_post(client: TestClient, url, data={}):
+def client_post(client: TestClient, url, data=None):
 
+    if data is None:
+        data = {}
     return client.post(url,
                        json=data,
                        headers={'Authorization': _basic_auth_str(_TEST_USER, _TEST_PASS),
@@ -82,8 +85,10 @@ def client_post(client: TestClient, url, data={}):
                                 })
 
 
-def client_patch(client: TestClient, url, data={}):
+def client_patch(client: TestClient, url, data=None):
 
+    if data is None:
+        data = {}
     return client.patch(url,
                         json=data,
                         headers={'Authorization': _basic_auth_str(_TEST_USER, _TEST_PASS),
@@ -181,7 +186,9 @@ def test_api_auth():
 
 def test_api_ws_auth(botclient):
     ftbot, client = botclient
-    def url(token): return f"/api/v1/message/ws?token={token}"
+
+    def url(token):
+        return f"/api/v1/message/ws?token={token}"
 
     bad_token = "bad-ws_token"
     with pytest.raises(WebSocketDisconnect):
@@ -555,8 +562,19 @@ def test_api_locks(botclient):
     assert rc.json()['lock_count'] == 0
     assert rc.json()['lock_count'] == len(rc.json()['locks'])
 
-    PairLocks.lock_pair('ETH/BTC', datetime.now(timezone.utc) + timedelta(minutes=4), 'randreason')
-    PairLocks.lock_pair('XRP/BTC', datetime.now(timezone.utc) + timedelta(minutes=20), 'deadbeef')
+    rc = client_post(client, f"{BASE_URI}/locks", [
+        {
+            "pair": "ETH/BTC",
+            "until": f"{format_date(datetime.now(timezone.utc) + timedelta(minutes=4))}Z",
+            "reason": "randreason"
+        }, {
+            "pair": "XRP/BTC",
+            "until": f"{format_date(datetime.now(timezone.utc) + timedelta(minutes=20))}Z",
+            "reason": "deadbeef"
+        }
+    ])
+    assert_response(rc)
+    assert rc.json()['lock_count'] == 2
 
     rc = client_get(client, f"{BASE_URI}/locks")
     assert_response(rc)
@@ -875,11 +893,11 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
     (
         True,
         {'best_pair': 'ETC/BTC', 'best_rate': -0.5, 'best_pair_profit_ratio': -0.005,
-         'profit_all_coin': 45.561959,
-         'profit_all_fiat': 562462.39126200, 'profit_all_percent_mean': 66.41,
-         'profit_all_ratio_mean': 0.664109545, 'profit_all_percent_sum': 398.47,
-         'profit_all_ratio_sum': 3.98465727, 'profit_all_percent': 4.56,
-         'profit_all_ratio': 0.04556147, 'profit_closed_coin': -0.00673913,
+         'profit_all_coin': 15.382312,
+         'profit_all_fiat': 189894.6470718, 'profit_all_percent_mean': 49.62,
+         'profit_all_ratio_mean': 0.49620917, 'profit_all_percent_sum': 198.48,
+         'profit_all_ratio_sum': 1.98483671, 'profit_all_percent': 1.54,
+         'profit_all_ratio': 0.01538214, 'profit_closed_coin': -0.00673913,
          'profit_closed_fiat': -83.19455985, 'profit_closed_ratio_mean': -0.0075,
          'profit_closed_percent_mean': -0.75, 'profit_closed_ratio_sum': -0.015,
          'profit_closed_percent_sum': -1.5, 'profit_closed_ratio': -6.739057628404269e-06,
@@ -891,11 +909,11 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
     (
         False,
         {'best_pair': 'XRP/BTC', 'best_rate': 1.0, 'best_pair_profit_ratio': 0.01,
-         'profit_all_coin': -45.79641127,
-         'profit_all_fiat': -565356.69712815, 'profit_all_percent_mean': -66.41,
-         'profit_all_ratio_mean': -0.6641100666666667, 'profit_all_percent_sum': -398.47,
-         'profit_all_ratio_sum': -3.9846604, 'profit_all_percent': -4.58,
-         'profit_all_ratio': -0.045796261934205953, 'profit_closed_coin': 0.00073913,
+         'profit_all_coin': -15.46546305,
+         'profit_all_fiat': -190921.14135225, 'profit_all_percent_mean': -49.62,
+         'profit_all_ratio_mean': -0.49620955, 'profit_all_percent_sum': -198.48,
+         'profit_all_ratio_sum': -1.9848382, 'profit_all_percent': -1.55,
+         'profit_all_ratio': -0.0154654126, 'profit_closed_coin': 0.00073913,
          'profit_closed_fiat': 9.124559849999999, 'profit_closed_ratio_mean': 0.0075,
          'profit_closed_percent_mean': 0.75, 'profit_closed_ratio_sum': 0.015,
          'profit_closed_percent_sum': 1.5, 'profit_closed_ratio': 7.391275897987988e-07,
@@ -907,11 +925,11 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
     (
         None,
         {'best_pair': 'XRP/BTC', 'best_rate': 1.0, 'best_pair_profit_ratio': 0.01,
-         'profit_all_coin': -14.94732578,
-         'profit_all_fiat': -184524.7367541, 'profit_all_percent_mean': 0.08,
-         'profit_all_ratio_mean': 0.000835751666666662, 'profit_all_percent_sum': 0.5,
-         'profit_all_ratio_sum': 0.005014509999999972, 'profit_all_percent': -1.49,
-         'profit_all_ratio': -0.014947184841095841, 'profit_closed_coin': -0.00542913,
+         'profit_all_coin': -14.87167525,
+         'profit_all_fiat': -183590.83096125, 'profit_all_percent_mean': 0.13,
+         'profit_all_ratio_mean': 0.0012538324, 'profit_all_percent_sum': 0.5,
+         'profit_all_ratio_sum': 0.005015329, 'profit_all_percent': -1.49,
+         'profit_all_ratio': -0.0148715350, 'profit_closed_coin': -0.00542913,
          'profit_closed_fiat': -67.02260985, 'profit_closed_ratio_mean': 0.0025,
          'profit_closed_percent_mean': 0.25, 'profit_closed_ratio_sum': 0.005,
          'profit_closed_percent_sum': 0.5, 'profit_closed_ratio': -5.429078808526421e-06,
@@ -1169,6 +1187,8 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'current_rate': current_rate,
         'open_date': ANY,
         'open_timestamp': ANY,
+        'open_fill_date': ANY,
+        'open_fill_timestamp': ANY,
         'open_rate': 0.123,
         'pair': 'ETH/BTC',
         'base_currency': 'ETH',
@@ -1372,6 +1392,8 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
         'close_rate': 0.265441,
         'open_date': ANY,
         'open_timestamp': ANY,
+        'open_fill_date': ANY,
+        'open_fill_timestamp': ANY,
         'open_rate': 0.245441,
         'pair': 'ETH/BTC',
         'base_currency': 'ETH',
@@ -1493,6 +1515,7 @@ def test_api_pair_candles(botclient, ohlcv_history):
     assert 'data_stop_ts' in rc.json()
     assert len(rc.json()['data']) == 0
     ohlcv_history['sma'] = ohlcv_history['close'].rolling(2).mean()
+    ohlcv_history['sma2'] = ohlcv_history['close'].rolling(2).mean()
     ohlcv_history['enter_long'] = 0
     ohlcv_history.loc[1, 'enter_long'] = 1
     ohlcv_history['exit_long'] = 0
@@ -1500,44 +1523,83 @@ def test_api_pair_candles(botclient, ohlcv_history):
     ohlcv_history['exit_short'] = 0
 
     ftbot.dataprovider._set_cached_df("XRP/BTC", timeframe, ohlcv_history, CandleType.SPOT)
+    for call in ('get', 'post'):
+        if call == 'get':
+            rc = client_get(
+                client,
+                f"{BASE_URI}/pair_candles?limit={amount}&pair=XRP%2FBTC&timeframe={timeframe}")
+        else:
+            rc = client_post(
+                client,
+                f"{BASE_URI}/pair_candles",
+                data={
+                    "pair": "XRP/BTC",
+                    "timeframe": timeframe,
+                    "limit": amount,
+                    "columns": ['sma'],
+                }
+            )
+        assert_response(rc)
+        resp = rc.json()
+        assert 'strategy' in resp
+        assert resp['strategy'] == CURRENT_TEST_STRATEGY
+        assert 'columns' in resp
+        assert 'data_start_ts' in resp
+        assert 'data_start' in resp
+        assert 'data_stop' in resp
+        assert 'data_stop_ts' in resp
+        assert resp['data_start'] == '2017-11-26 08:50:00+00:00'
+        assert resp['data_start_ts'] == 1511686200000
+        assert resp['data_stop'] == '2017-11-26 09:00:00+00:00'
+        assert resp['data_stop_ts'] == 1511686800000
+        assert isinstance(resp['columns'], list)
+        base_cols = {
+                'date', 'open', 'high', 'low', 'close', 'volume',
+                'sma', 'enter_long', 'exit_long', 'enter_short', 'exit_short', '__date_ts',
+                '_enter_long_signal_close', '_exit_long_signal_close',
+                '_enter_short_signal_close', '_exit_short_signal_close'
+            }
+        if call == 'get':
+            assert set(resp['columns']) == base_cols.union({'sma2'})
+        else:
+            assert set(resp['columns']) == base_cols
 
-    rc = client_get(client,
-                    f"{BASE_URI}/pair_candles?limit={amount}&pair=XRP%2FBTC&timeframe={timeframe}")
-    assert_response(rc)
-    assert 'strategy' in rc.json()
-    assert rc.json()['strategy'] == CURRENT_TEST_STRATEGY
-    assert 'columns' in rc.json()
-    assert 'data_start_ts' in rc.json()
-    assert 'data_start' in rc.json()
-    assert 'data_stop' in rc.json()
-    assert 'data_stop_ts' in rc.json()
-    assert rc.json()['data_start'] == '2017-11-26 08:50:00+00:00'
-    assert rc.json()['data_start_ts'] == 1511686200000
-    assert rc.json()['data_stop'] == '2017-11-26 09:00:00+00:00'
-    assert rc.json()['data_stop_ts'] == 1511686800000
-    assert isinstance(rc.json()['columns'], list)
-    assert set(rc.json()['columns']) == {
-        'date', 'open', 'high', 'low', 'close', 'volume',
-        'sma', 'enter_long', 'exit_long', 'enter_short', 'exit_short', '__date_ts',
-        '_enter_long_signal_close', '_exit_long_signal_close',
-        '_enter_short_signal_close', '_exit_short_signal_close'
-    }
-    assert 'pair' in rc.json()
-    assert rc.json()['pair'] == 'XRP/BTC'
+        # All columns doesn't include the internal columns
+        assert set(resp['all_columns']) == {
+            'date', 'open', 'high', 'low', 'close', 'volume',
+            'sma', 'sma2', 'enter_long', 'exit_long', 'enter_short', 'exit_short'
+        }
+        assert 'pair' in resp
+        assert resp['pair'] == 'XRP/BTC'
 
-    assert 'data' in rc.json()
-    assert len(rc.json()['data']) == amount
+        assert 'data' in resp
+        assert len(resp['data']) == amount
+        if call == 'get':
+            assert len(resp['data'][0]) == 17
+            assert resp['data'] == [
+                ['2017-11-26T08:50:00Z', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05,
+                 0.0877869, None, None, 0, 0, 0, 0, 1511686200000, None, None, None, None],
+                ['2017-11-26T08:55:00Z', 8.88e-05, 8.942e-05, 8.88e-05, 8.893e-05, 0.05874751,
+                 8.886500000000001e-05, 8.886500000000001e-05, 1, 0, 0, 0, 1511686500000,
+                 8.893e-05, None, None, None],
+                ['2017-11-26T09:00:00Z', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
+                 0.7039405, 8.885e-05, 8.885e-05, 0, 0, 0, 0, 1511686800000, None, None, None, None
+                 ]
+            ]
+        else:
+            assert len(resp['data'][0]) == 16
+            assert resp['data'] == [
+                ['2017-11-26T08:50:00Z', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05,
+                 0.0877869, None, 0, 0, 0, 0, 1511686200000, None, None, None, None],
+                ['2017-11-26T08:55:00Z', 8.88e-05, 8.942e-05, 8.88e-05, 8.893e-05, 0.05874751,
+                 8.886500000000001e-05, 1, 0, 0, 0, 1511686500000,
+                 8.893e-05, None, None, None],
+                ['2017-11-26T09:00:00Z', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
+                 0.7039405, 8.885e-05, 0, 0, 0, 0, 1511686800000, None, None, None, None
+                 ]
+            ]
 
-    assert (rc.json()['data'] ==
-            [['2017-11-26T08:50:00Z', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05, 0.0877869,
-              None, 0, 0, 0, 0, 1511686200000, None, None, None, None],
-             ['2017-11-26T08:55:00Z', 8.88e-05, 8.942e-05, 8.88e-05,
-                 8.893e-05, 0.05874751, 8.886500000000001e-05, 1, 0, 0, 0, 1511686500000, 8.893e-05,
-                 None, None, None],
-             ['2017-11-26T09:00:00Z', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
-                 0.7039405, 8.885e-05, 0, 0, 0, 0, 1511686800000, None, None, None, None]
-
-             ])
+    # prep for next test
     ohlcv_history['exit_long'] = ohlcv_history['exit_long'].astype('float64')
     ohlcv_history.at[0, 'exit_long'] = float('inf')
     ohlcv_history['date1'] = ohlcv_history['date']
@@ -1549,18 +1611,20 @@ def test_api_pair_candles(botclient, ohlcv_history):
     assert_response(rc)
     assert (rc.json()['data'] ==
             [['2017-11-26T08:50:00Z', 8.794e-05, 8.948e-05, 8.794e-05, 8.88e-05, 0.0877869,
-              None, 0, None, 0, 0, None, 1511686200000, None, None, None, None],
+              None, None, 0, None, 0, 0, None, 1511686200000, None, None, None, None],
              ['2017-11-26T08:55:00Z', 8.88e-05, 8.942e-05, 8.88e-05,
-                 8.893e-05, 0.05874751, 8.886500000000001e-05, 1, 0.0, 0, 0, '2017-11-26T08:55:00Z',
-                 1511686500000, 8.893e-05, None, None, None],
+                 8.893e-05, 0.05874751, 8.886500000000001e-05, 8.886500000000001e-05, 1, 0.0, 0,
+                 0, '2017-11-26T08:55:00Z', 1511686500000, 8.893e-05, None, None, None],
              ['2017-11-26T09:00:00Z', 8.891e-05, 8.893e-05, 8.875e-05, 8.877e-05,
-                 0.7039405, 8.885e-05, 0, 0.0, 0, 0, '2017-11-26T09:00:00Z', 1511686800000,
-                 None, None, None, None]
+                 0.7039405, 8.885e-05, 8.885e-05, 0, 0.0, 0, 0, '2017-11-26T09:00:00Z',
+                 1511686800000, None, None, None, None]
              ])
 
 
-def test_api_pair_history(botclient, mocker):
+def test_api_pair_history(botclient, tmp_path, mocker):
     _ftbot, client = botclient
+    _ftbot.config['user_data_dir'] = tmp_path
+
     timeframe = '5m'
     lfm = mocker.patch('freqtrade.strategy.interface.IStrategy.load_freqAI_model')
     # No pair
@@ -1594,44 +1658,74 @@ def test_api_pair_history(botclient, mocker):
     assert_response(rc, 502)
 
     # Working
-    rc = client_get(client,
-                    f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
-                    f"&timerange=20180111-20180112&strategy={CURRENT_TEST_STRATEGY}")
-    assert_response(rc, 200)
-    result = rc.json()
-    assert result['length'] == 289
-    assert len(result['data']) == result['length']
-    assert 'columns' in result
-    assert 'data' in result
-    data = result['data']
-    assert len(data) == 289
-    # analyed DF has 30 columns
-    assert len(result['columns']) == 30
-    assert len(data[0]) == 30
-    date_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'date'][0]
-    rsi_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'rsi'][0]
+    for call in ('get', 'post'):
+        if call == 'get':
+            rc = client_get(client,
+                            f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
+                            f"&timerange=20180111-20180112&strategy={CURRENT_TEST_STRATEGY}")
+        else:
+            rc = client_post(
+                client,
+                f"{BASE_URI}/pair_history",
+                data={
+                    "pair": "UNITTEST/BTC",
+                    "timeframe": timeframe,
+                    "timerange": "20180111-20180112",
+                    "strategy": CURRENT_TEST_STRATEGY,
+                    "columns": ['rsi', 'fastd', 'fastk'],
+                })
 
-    assert data[0][date_col_idx] == '2018-01-11T00:00:00Z'
-    assert data[0][rsi_col_idx] is not None
-    assert data[0][rsi_col_idx] > 0
-    assert lfm.call_count == 1
-    assert result['pair'] == 'UNITTEST/BTC'
-    assert result['strategy'] == CURRENT_TEST_STRATEGY
-    assert result['data_start'] == '2018-01-11 00:00:00+00:00'
-    assert result['data_start_ts'] == 1515628800000
-    assert result['data_stop'] == '2018-01-12 00:00:00+00:00'
-    assert result['data_stop_ts'] == 1515715200000
+        assert_response(rc, 200)
+        result = rc.json()
+        assert result['length'] == 289
+        assert len(result['data']) == result['length']
+        assert 'columns' in result
+        assert 'data' in result
+        data = result['data']
+        assert len(data) == 289
+        col_count = 30 if call == 'get' else 18
+        # analyzed DF has 30 columns
+        assert len(result['columns']) == col_count
+        assert len(result['all_columns']) == 25
+        assert len(data[0]) == col_count
+        date_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'date'][0]
+        rsi_col_idx = [idx for idx, c in enumerate(result['columns']) if c == 'rsi'][0]
 
-    # No data found
-    rc = client_get(client,
-                    f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
-                    f"&timerange=20200111-20200112&strategy={CURRENT_TEST_STRATEGY}")
-    assert_response(rc, 502)
-    assert rc.json()['detail'] == ("No data for UNITTEST/BTC, 5m in 20200111-20200112 found.")
+        assert data[0][date_col_idx] == '2018-01-11T00:00:00Z'
+        assert data[0][rsi_col_idx] is not None
+        assert data[0][rsi_col_idx] > 0
+        assert lfm.call_count == 1
+        assert result['pair'] == 'UNITTEST/BTC'
+        assert result['strategy'] == CURRENT_TEST_STRATEGY
+        assert result['data_start'] == '2018-01-11 00:00:00+00:00'
+        assert result['data_start_ts'] == 1515628800000
+        assert result['data_stop'] == '2018-01-12 00:00:00+00:00'
+        assert result['data_stop_ts'] == 1515715200000
+        lfm.reset_mock()
+
+        # No data found
+        if call == 'get':
+            rc = client_get(client,
+                            f"{BASE_URI}/pair_history?pair=UNITTEST%2FBTC&timeframe={timeframe}"
+                            f"&timerange=20200111-20200112&strategy={CURRENT_TEST_STRATEGY}")
+        else:
+            rc = client_post(
+                client,
+                f"{BASE_URI}/pair_history",
+                data={
+                    "pair": "UNITTEST/BTC",
+                    "timeframe": timeframe,
+                    "timerange": "20200111-20200112",
+                    "strategy": CURRENT_TEST_STRATEGY,
+                    "columns": ['rsi', 'fastd', 'fastk'],
+                })
+        assert_response(rc, 502)
+        assert rc.json()['detail'] == ("No data for UNITTEST/BTC, 5m in 20200111-20200112 found.")
 
 
-def test_api_plot_config(botclient, mocker):
+def test_api_plot_config(botclient, mocker, tmp_path):
     ftbot, client = botclient
+    ftbot.config['user_data_dir'] = tmp_path
 
     rc = client_get(client, f"{BASE_URI}/plot_config")
     assert_response(rc)
@@ -1699,8 +1793,9 @@ def test_api_strategies(botclient, tmp_path):
     ]}
 
 
-def test_api_strategy(botclient):
+def test_api_strategy(botclient, tmp_path, mocker):
     _ftbot, client = botclient
+    _ftbot.config['user_data_dir'] = tmp_path
 
     rc = client_get(client, f"{BASE_URI}/strategy/{CURRENT_TEST_STRATEGY}")
 
@@ -1716,6 +1811,11 @@ def test_api_strategy(botclient):
     # Disallow base64 strategies
     rc = client_get(client, f"{BASE_URI}/strategy/xx:cHJpbnQoImhlbGxvIHdvcmxkIik=")
     assert_response(rc, 500)
+    mocker.patch('freqtrade.resolvers.strategy_resolver.StrategyResolver._load_strategy',
+                 side_effect=Exception("Test"))
+
+    rc = client_get(client, f"{BASE_URI}/strategy/NoStrat")
+    assert_response(rc, 502)
 
 
 def test_api_exchanges(botclient):
@@ -1868,6 +1968,15 @@ def test_api_pairlists_evaluate(botclient, tmp_path, mocker):
     assert_response(rc, 404)
     assert rc.json()['detail'] == 'Job not found.'
 
+    # Background list
+    rc = client_get(client, f"{BASE_URI}/background")
+    assert_response(rc)
+    response = rc.json()
+    assert isinstance(response, list)
+    assert len(response) == 1
+    assert response[0]['job_id'] == job_id
+
+    # Get individual job
     rc = client_get(client, f"{BASE_URI}/background/{job_id}")
     assert_response(rc)
     response = rc.json()
@@ -2233,6 +2342,42 @@ def test_api_patch_backtest_history_entry(botclient, tmp_path: Path):
     fileres = read_metadata()
     assert fileres[CURRENT_TEST_STRATEGY]['run_id'] == res[0]['run_id']
     assert fileres[CURRENT_TEST_STRATEGY]['notes'] == 'FooBar'
+
+
+def test_api_patch_backtest_market_change(botclient, tmp_path: Path):
+    ftbot, client = botclient
+
+    # Create a temporary directory and file
+    bt_results_base = tmp_path / "backtest_results"
+    bt_results_base.mkdir()
+    file_path = bt_results_base / "test_22_market_change.feather"
+    df = pd.DataFrame({
+        'date': ['2018-01-01T00:00:00Z', '2018-01-01T00:05:00Z'],
+        'count': [2, 4],
+        'mean': [2555, 2556],
+        'rel_mean': [0, 0.022],
+    })
+    df['date'] = pd.to_datetime(df['date'])
+    df.to_feather(file_path, compression_level=9, compression='lz4')
+    # Nonexisting file
+    rc = client_get(client, f"{BASE_URI}/backtest/history/randomFile.json/market_change")
+    assert_response(rc, 503)
+
+    ftbot.config['user_data_dir'] = tmp_path
+    ftbot.config['runmode'] = RunMode.WEBSERVER
+
+    rc = client_get(client, f"{BASE_URI}/backtest/history/randomFile.json/market_change")
+    assert_response(rc, 404)
+
+    rc = client_get(client, f"{BASE_URI}/backtest/history/test_22/market_change")
+    assert_response(rc, 200)
+    result = rc.json()
+    assert result['length'] == 2
+    assert result['columns'] == ['date', 'count', 'mean', 'rel_mean', '__date_ts']
+    assert result['data'] == [
+        ['2018-01-01T00:00:00Z', 2, 2555, 0.0, 1514764800000],
+        ['2018-01-01T00:05:00Z', 4, 2556, 0.022, 1514765100000]
+    ]
 
 
 def test_health(botclient):

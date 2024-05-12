@@ -23,7 +23,8 @@ from freqtrade.exchange import (ROUND_DOWN, ROUND_UP, amount_to_contract_precisi
 from freqtrade.leverage import interest
 from freqtrade.misc import safe_value_fallback
 from freqtrade.persistence.base import ModelBase, SessionType
-from freqtrade.util import FtPrecise, dt_from_ts, dt_now, dt_ts
+from freqtrade.persistence.custom_data import CustomDataWrapper, _CustomData
+from freqtrade.util import FtPrecise, dt_from_ts, dt_now, dt_ts, dt_ts_none
 
 
 logger = logging.getLogger(__name__)
@@ -73,8 +74,7 @@ class Order(ModelBase):
     order_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     status: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     symbol: Mapped[Optional[str]] = mapped_column(String(25), nullable=True)
-    # TODO: type: order_type type is Optional[str]
-    order_type: Mapped[str] = mapped_column(String(50), nullable=True)
+    order_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     side: Mapped[str] = mapped_column(String(25), nullable=True)
     price: Mapped[Optional[float]] = mapped_column(Float(), nullable=True)
     average: Mapped[Optional[float]] = mapped_column(Float(), nullable=True)
@@ -224,8 +224,7 @@ class Order(ModelBase):
             'amount': self.safe_amount,
             'safe_price': self.safe_price,
             'ft_order_side': self.ft_order_side,
-            'order_filled_timestamp': int(self.order_filled_date.replace(
-                tzinfo=timezone.utc).timestamp() * 1000) if self.order_filled_date else None,
+            'order_filled_timestamp': dt_ts_none(self.order_filled_utc),
             'ft_is_entry': self.ft_order_side == entry_side,
             'ft_order_tag': self.ft_order_tag,
         }
@@ -462,6 +461,17 @@ class LocalTrade:
         return max([self.open_date_utc, dt_last_filled])
 
     @property
+    def date_entry_fill_utc(self) -> Optional[datetime]:
+        """ Date of the first filled order"""
+        orders = self.select_filled_orders(self.entry_side)
+        if (
+            orders
+            and len(filled_date := [o.order_filled_utc for o in orders if o.order_filled_utc])
+        ):
+            return min(filled_date)
+        return None
+
+    @property
     def open_date_utc(self):
         return self.open_date.replace(tzinfo=timezone.utc)
 
@@ -625,15 +635,17 @@ class LocalTrade:
             'fee_close_currency': self.fee_close_currency,
 
             'open_date': self.open_date.strftime(DATETIME_PRINT_FORMAT),
-            'open_timestamp': int(self.open_date.replace(tzinfo=timezone.utc).timestamp() * 1000),
+            'open_timestamp': dt_ts_none(self.open_date_utc),
+            'open_fill_date': (self.date_entry_fill_utc.strftime(DATETIME_PRINT_FORMAT)
+                               if self.date_entry_fill_utc else None),
+            'open_fill_timestamp': dt_ts_none(self.date_entry_fill_utc),
             'open_rate': self.open_rate,
             'open_rate_requested': self.open_rate_requested,
             'open_trade_value': round(self.open_trade_value, 8),
 
             'close_date': (self.close_date.strftime(DATETIME_PRINT_FORMAT)
                            if self.close_date else None),
-            'close_timestamp': int(self.close_date.replace(
-                tzinfo=timezone.utc).timestamp() * 1000) if self.close_date else None,
+            'close_timestamp': dt_ts_none(self.close_date_utc),
             'realized_profit': self.realized_profit or 0.0,
             # Close-profit corresponds to relative realized_profit ratio
             'realized_profit_ratio': self.close_profit or None,
@@ -659,8 +671,7 @@ class LocalTrade:
             'stop_loss_pct': (self.stop_loss_pct * 100) if self.stop_loss_pct else None,
             'stoploss_last_update': (self.stoploss_last_update_utc.strftime(DATETIME_PRINT_FORMAT)
                                      if self.stoploss_last_update_utc else None),
-            'stoploss_last_update_timestamp': int(self.stoploss_last_update_utc.timestamp() * 1000
-                                                  ) if self.stoploss_last_update_utc else None,
+            'stoploss_last_update_timestamp': dt_ts_none(self.stoploss_last_update_utc),
             'initial_stop_loss_abs': self.initial_stop_loss,
             'initial_stop_loss_ratio': (self.initial_stop_loss_pct
                                         if self.initial_stop_loss_pct else None),
@@ -804,6 +815,7 @@ class LocalTrade:
             order.funding_fee = self.funding_fee_running
             # Reset running funding fees
             self.funding_fee_running = 0.0
+        order_type = order.order_type.upper() if order.order_type else None
 
         if order.ft_order_side == self.entry_side:
             # Update open rate and actual amount
@@ -811,20 +823,20 @@ class LocalTrade:
             self.amount = order.safe_amount_after_fee
             if self.is_open:
                 payment = "SELL" if self.is_short else "BUY"
-                logger.info(f'{order.order_type.upper()}_{payment} has been fulfilled for {self}.')
+                logger.info(f'{order_type}_{payment} has been fulfilled for {self}.')
 
             self.recalc_trade_from_orders()
         elif order.ft_order_side == self.exit_side:
             if self.is_open:
                 payment = "BUY" if self.is_short else "SELL"
                 # * On margin shorts, you buy a little bit more than the amount (amount + interest)
-                logger.info(f'{order.order_type.upper()}_{payment} has been fulfilled for {self}.')
+                logger.info(f'{order_type}_{payment} has been fulfilled for {self}.')
 
         elif order.ft_order_side == 'stoploss' and order.status not in ('open', ):
             self.close_rate_requested = self.stop_loss
             self.exit_reason = ExitType.STOPLOSS_ON_EXCHANGE.value
             if self.is_open and order.safe_filled > 0:
-                logger.info(f'{order.order_type.upper()} is hit for {self}.')
+                logger.info(f'{order_type} is hit for {self}.')
         else:
             raise ValueError(f'Unknown order type: {order.order_type}')
 
@@ -835,7 +847,7 @@ class LocalTrade:
                 isclose(order.safe_amount_after_fee, amount_tr, abs_tol=MATH_CLOSE_PREC)
                 or (not recalculating and order.safe_amount_after_fee > amount_tr)
             ):
-                # When recalculating a trade, only comming out to 0 can force a close
+                # When recalculating a trade, only coming out to 0 can force a close
                 self.close(order.safe_price)
             else:
                 self.recalc_trade_from_orders()
@@ -1113,7 +1125,7 @@ class LocalTrade:
                 prof = self.calculate_profit(exit_rate, exit_amount, float(avg_price))
                 close_profit_abs += prof.profit_abs
                 if total_stake > 0:
-                    # This needs to be calculated based on the last occuring exit to be aligned
+                    # This needs to be calculated based on the last occurring exit to be aligned
                     # with realized_profit.
                     close_profit = (close_profit_abs / total_stake) * self.leverage
             else:
@@ -1202,6 +1214,40 @@ class LocalTrade:
                     )
                 or (o.ft_is_open is True and o.status is not None)
                 ]
+
+    def set_custom_data(self, key: str, value: Any) -> None:
+        """
+        Set custom data for this trade
+        :param key: key of the custom data
+        :param value: value of the custom data (must be JSON serializable)
+        """
+        CustomDataWrapper.set_custom_data(trade_id=self.id, key=key, value=value)
+
+    def get_custom_data(self, key: str, default: Any = None) -> Any:
+        """
+        Get custom data for this trade
+        :param key: key of the custom data
+        """
+        data = CustomDataWrapper.get_custom_data(trade_id=self.id, key=key)
+        if data:
+            return data[0].value
+        return default
+
+    def get_custom_data_entry(self, key: str) -> Optional[_CustomData]:
+        """
+        Get custom data for this trade
+        :param key: key of the custom data
+        """
+        data = CustomDataWrapper.get_custom_data(trade_id=self.id, key=key)
+        if data:
+            return data[0]
+        return None
+
+    def get_all_custom_data(self) -> List[_CustomData]:
+        """
+        Get all custom data for this trade
+        """
+        return CustomDataWrapper.get_custom_data(trade_id=self.id)
 
     @property
     def nr_of_successful_entries(self) -> int:
@@ -1458,6 +1504,9 @@ class Trade(ModelBase, LocalTrade):
     orders: Mapped[List[Order]] = relationship(
         "Order", order_by="Order.id", cascade="all, delete-orphan", lazy="selectin",
         innerjoin=True)  # type: ignore
+    custom_data: Mapped[List[_CustomData]] = relationship(
+        "_CustomData", cascade="all, delete-orphan",
+        lazy="raise")
 
     exchange: Mapped[str] = mapped_column(String(25), nullable=False)  # type: ignore
     pair: Mapped[str] = mapped_column(String(25), nullable=False, index=True)  # type: ignore
@@ -1489,7 +1538,7 @@ class Trade(ModelBase, LocalTrade):
     amount: Mapped[float] = mapped_column(Float())  # type: ignore
     amount_requested: Mapped[Optional[float]] = mapped_column(Float())  # type: ignore
     open_date: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow)  # type: ignore
+        nullable=False, default=datetime.now)  # type: ignore
     close_date: Mapped[Optional[datetime]] = mapped_column()  # type: ignore
     # absolute value of the stop loss
     stop_loss: Mapped[float] = mapped_column(Float(), nullable=True, default=0.0)  # type: ignore
@@ -1560,6 +1609,8 @@ class Trade(ModelBase, LocalTrade):
 
         for order in self.orders:
             Order.session.delete(order)
+
+        CustomDataWrapper.delete_custom_data(trade_id=self.id)
 
         Trade.session.delete(self)
         Trade.commit()
@@ -1849,17 +1900,21 @@ class Trade(ModelBase, LocalTrade):
         return resp
 
     @staticmethod
-    def get_best_pair(start_date: datetime = datetime.fromtimestamp(0)):
+    def get_best_pair(start_date: Optional[datetime] = None):
         """
         Get best pair with closed trade.
         NOTE: Not supported in Backtesting.
         :returns: Tuple containing (pair, profit_sum)
         """
+        filters: List = [Trade.is_open.is_(False)]
+        if start_date:
+            filters.append(Trade.close_date >= start_date)
+
         best_pair = Trade.session.execute(
             select(
                 Trade.pair,
                 func.sum(Trade.close_profit).label('profit_sum')
-            ).filter(Trade.is_open.is_(False) & (Trade.close_date >= start_date))
+            ).filter(*filters)
             .group_by(Trade.pair)
             .order_by(desc('profit_sum'))
         ).first()
@@ -1867,17 +1922,21 @@ class Trade(ModelBase, LocalTrade):
         return best_pair
 
     @staticmethod
-    def get_trading_volume(start_date: datetime = datetime.fromtimestamp(0)) -> float:
+    def get_trading_volume(start_date: Optional[datetime] = None) -> float:
         """
         Get Trade volume based on Orders
         NOTE: Not supported in Backtesting.
         :returns: Tuple containing (pair, profit_sum)
         """
+        filters = [
+                Order.status == 'closed'
+        ]
+        if start_date:
+            filters.append(Order.order_filled_date >= start_date)
         trading_volume = Trade.session.execute(
             select(
                 func.sum(Order.cost).label('volume')
             ).filter(
-                Order.order_filled_date >= start_date,
-                Order.status == 'closed'
+                *filters
             )).scalar_one()
         return trading_volume or 0.0

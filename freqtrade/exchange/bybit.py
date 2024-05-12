@@ -25,6 +25,7 @@ class Bybit(Exchange):
     officially supported by the Freqtrade development team. So some features
     may still not work as expected.
     """
+    unified_account = False
 
     _ft_has: Dict = {
         "ohlcv_candle_limit": 1000,
@@ -82,12 +83,23 @@ class Bybit(Exchange):
         Must be overridden in child methods if required.
         """
         try:
-            if self.trading_mode == TradingMode.FUTURES and not self._config['dry_run']:
-                position_mode = self._api_async.set_position_mode(False)
-                self._log_exchange_response('set_position_mode', position_mode)
+            if not self._config['dry_run']:
+                if self.trading_mode == TradingMode.FUTURES:
+                    position_mode = await self._api_async.set_position_mode(False)
+                    self._log_exchange_response('set_position_mode', position_mode)
+                is_unified = await self._api_async.is_unified_enabled()
+                # Returns a tuple of bools, first for margin, second for Account
+                if is_unified and len(is_unified) > 1 and is_unified[1]:
+                    self.unified_account = True
+                    logger.info("Bybit: Unified account.")
+                    raise OperationalException("Bybit: Unified account is not supported. "
+                                               "Please use a standard (sub)account.")
+                else:
+                    self.unified_account = False
+                    logger.info("Bybit: Standard account.")
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
-        except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+        except (ccxt.OperationFailed, ccxt.ExchangeError) as e:
             raise TemporaryError(
                 f'Error in additional_exchange_init due to {e.__class__.__name__}. Message: {e}'
                 ) from e
@@ -228,7 +240,7 @@ class Bybit(Exchange):
 
         return orders
 
-    async def fetch_order(self, order_id: str, pair: str, params: Dict = {}) -> Dict:
+    async def fetch_order(self, order_id: str, pair: str, params: Optional[Dict] = None) -> Dict:
         order = await super().fetch_order(order_id, pair, params)
         if (
             order.get('status') == 'canceled'
@@ -238,3 +250,44 @@ class Bybit(Exchange):
             # Canceled orders will have "remaining=0" on bybit.
             order['remaining'] = None
         return order
+
+    @retrier_async
+    async def get_leverage_tiers(self) -> Dict[str, List[Dict]]:
+        """
+        Temporary workaround for https://github.com/freqtrade/freqtrade/issues/10196
+        should be removed or updated once https://github.com/ccxt/ccxt/issues/22448 is fixed.
+        """
+
+        # Load cached tiers
+        tiers_cached = self.load_cached_leverage_tiers(self._config['stake_currency'])
+        if tiers_cached:
+            tiers = tiers_cached
+            return tiers
+
+        # Fetch tiers from exchange
+
+        symbols = self._api_async.market_symbols([])
+
+        def parse_resp(response):
+            result = self._api_async.safe_dict(response, 'result', {})
+            data = self._api_async.safe_list(result, 'list', [])
+            return self._api_async.parse_leverage_tiers(data, symbols, 'symbol')
+
+        params = {
+            'category': 'linear',
+        }
+        tiers = {}
+        # 20 pairs ... should be sufficient assuming 30 pairs per page
+        # Aimed to avoid a potential infinite loop
+        for _ in range(20):
+            # Fetch from private endpoint
+            response = await self._api_async.publicGetV5MarketRiskLimit(params)
+            tiers = tiers | parse_resp(response)
+            if (cursor := response['result']['nextPageCursor']) == '':
+                break
+            params.update({
+                "cursor": cursor
+            })
+
+        self.cache_leverage_tiers(tiers, self._config['stake_currency'])
+        return tiers

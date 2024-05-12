@@ -24,11 +24,6 @@ async def start_trading(args: Dict[str, Any]) -> int:
         worker = Worker(args)
         await worker.init_worker()
         await worker.run()
-    except Exception as e:
-        logger.error(str(e))
-        logger.exception("Fatal exception!")
-    except (KeyboardInterrupt):
-        logger.info('SIGINT received, aborting ...')
     finally:
         if worker:
             logger.info("worker found ... calling exit")

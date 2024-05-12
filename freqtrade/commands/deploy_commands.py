@@ -9,11 +9,15 @@ from freqtrade.configuration import setup_utils_configuration
 from freqtrade.configuration.directory_operations import copy_sample_files, create_userdata_dir
 from freqtrade.constants import USERPATH_STRATEGIES
 from freqtrade.enums import RunMode
-from freqtrade.exceptions import OperationalException
+from freqtrade.exceptions import ConfigurationError, OperationalException
 from freqtrade.util import render_template, render_template_with_fallback
 
 
 logger = logging.getLogger(__name__)
+
+
+# Timeout for requests
+req_timeout = 30
 
 
 def start_create_userdir(args: Dict[str, Any]) -> None:
@@ -89,7 +93,7 @@ def start_new_strategy(args: Dict[str, Any]) -> None:
         deploy_new_strategy(args['strategy'], new_path, args['template'])
 
     else:
-        raise OperationalException("`new-strategy` requires --strategy to be set.")
+        raise ConfigurationError("`new-strategy` requires --strategy to be set.")
 
 
 def clean_ui_subdir(directory: Path):
@@ -119,7 +123,7 @@ def download_and_install_ui(dest_folder: Path, dl_url: str, version: str):
     from zipfile import ZipFile
 
     logger.info(f"Downloading {dl_url}")
-    resp = requests.get(dl_url).content
+    resp = requests.get(dl_url, timeout=req_timeout).content
     dest_folder.mkdir(parents=True, exist_ok=True)
     with ZipFile(BytesIO(resp)) as zf:
         for fn in zf.filelist:
@@ -137,7 +141,7 @@ def get_ui_download_url(version: Optional[str] = None) -> Tuple[str, str]:
     base_url = 'https://api.github.com/repos/freqtrade/frequi/'
     # Get base UI Repo path
 
-    resp = requests.get(f"{base_url}releases")
+    resp = requests.get(f"{base_url}releases", timeout=req_timeout)
     resp.raise_for_status()
     r = resp.json()
 
@@ -158,7 +162,7 @@ def get_ui_download_url(version: Optional[str] = None) -> Tuple[str, str]:
     # URL not found - try assets url
     if not dl_url:
         assets = r[0]['assets_url']
-        resp = requests.get(assets)
+        resp = requests.get(assets, timeout=req_timeout)
         r = resp.json()
         dl_url = r[0]['browser_download_url']
 

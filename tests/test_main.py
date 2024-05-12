@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
-from freqtrade.exceptions import FreqtradeException
+from freqtrade.exceptions import ConfigurationError, FreqtradeException
 from freqtrade.main import main
 from tests.conftest import (log_has, log_has_re, patch_exchange,
                             patched_configuration_load_config_file)
@@ -115,3 +115,21 @@ def test_main_operational_exception1(mocker, default_conf, caplog) -> None:
         main(args)
 
     assert log_has_re(r'SIGINT.*', caplog)
+
+
+def test_main_ConfigurationError(mocker, default_conf, caplog) -> None:
+    patch_exchange(mocker)
+    mocker.patch(
+        'freqtrade.commands.list_commands.list_available_exchanges',
+        MagicMock(side_effect=ConfigurationError('Oh snap!'))
+    )
+    patched_configuration_load_config_file(mocker, default_conf)
+
+    args = ['list-exchanges']
+
+    # Test Main + the KeyboardInterrupt exception
+    with pytest.raises(SystemExit):
+        main(args)
+    assert log_has_re('Configuration error: Oh snap!', caplog)
+
+

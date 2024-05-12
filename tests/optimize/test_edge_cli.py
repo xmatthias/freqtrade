@@ -98,13 +98,13 @@ async def test_edge_init(mocker, edge_conf) -> None:
 
 async def test_edge_init_fee(mocker, edge_conf) -> None:
     patch_exchange(mocker)
-    edge_conf['fee'] = 0.1234
+    edge_conf['fee'] = 0.01234
     edge_conf['stake_amount'] = 20
     fee_mock = mocker.patch(f'{EXMS}.get_fee', return_value=0.5)
     edge_cli = EdgeCli(edge_conf)
     await edge_cli.init_async()
 
-    assert edge_cli.edge.fee == 0.1234
+    assert edge_cli.edge.fee == 0.01234
     assert fee_mock.call_count == 0
 
 

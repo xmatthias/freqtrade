@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import platform
 import shutil
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -17,25 +16,17 @@ from freqtrade.persistence import Trade
 from freqtrade.plugins.pairlistmanager import PairListManager
 from tests.conftest import (EXMS, create_mock_trades, get_mock_coro, get_patched_exchange,
                             log_has_re, patch_eventloop_threading)
-from tests.freqai.conftest import (get_patched_freqai_strategy, is_mac, is_py12, make_rl_config,
+from tests.freqai.conftest import (get_patched_freqai_strategy, is_arm, is_mac, make_rl_config,
                                    mock_pytorch_mlp_model_training_parameters)
-
-
-def is_arm() -> bool:
-    machine = platform.machine()
-    return "arm" in machine or "aarch64" in machine
 
 
 def can_run_model(model: str) -> None:
     is_pytorch_model = 'Reinforcement' in model or 'PyTorch' in model
 
-    if is_py12() and ("Catboost" in model or is_pytorch_model):
-        pytest.skip("Model not supported on python 3.12 yet.")
-
     if is_arm() and "Catboost" in model:
         pytest.skip("CatBoost is not supported on ARM.")
 
-    if is_pytorch_model and is_mac() and not is_arm():
+    if is_pytorch_model and is_mac():
         pytest.skip("Reinforcement learning / PyTorch module not available on intel based Mac OS.")
 
 
@@ -245,7 +236,7 @@ async def test_extract_data_and_train_model_Classifiers(mocker, freqai_conf, mod
 async def test_start_backtesting(mocker, freqai_conf, model, num_files, strat, caplog):
     can_run_model(model)
     test_tb = True
-    if is_mac():
+    if is_mac() and not is_arm():
         test_tb = False
 
     freqai_conf.get("freqai", {}).update({"save_backtest_models": True})
@@ -414,7 +405,7 @@ async def test_backtesting_fit_live_predictions(mocker, freqai_conf, caplog):
     freqai.dk.get_unique_classes_from_labels(df)
     freqai.dk.pair = "ADA/BTC"
     freqai.dk.full_df = df.fillna(0)
-    freqai.dk.full_df
+
     assert "&-s_close_mean" not in freqai.dk.full_df.columns
     assert "&-s_close_std" not in freqai.dk.full_df.columns
     freqai.backtesting_fit_live_predictions(freqai.dk)
@@ -529,8 +520,6 @@ async def test_get_state_info(mocker, freqai_conf, dp_exists, caplog, tickers):
 
     if is_mac():
         pytest.skip("Reinforcement learning module not available on intel based Mac OS")
-    if is_py12():
-        pytest.skip("Reinforcement learning currently not available on python 3.12.")
 
     freqai_conf.update({"freqaimodel": "ReinforcementLearner"})
     freqai_conf.update({"timerange": "20180110-20180130"})
