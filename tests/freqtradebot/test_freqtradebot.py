@@ -4661,13 +4661,14 @@ async def test_handle_onexchange_order_changed_amount(
     factor, adjusts,
 ):
     default_conf_usdt['dry_run'] = False
+    mocker.patch(f"{EXMS}.get_balances", get_mock_coro([]))
     freqtrade = await get_patched_freqtradebot(mocker, default_conf_usdt)
     mock_uts = mocker.spy(freqtrade, 'update_trade_state')
 
     entry_order = limit_order[entry_side(is_short)]
-    mock_fo = mocker.patch(f'{EXMS}.fetch_orders', return_value=[
+    mock_fo = mocker.patch(f'{EXMS}.fetch_orders', get_mock_coro(return_value=[
         entry_order,
-    ])
+    ]))
 
     trade = Trade(
         pair='ETH/USDT',
@@ -4683,6 +4684,7 @@ async def test_handle_onexchange_order_changed_amount(
         leverage=1,
     )
     freqtrade.wallets = MagicMock()
+    freqtrade.wallets.update = get_mock_coro()
     freqtrade.wallets.get_total = MagicMock(return_value=entry_order['amount'] * factor)
 
     trade.orders.append(Order.parse_from_ccxt_object(
