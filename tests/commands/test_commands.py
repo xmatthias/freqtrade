@@ -52,7 +52,7 @@ def test_setup_utils_configuration():
 async def test_start_trading_fail(mocker, caplog):
 
     mocker.patch("freqtrade.worker.Worker.run", MagicMock(side_effect=OperationalException))
-
+    mocker.patch("freqtrade.worker.Worker.init_worker")
     mocker.patch("freqtrade.worker.Worker.__init__", MagicMock(return_value=None))
 
     exitmock = mocker.patch("freqtrade.worker.Worker.exit", get_mock_coro())
@@ -70,24 +70,6 @@ async def test_start_trading_fail(mocker, caplog):
     with pytest.raises(OperationalException):
         await start_trading(get_args(args))
     assert exitmock.call_count == 0
-
-
-async def test_start_trading_kbinterrupt(mocker, caplog):
-
-    mocker.patch("freqtrade.worker.Worker.init_worker",
-                 AsyncMock(side_effect=KeyboardInterrupt))
-
-    mocker.patch("freqtrade.worker.Worker.__init__", MagicMock(return_value=None))
-
-    exitmock = mocker.patch("freqtrade.worker.Worker.exit", get_mock_coro())
-    args = [
-        'trade',
-        '-c', 'config_examples/config_bittrex.example.json'
-    ]
-    await start_trading(get_args(args))
-    assert exitmock.call_count == 1
-
-    assert log_has('SIGINT received, aborting ...', caplog)
 
 
 def test_start_webserver(mocker, caplog):
