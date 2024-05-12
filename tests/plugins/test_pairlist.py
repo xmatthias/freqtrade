@@ -828,7 +828,7 @@ async def test_VolatilityFilter_RangeStabilityFilter_sort(
         ('BLK/BTC', '1d', CandleType.SPOT): df6,
 
     }
-    ohlcv_mock = MagicMock(return_value=ohlcv_data)
+    ohlcv_mock = get_mock_coro(return_value=ohlcv_data)
     mocker.patch.multiple(
         EXMS,
         exchange_has=MagicMock(return_value=True),
@@ -1204,7 +1204,7 @@ async def test_rangestabilityfilter_checks(mocker, default_conf, markets, ticker
 
     with pytest.raises(OperationalException,
                        match='RangeStabilityFilter requires sort_direction to be either None.*'):
-        get_patched_freqtradebot(mocker, default_conf)
+        await get_patched_freqtradebot(mocker, default_conf)
 
 
 @pytest.mark.parametrize('min_rate_of_change,max_rate_of_change,expected_length', [

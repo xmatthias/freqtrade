@@ -2213,7 +2213,7 @@ class Exchange:
 
         return results_df
 
-    def refresh_ohlcv_with_cache(
+    async def refresh_ohlcv_with_cache(
         self,
         pairs: List[PairWithTimeframe],
         since_ms: int
@@ -2239,7 +2239,7 @@ class Exchange:
         }
         pairs_to_download = [p for p in pairs if p not in candles]
         if pairs_to_download:
-            candles = self.refresh_latest_ohlcv(
+            candles = await self.refresh_latest_ohlcv(
                 pairs_to_download, since_ms=since_ms, cache=False
             )
             for c, val in candles.items():
