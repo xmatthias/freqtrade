@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,8 +15,8 @@ async def test_additional_exchange_init_bybit(default_conf, mocker, caplog):
     default_conf['trading_mode'] = TradingMode.FUTURES
     default_conf['margin_mode'] = MarginMode.ISOLATED
     api_mock = MagicMock()
-    api_mock.set_position_mode = MagicMock(return_value={"dualSidePosition": False})
-    api_mock.is_unified_enabled = MagicMock(return_value=[False, False])
+    api_mock.set_position_mode = get_mock_coro(return_value={"dualSidePosition": False})
+    api_mock.is_unified_enabled = get_mock_coro(return_value=[False, False])
 
     exchange = await get_patched_exchange(mocker, default_conf, id="bybit", api_mock=api_mock)
     assert api_mock.set_position_mode.call_count == 1
@@ -26,7 +26,7 @@ async def test_additional_exchange_init_bybit(default_conf, mocker, caplog):
     assert log_has("Bybit: Standard account.", caplog)
 
     api_mock.set_position_mode.reset_mock()
-    api_mock.is_unified_enabled = MagicMock(return_value=[False, True])
+    api_mock.is_unified_enabled = get_mock_coro(return_value=[False, True])
     with pytest.raises(OperationalException, match=r"Bybit: Unified account is not supported.*"):
         await get_patched_exchange(mocker, default_conf, id="bybit", api_mock=api_mock)
     assert log_has("Bybit: Unified account.", caplog)
@@ -92,7 +92,7 @@ async def test_bybit_get_funding_fees(default_conf, mocker):
 
 async def test_bybit_fetch_orders(default_conf, mocker, limit_order):
 
-    api_mock = MagicMock()
+    api_mock = AsyncMock()
     api_mock.fetch_orders = get_mock_coro(return_value=[
         limit_order['buy'],
         limit_order['sell'],
@@ -121,7 +121,7 @@ async def test_bybit_fetch_orders(default_conf, mocker, limit_order):
 async def test_bybit_fetch_order_canceled_empty(default_conf_usdt, mocker):
     default_conf_usdt['dry_run'] = False
 
-    api_mock = MagicMock()
+    api_mock = AsyncMock()
     api_mock.fetch_order = get_mock_coro(return_value={
         'id': '123',
         'symbol': 'BTC/USDT',

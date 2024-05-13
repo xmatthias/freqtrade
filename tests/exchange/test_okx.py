@@ -485,6 +485,7 @@ async def test_load_leverage_tiers_okx(
 async def test__set_leverage_okx(mocker, default_conf):
 
     api_mock = MagicMock()
+    api_mock.fetch_leverage = AsyncMock()
     api_mock.set_leverage = get_mock_coro()
     type(api_mock).has = PropertyMock(return_value={'setLeverage': True})
     default_conf['dry_run'] = False
@@ -501,8 +502,8 @@ async def test__set_leverage_okx(mocker, default_conf):
     assert api_mock.set_leverage.call_args_list[0][1]['params'] == {
         'mgnMode': 'isolated',
         'posSide': 'net'}
-    api_mock.set_leverage = MagicMock(side_effect=ccxt.NetworkError())
-    exchange._lev_prep('BTC/USDT:USDT', 3.2, 'buy')
+    api_mock.set_leverage = get_mock_coro(side_effect=ccxt.NetworkError())
+    await exchange._lev_prep('BTC/USDT:USDT', 3.2, 'buy')
     assert api_mock.fetch_leverage.call_count == 1
 
     api_mock.fetch_leverage = MagicMock(side_effect=ccxt.NetworkError())

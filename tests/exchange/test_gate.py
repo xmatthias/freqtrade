@@ -11,7 +11,7 @@ from tests.conftest import EXMS, get_mock_coro, get_patched_exchange
 async def test_fetch_stoploss_order_gate(default_conf, mocker):
     exchange = await get_patched_exchange(mocker, default_conf, id='gate')
 
-    fetch_order_mock = get_mock_coro()
+    fetch_order_mock = get_mock_coro({})
     exchange.fetch_order = fetch_order_mock
 
     await exchange.fetch_stoploss_order('1234', 'ETH/BTC')
