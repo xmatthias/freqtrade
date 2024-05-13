@@ -225,6 +225,10 @@ def patch_exchange(
     mocker.patch(f'{EXMS}.precisionMode', PropertyMock(return_value=2))
     # Temporary patch ...
     mocker.patch('freqtrade.exchange.bybit.Bybit.cache_leverage_tiers')
+    mocker.patch('freqtrade.exchange.bybit.Bybit.get_leverage_tiers', return_value={})
+    mocker.patch('freqtrade.exchange.bybit.Bybit.additional_exchange_init')
+
+
 
     if mock_markets:
         mocker.patch(f'{EXMS}.load_markets', get_mock_coro())

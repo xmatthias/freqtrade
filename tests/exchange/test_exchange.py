@@ -2378,7 +2378,7 @@ async def test_refresh_latest_ohlcv_cache(mocker, default_conf, candle_type, tim
     assert res[pair2].at[0, 'open']
 
 
-def test_refresh_ohlcv_with_cache(mocker, default_conf, time_machine) -> None:
+async def test_refresh_ohlcv_with_cache(mocker, default_conf, time_machine) -> None:
     start = datetime(2021, 8, 1, 0, 0, 0, 0, tzinfo=timezone.utc)
     ohlcv = generate_test_data_raw('1h', 100, start.strftime('%Y-%m-%d'))
     time_machine.move_to(start, tick=False)
@@ -2395,11 +2395,11 @@ def test_refresh_ohlcv_with_cache(mocker, default_conf, time_machine) -> None:
     }
     ohlcv_mock = mocker.patch(f"{EXMS}.refresh_latest_ohlcv", return_value=ohlcv_data)
     mocker.patch(f"{EXMS}.ohlcv_candle_limit", return_value=100)
-    exchange = get_patched_exchange(mocker, default_conf)
+    exchange = await get_patched_exchange(mocker, default_conf)
 
     assert len(exchange._expiring_candle_cache) == 0
 
-    res = exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
+    res = await exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
     assert ohlcv_mock.call_count == 1
     assert ohlcv_mock.call_args_list[0][0][0] == pairs
     assert len(ohlcv_mock.call_args_list[0][0][0]) == 5
@@ -2409,14 +2409,14 @@ def test_refresh_ohlcv_with_cache(mocker, default_conf, time_machine) -> None:
     assert len(exchange._expiring_candle_cache) == 3
 
     ohlcv_mock.reset_mock()
-    res = exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
+    res = await exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
     assert ohlcv_mock.call_count == 0
 
     # Expire 5m cache
     time_machine.move_to(start + timedelta(minutes=6), tick=False)
 
     ohlcv_mock.reset_mock()
-    res = exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
+    res = await exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
     assert ohlcv_mock.call_count == 1
     assert len(ohlcv_mock.call_args_list[0][0][0]) == 1
 
@@ -2424,7 +2424,7 @@ def test_refresh_ohlcv_with_cache(mocker, default_conf, time_machine) -> None:
     time_machine.move_to(start + timedelta(hours=2), tick=False)
 
     ohlcv_mock.reset_mock()
-    res = exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
+    res = await exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
     assert ohlcv_mock.call_count == 1
     assert len(ohlcv_mock.call_args_list[0][0][0]) == 2
 
@@ -2432,7 +2432,7 @@ def test_refresh_ohlcv_with_cache(mocker, default_conf, time_machine) -> None:
     time_machine.move_to(start + timedelta(days=1, hours=2), tick=False)
 
     ohlcv_mock.reset_mock()
-    res = exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
+    res = await exchange.refresh_ohlcv_with_cache(pairs, start.timestamp())
     assert ohlcv_mock.call_count == 1
     assert len(ohlcv_mock.call_args_list[0][0][0]) == 5
     assert ohlcv_mock.call_args_list[0][0][0] == pairs
