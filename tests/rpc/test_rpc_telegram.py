@@ -2667,7 +2667,7 @@ async def test_telegram_list_custom_data(default_conf_usdt, update, ticker, fee,
         fetch_ticker=ticker,
         get_fee=fee,
     )
-    telegram, _freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf_usdt)
+    telegram, _freqtradebot, msg_mock = await get_telegram_testobject(mocker, default_conf_usdt)
 
     # Create some test data
     create_mock_trades_usdt(fee)

@@ -105,7 +105,7 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
             'funding_fee': ANY, 'ft_order_tag': None,
         }],
     }
-    freqtradebot = await get_patched_freqtradebot(mocker, default_conf)
+    freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     mocker.patch('freqtrade.rpc.telegram.Telegram', MagicMock())
     mocker.patch.multiple(
         EXMS,
@@ -558,7 +558,7 @@ async def test_rpc_balance_handle(default_conf_usdt, mocker, tickers):
     mocker.patch('freqtrade.exchange.binance.Binance.additional_exchange_init')
     default_conf_usdt['dry_run'] = False
     default_conf_usdt['trading_mode'] = 'futures'
-    freqtradebot = await get_patched_freqtradebot(mocker, default_conf_usdt)
+    freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf_usdt)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
     rpc._fiat_converter = CryptoToFiatConverter()
