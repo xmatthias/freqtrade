@@ -1,6 +1,7 @@
 """
 Custom workaround to schedule coroutines with the great schedule package.
 """
+
 from datetime import datetime
 from inspect import iscoroutine, iscoroutinefunction
 
@@ -8,15 +9,13 @@ from schedule import CancelJob, Job, Scheduler
 
 
 class AsyncJob(Job):
-
     async def run(self):
         self.last_run = datetime.now()
         self._schedule_next_run()
         if self._is_overdue(datetime.now()):
             return CancelJob
 
-        if (iscoroutine(self.job_func.func)
-                or iscoroutinefunction(self.job_func.func)):
+        if iscoroutine(self.job_func.func) or iscoroutinefunction(self.job_func.func):
             ret = await self.job_func()
         else:
             ret = self.job_func()
@@ -29,7 +28,6 @@ class AsyncJob(Job):
 
 
 class AsyncScheduler(Scheduler):
-
     async def run_pending(self):
         runnable_jobs = (job for job in self.jobs if job.should_run)
 

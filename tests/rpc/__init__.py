@@ -1,5 +1,3 @@
-
-
 from freqtrade.rpc.rpc import RPC
 
 

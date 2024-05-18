@@ -637,8 +637,7 @@ def load_and_plot_trades(config: Config):
     """
     strategy = StrategyResolver.load_strategy(config)
     loop = asyncio.get_event_loop()
-    exchange = loop.run_until_complete(
-        ExchangeResolver.load_exchange(config))
+    exchange = loop.run_until_complete(ExchangeResolver.load_exchange(config))
     IStrategy.dp = DataProvider(config, exchange, loop)
     loop.run_until_complete(strategy.ft_bot_start())
     strategy_safe_wrapper(strategy.bot_loop_start)(current_time=datetime.now(timezone.utc))
@@ -686,8 +685,7 @@ def plot_profit(config: Config) -> None:
     if "timeframe" not in config:
         raise OperationalException("Timeframe must be set in either config or via --timeframe.")
 
-    exchange = asyncio.get_event_loop().run_until_complete(
-        ExchangeResolver.load_exchange(config))
+    exchange = asyncio.get_event_loop().run_until_complete(ExchangeResolver.load_exchange(config))
     plot_elements = init_plotscript(config, list(exchange.markets))
     trades = plot_elements["trades"]
     # Filter trades to relevant pairs

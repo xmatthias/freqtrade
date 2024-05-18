@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class FtAsyncLock:
-
     def __init__(self):
         self.__lock = Lock()
 
