@@ -1803,7 +1803,7 @@ async def test_get_balances_prod(default_conf, mocker, exchange_name):
 
     api_mock = MagicMock()
     api_mock.fetch_balance = get_mock_coro(
-        return_value={"1ST": balance_item, "2ST": balance_item, "3ST": balance_item}
+        return_value={"1ST": balance_item, "2ND": balance_item, "3RD": balance_item}
     )
     api_mock.fetch_open_orders = get_mock_coro(return_value=[])
     default_conf["dry_run"] = False

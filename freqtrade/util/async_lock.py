@@ -16,11 +16,11 @@ class FtAsyncLock:
         started = time.time()
         while True:
             if self.__lock.acquire(blocking=False):
-                # logger.info("Aquired async compatible Lock")
+                # logger.info("Acquired async compatible Lock")
                 break
             await asyncio.sleep(0.001)
             waited = True
-            # logger.warning("Couldn't aquire lock, waiting")
+            # logger.warning("Couldn't acquire lock, waiting")
         if waited:
             logger.info(f"Waited for async Lock for {time.time() - started:.3f}s")
 

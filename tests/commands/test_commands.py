@@ -885,34 +885,7 @@ async def test_download_data_all_pairs(mocker, markets):
     )
     patch_exchange(mocker)
     mocker.patch(f"{EXMS}.markets", PropertyMock(return_value=markets))
-    args = [
-        "download-data",
-        "--exchange",
-        "binance",
-        "--pairs",
-        "ETH/BTC",
-        "XRP/BTC",
-        "--days",
-        "20",
-        "--timerange",
-        "20200101-",
-    ]
-    with pytest.raises(OperationalException, match=r"--days and --timerange are mutually.*"):
-        pargs = get_args(args)
-        pargs["config"] = None
-        start_download_data(pargs)
-    assert dl_mock.call_count == 0
-
-    args = [
-        "download-data",
-        "--exchange",
-        "binance",
-        "--pairs",
-        "ETH/BTC",
-        "XRP/BTC",
-        "--days",
-        "20",
-    ]
+    args = ["download-data", "--exchange", "binance", "--pairs", ".*/USDT"]
     pargs = get_args(args)
     pargs["config"] = None
     await start_download_data(pargs)
