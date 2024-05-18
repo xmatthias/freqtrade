@@ -1297,6 +1297,13 @@ class FreqtradeBot(LoggingMixin):
                 trade.pair, self.strategy.timeframe
             )
 
+            (enter, exit_, exit_tag) = self.strategy.get_exit_signal(
+                trade.pair,
+                self.strategy.timeframe,
+                analyzed_df,
+                is_short=trade.is_short,
+            )
+
         logger.debug("checking exit")
         exit_rate = await self.exchange.get_rate(
             trade.pair, side="exit", is_short=trade.is_short, refresh=True

@@ -203,7 +203,6 @@ class Binance(Exchange):
                 "Freqtrade only supports isolated futures for leverage trading"
             )
 
-    @retrier_async
     async def load_leverage_tiers(self) -> Dict[str, List[Dict]]:
         if self.trading_mode == TradingMode.FUTURES:
             if self._config["dry_run"]:

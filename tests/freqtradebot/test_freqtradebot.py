@@ -2081,10 +2081,6 @@ async def test_adjust_entry_replace_fail_create_order(
         cancel_order_with_result=cancel_order_mock,
         get_fee=fee,
     )
-    mocker.patch("freqtrade.freqtradebot.sleep")
-    mocker.patch(
-        "freqtrade.freqtradebot.FreqtradeBot.execute_entry", side_effect=DependencyException()
-    )
     mocker.patch("freqtrade.freqtradebot.asyncio.sleep")
     mocker.patch(
         "freqtrade.freqtradebot.FreqtradeBot.execute_entry", side_effect=DependencyException()

@@ -721,6 +721,10 @@ async def test_handle_stoploss_on_exchange_trailing(
             }
         ),
     )
+    mocker.patch(
+        f"{EXMS}.cancel_stoploss_order_with_result",
+        return_value={"id": "so1", "status": "canceled"},
+    )
     assert len(trade.open_sl_orders) == 1
     assert trade.open_sl_orders[-1].order_id == "so1"
 

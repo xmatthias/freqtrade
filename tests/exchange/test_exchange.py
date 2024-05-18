@@ -5335,6 +5335,14 @@ async def test__get_contract_size(mocker, default_conf, pair, expected_size, tra
                 "symbol": "LTC/USD",
                 "contractSize": None,
             },
+            "XLTCUSDT": {
+                "symbol": "XLTCUSDT",
+                "contractSize": "0.01",
+            },
+            "ETH/USDT:USDT": {
+                "symbol": "ETH/USDT:USDT",
+                "contractSize": "10",
+            },
         },
     )
     size = exchange.get_contract_size(pair)
@@ -5604,13 +5612,6 @@ async def test_liquidation_price_is_none(
     is_short,
     trading_mode,
     margin_mode,
-    wallet_balance,
-    mm_ex_1,
-    upnl_ex_1,
-    maintenance_amt,
-    amount,
-    mm_ratio,
-    expected,
 ):
     default_conf["trading_mode"] = trading_mode
     default_conf["margin_mode"] = margin_mode

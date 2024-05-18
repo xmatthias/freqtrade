@@ -65,9 +65,9 @@ async def test_get_balances_prod(default_conf, mocker):
     api_mock.fetch_balance = get_mock_coro(
         return_value={
             "1ST": balance_item.copy(),
-            "2ST": balance_item.copy(),
-            "3ST": balance_item.copy(),
-            "4ST": balance_item.copy(),
+            "2ND": balance_item.copy(),
+            "3RD": balance_item.copy(),
+            "4TH": balance_item.copy(),
             "EUR": balance_item.copy(),
             "timestamp": 123123,
         }
@@ -86,7 +86,7 @@ async def test_get_balances_prod(default_conf, mocker):
         },
         {
             "status": "open",
-            "symbol": "2ST/EUR",
+            "symbol": "2ND/EUR",
             "type": "limit",
             "side": "sell",
             "price": 20.0,
@@ -98,7 +98,7 @@ async def test_get_balances_prod(default_conf, mocker):
         },
         {
             "status": "open",
-            "symbol": "2ST/USD",
+            "symbol": "2ND/USD",
             "type": "limit",
             "side": "sell",
             "price": 20.0,
@@ -110,7 +110,7 @@ async def test_get_balances_prod(default_conf, mocker):
         },
         {
             "status": "open",
-            "symbol": "3ST/EUR",
+            "symbol": "3RD/EUR",
             "type": "limit",
             "side": "buy",
             "price": 0.02,
