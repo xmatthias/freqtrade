@@ -59,7 +59,7 @@ from freqtrade.rpc.rpc_types import (
 from freqtrade.strategy.interface import IStrategy
 from freqtrade.strategy.strategy_wrapper import strategy_safe_wrapper
 from freqtrade.util import FtAsyncLock, MeasureTime
-from freqtrade.util.migrations import migrate_binance_futures_names
+from freqtrade.util.migrations.binance_mig import migrate_binance_futures_names
 from freqtrade.vendor.AsyncSchedule import AsyncScheduler
 from freqtrade.wallets import Wallets
 
@@ -566,7 +566,7 @@ class FreqtradeBot(LoggingMixin):
                         )
                 if prev_trade_amount != trade.amount:
                     # Cancel stoploss on exchange if the amount changed
-                    trade = self.cancel_stoploss_on_exchange(trade)
+                    trade = await self.cancel_stoploss_on_exchange(trade)
             Trade.commit()
 
         except ExchangeError:
