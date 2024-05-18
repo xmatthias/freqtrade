@@ -112,7 +112,11 @@ jobs:
 
     - name: Run Ruff
       run: |
-        ruff check --output-format=github .
+        ruff check --output-format=github
+
+    - name: Run Ruff format check
+      run: |
+        ruff format --check
 
     - name: Mypy
       run: |
@@ -231,7 +235,11 @@ jobs:
 
     - name: Run Ruff
       run: |
-        ruff check --output-format=github .
+        ruff check --output-format=github
+
+    - name: Run Ruff format check
+      run: |
+        ruff format --check
 
     - name: Mypy
       run: |
@@ -301,7 +309,11 @@ jobs:
 
     - name: Run Ruff
       run: |
-        ruff check --output-format=github .
+        ruff check --output-format=github
+
+    - name: Run Ruff format check
+      run: |
+        ruff format --check
 
     - name: Mypy
       run: |

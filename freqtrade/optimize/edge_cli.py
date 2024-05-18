@@ -3,6 +3,7 @@
 """
 This module contains the edge backtesting interface
 """
+
 import asyncio
 import logging
 
@@ -31,8 +32,8 @@ class EdgeCli:
         self.config = config
 
         # Ensure using dry-run
-        self.config['dry_run'] = True
-        self.config['stake_amount'] = constants.UNLIMITED_STAKE_AMOUNT
+        self.config["dry_run"] = True
+        self.config["stake_amount"] = constants.UNLIMITED_STAKE_AMOUNT
 
     async def init_async(self):
         self.exchange = await ExchangeResolver.load_exchange(self.config)
@@ -45,12 +46,13 @@ class EdgeCli:
         # Set refresh_pairs to false for edge-cli (it must be true for edge)
         self.edge._refresh_pairs = False
 
-        self.edge._timerange = TimeRange.parse_timerange(None if self.config.get(
-            'timerange') is None else str(self.config.get('timerange')))
+        self.edge._timerange = TimeRange.parse_timerange(
+            None if self.config.get("timerange") is None else str(self.config.get("timerange"))
+        )
         await self.strategy.ft_bot_start()
 
     async def start(self) -> None:
-        result = await self.edge.calculate(self.config['exchange']['pair_whitelist'])
+        result = await self.edge.calculate(self.config["exchange"]["pair_whitelist"])
         if result:
-            print('')  # blank line for readability
+            print("")  # blank line for readability
             print(generate_edge_table(self.edge._cached_pairs))

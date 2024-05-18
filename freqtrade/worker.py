@@ -1,6 +1,7 @@
 """
 Main Freqtrade worker class.
 """
+
 import asyncio
 import logging
 import time
@@ -39,8 +40,11 @@ class Worker:
 
         self._heartbeat_msg: float = 0
 
-        self._sd_notify = sdnotify.SystemdNotifier() if \
-            self._config.get('internals', {}).get('sd_notify', False) else None
+        self._sd_notify = (
+            sdnotify.SystemdNotifier()
+            if self._config.get("internals", {}).get("sd_notify", False)
+            else None
+        )
 
         # Tell systemd that we completed initialization phase
         self._notify("READY=1")
@@ -61,10 +65,9 @@ class Worker:
         await self.freqtrade.init_bot()
         self._initialized = True
 
-        internals_config = self._config.get('internals', {})
-        self._throttle_secs = internals_config.get('process_throttle_secs',
-                                                   PROCESS_THROTTLE_SECS)
-        self._heartbeat_interval = internals_config.get('heartbeat_interval', 60)
+        internals_config = self._config.get("internals", {})
+        self._throttle_secs = internals_config.get("process_throttle_secs", PROCESS_THROTTLE_SECS)
+        self._heartbeat_interval = internals_config.get("heartbeat_interval", 60)
 
     def _notify(self, message: str) -> None:
         """
@@ -92,12 +95,12 @@ class Worker:
 
         # Log state transition
         if state != old_state:
-
             if old_state != State.RELOAD_CONFIG:
-                self.freqtrade.notify_status(f'{state.name.lower()}')
+                self.freqtrade.notify_status(f"{state.name.lower()}")
 
             logger.info(
-                f"Changing state{f' from {old_state.name}' if old_state else ''} to: {state.name}")
+                f"Changing state{f' from {old_state.name}' if old_state else ''} to: {state.name}"
+            )
             if state == State.RUNNING:
                 await self.freqtrade.startup()
 
@@ -120,26 +123,35 @@ class Worker:
 
             # Use an offset of 1s to ensure a new candle has been issued
             await self._throttle(
-                func=self._process_running, throttle_secs=self._throttle_secs,
-                timeframe=self._config['timeframe'] if self._config else None,
-                timeframe_offset=1)
+                func=self._process_running,
+                throttle_secs=self._throttle_secs,
+                timeframe=self._config["timeframe"] if self._config else None,
+                timeframe_offset=1,
+            )
 
         if self._heartbeat_interval:
             now = time.time()
             if (now - self._heartbeat_msg) > self._heartbeat_interval:
                 version = __version__
                 strategy_version = self.freqtrade.strategy.version()
-                if (strategy_version is not None):
-                    version += ', strategy_version: ' + strategy_version
-                logger.info(f"Bot heartbeat. PID={getpid()}, "
-                            f"version='{version}', state='{state.name}'")
+                if strategy_version is not None:
+                    version += ", strategy_version: " + strategy_version
+                logger.info(
+                    f"Bot heartbeat. PID={getpid()}, version='{version}', state='{state.name}'"
+                )
                 self._heartbeat_msg = now
 
         return state
 
-    async def _throttle(self, func: Callable[..., Any], throttle_secs: float,
-                        timeframe: Optional[str] = None, timeframe_offset: float = 1.0,
-                        *args, **kwargs) -> Any:
+    async def _throttle(
+        self,
+        func: Callable[..., Any],
+        throttle_secs: float,
+        timeframe: Optional[str] = None,
+        timeframe_offset: float = 1.0,
+        *args,
+        **kwargs,
+    ) -> Any:
         """
         Throttles the given callable that it
         takes at least `min_secs` to finish execution.
@@ -167,10 +179,11 @@ class Worker:
         sleep_duration = max(sleep_duration, 0.0)
         # next_iter = datetime.now(timezone.utc) + timedelta(seconds=sleep_duration)
 
-        logger.debug(f"Throttling with '{func.__name__}()': sleep for {sleep_duration:.2f} s, "
-                     f"last iteration took {time_passed:.2f} s."
-                     #  f"next: {next_iter}"
-                     )
+        logger.debug(
+            f"Throttling with '{func.__name__}()': sleep for {sleep_duration:.2f} s, "
+            f"last iteration took {time_passed:.2f} s."
+            #  f"next: {next_iter}"
+        )
         await self._sleep(sleep_duration)
         return result
 
@@ -190,14 +203,13 @@ class Worker:
             time.sleep(RETRY_TIMEOUT)
         except OperationalException:
             tb = traceback.format_exc()
-            hint = 'Issue `/start` if you think it is safe to restart.'
+            hint = "Issue `/start` if you think it is safe to restart."
 
             self.freqtrade.notify_status(
-                f'*OperationalException:*\n```\n{tb}```\n {hint}',
-                msg_type=RPCMessageType.EXCEPTION
+                f"*OperationalException:*\n```\n{tb}```\n {hint}", msg_type=RPCMessageType.EXCEPTION
             )
 
-            logger.exception('OperationalException. Stopping trader ...')
+            logger.exception("OperationalException. Stopping trader ...")
             self.freqtrade.state = State.STOPPED
 
     async def _reconfigure(self) -> None:
@@ -214,7 +226,7 @@ class Worker:
         # Load and validate config and create new instance of the bot
         await self.init_worker(True)
 
-        self.freqtrade.notify_status('config reloaded')
+        self.freqtrade.notify_status("config reloaded")
 
         # Tell systemd that we completed reconfiguration
         self._notify("READY=1")
@@ -224,5 +236,5 @@ class Worker:
         self._notify("STOPPING=1")
 
         if self._initialized:
-            self.freqtrade.notify_status('process died')
+            self.freqtrade.notify_status("process died")
             await self.freqtrade.cleanup()

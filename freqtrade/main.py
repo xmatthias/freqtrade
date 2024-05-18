@@ -3,6 +3,7 @@
 Main Freqtrade bot script.
 Read the documentation to know what cli arguments you need.
 """
+
 import asyncio
 import logging
 import sys
@@ -21,7 +22,7 @@ from freqtrade.loggers import setup_logging_pre
 from freqtrade.util.gc_setup import gc_set_threshold
 
 
-logger = logging.getLogger('freqtrade')
+logger = logging.getLogger("freqtrade")
 
 
 def main(sysargv: Optional[List[str]] = None) -> None:
@@ -37,10 +38,10 @@ def main(sysargv: Optional[List[str]] = None) -> None:
         args = arguments.get_parsed_arg()
 
         # Call subcommand.
-        if 'func' in args:
-            logger.info(f'freqtrade {__version__}')
+        if "func" in args:
+            logger.info(f"freqtrade {__version__}")
             gc_set_threshold()
-            func = args['func']
+            func = args["func"]
             if asyncio.iscoroutinefunction(func):
                 asyncio.run(func(args))
             else:
@@ -59,19 +60,21 @@ def main(sysargv: Optional[List[str]] = None) -> None:
     except SystemExit as e:  # pragma: no cover
         return_code = e
     except KeyboardInterrupt:
-        logger.info('SIGINT received, aborting ...')
+        logger.info("SIGINT received, aborting ...")
         return_code = 0
     except ConfigurationError as e:
-        logger.error(f"Configuration error: {e}\n"
-                     f"Please make sure to review the documentation at {DOCS_LINK}.")
+        logger.error(
+            f"Configuration error: {e}\n"
+            f"Please make sure to review the documentation at {DOCS_LINK}."
+        )
     except FreqtradeException as e:
         logger.error(str(e))
         return_code = 2
     except Exception:
-        logger.exception('Fatal exception!')
+        logger.exception("Fatal exception!")
     finally:
         sys.exit(return_code)
 
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == "__main__":  # pragma: no cover
     main()
