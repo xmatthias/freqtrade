@@ -313,7 +313,7 @@ async def test_refresh(mocker, default_conf):
     refresh_mock.reset_mock()
     refresh_mock.reset_mock()
     default_conf["exchange"]["use_public_trades"] = True
-    dp.refresh(pairs, pairs_non_trad)
+    await dp.refresh(pairs, pairs_non_trad)
     assert mock_refresh_trades.call_count == 1
     assert refresh_mock.call_count == 1
 

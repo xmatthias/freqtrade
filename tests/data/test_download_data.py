@@ -76,7 +76,7 @@ async def test_download_data_main_trades(mocker):
             "convert_trades": True,
         }
     )
-    download_data_main(config)
+    await download_data_main(config)
 
     assert dl_mock.call_args[1]["timerange"].starttype == "date"
     assert dl_mock.call_count == 1
@@ -85,8 +85,7 @@ async def test_download_data_main_trades(mocker):
     # Exchange that doesn't support historic downloads
     config["exchange"]["name"] = "bybit"
     with pytest.raises(OperationalException, match=r"Trade history not available for .*"):
-        config
-        download_data_main(config)
+        await download_data_main(config)
 
 
 async def test_download_data_main_data_invalid(mocker):
