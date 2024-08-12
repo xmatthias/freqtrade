@@ -154,19 +154,25 @@ async def async_ccxt_exception(
     with patch("freqtrade.exchange.common.asyncio.sleep", get_mock_coro(None)):
         with pytest.raises(DDosProtection):
             api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.DDoSProtection("Dooh"))
-            exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
+            exchange = await get_patched_exchange(
+                mocker, default_conf, api_mock, exchange=exchange_name
+            )
             await getattr(exchange, fun)(**kwargs)
         assert api_mock.__dict__[mock_ccxt_fun].call_count == retries
 
     with pytest.raises(TemporaryError):
         api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.NetworkError("DeadBeef"))
-        exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
+        exchange = await get_patched_exchange(
+            mocker, default_conf, api_mock, exchange=exchange_name
+        )
         await getattr(exchange, fun)(**kwargs)
     assert api_mock.__dict__[mock_ccxt_fun].call_count == retries
 
     with pytest.raises(OperationalException):
         api_mock.__dict__[mock_ccxt_fun] = MagicMock(side_effect=ccxt.BaseError("DeadBeef"))
-        exchange = await get_patched_exchange(mocker, default_conf, api_mock, id=exchange_name)
+        exchange = await get_patched_exchange(
+            mocker, default_conf, api_mock, exchange=exchange_name
+        )
         await getattr(exchange, fun)(**kwargs)
     assert api_mock.__dict__[mock_ccxt_fun].call_count == 1
 
@@ -1220,7 +1226,7 @@ async def test_exchange_has(default_conf, mocker):
 @pytest.mark.parametrize("exchange_name", EXCHANGES)
 async def test_create_dry_run_order(default_conf, mocker, side, exchange_name, leverage):
     default_conf["dry_run"] = True
-    exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
+    exchange = await get_patched_exchange(mocker, default_conf, exchange=exchange_name)
 
     order = await exchange.create_dry_run_order(
         pair="ETH/BTC", ordertype="limit", side=side, amount=1, rate=200, leverage=leverage
@@ -1314,7 +1320,7 @@ async def test_create_dry_run_order_limit_fill(
     leverage,
 ):
     default_conf["dry_run"] = True
-    exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
+    exchange = await get_patched_exchange(mocker, default_conf, exchange=exchange_name)
     mocker.patch.multiple(
         EXMS,
         exchange_has=MagicMock(return_value=True),
@@ -1385,7 +1391,7 @@ async def test_create_dry_run_order_market_fill(
     default_conf, mocker, side, rate, amount, endprice, exchange_name, order_book_l2_usd, leverage
 ):
     default_conf["dry_run"] = True
-    exchange = await get_patched_exchange(mocker, default_conf, id=exchange_name)
+    exchange = await get_patched_exchange(mocker, default_conf, exchange=exchange_name)
     mocker.patch.multiple(
         EXMS,
         exchange_has=MagicMock(return_value=True),

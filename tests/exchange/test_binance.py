@@ -558,11 +558,9 @@ async def test__set_leverage_binance(mocker, default_conf):
     default_conf["dry_run"] = False
     default_conf["trading_mode"] = TradingMode.FUTURES
     default_conf["margin_mode"] = MarginMode.ISOLATED
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="binance")
-    await exchange._set_leverage(3.2, "BTC/USDT:USDT")
-
     exchange = await get_patched_exchange(mocker, default_conf, api_mock, exchange="binance")
     await exchange._set_leverage(3.2, "BTC/USDT:USDT")
+
     assert api_mock.set_leverage.call_count == 1
     # Leverage is rounded to 3.
     assert api_mock.set_leverage.call_args_list[0][1]["leverage"] == 3
