@@ -12,6 +12,7 @@ from freqtrade.plugins.pairlistmanager import PairListManager
 from tests.conftest import (
     EXMS,
     generate_test_data_raw,
+    get_mock_coro,
     get_patched_exchange,
     get_patched_freqtradebot,
 )
@@ -30,7 +31,7 @@ def rpl_config(default_conf):
     return default_conf
 
 
-def test_volume_change_pair_list_init_exchange_support(mocker, rpl_config):
+async def test_volume_change_pair_list_init_exchange_support(mocker, rpl_config):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -47,10 +48,10 @@ def test_volume_change_pair_list_init_exchange_support(mocker, rpl_config):
         r"Please edit your config and either remove PercentChangePairList, "
         r"or switch to using candles. and restart the bot.",
     ):
-        get_patched_freqtradebot(mocker, rpl_config)
+        await get_patched_freqtradebot(mocker, rpl_config)
 
 
-def test_volume_change_pair_list_init_wrong_refresh_period(mocker, rpl_config):
+async def test_volume_change_pair_list_init_wrong_refresh_period(mocker, rpl_config):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -68,10 +69,10 @@ def test_volume_change_pair_list_init_wrong_refresh_period(mocker, rpl_config):
         r"timeframe of 1d. Please adjust refresh_period "
         r"to at least 86400 and restart the bot.",
     ):
-        get_patched_freqtradebot(mocker, rpl_config)
+        await get_patched_freqtradebot(mocker, rpl_config)
 
 
-def test_volume_change_pair_list_init_wrong_lookback_period(mocker, rpl_config):
+async def test_volume_change_pair_list_init_wrong_lookback_period(mocker, rpl_config):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -91,7 +92,7 @@ def test_volume_change_pair_list_init_wrong_lookback_period(mocker, rpl_config):
         r"Please set lookback_days only or lookback_period "
         r"and lookback_timeframe and restart the bot.",
     ):
-        get_patched_freqtradebot(mocker, rpl_config)
+        await get_patched_freqtradebot(mocker, rpl_config)
 
     rpl_config["pairlists"] = [
         {
@@ -109,10 +110,10 @@ def test_volume_change_pair_list_init_wrong_lookback_period(mocker, rpl_config):
         match=r"ChangeFilter requires lookback_period to not exceed"
         r" exchange max request size \(1000\)",
     ):
-        get_patched_freqtradebot(mocker, rpl_config)
+        await get_patched_freqtradebot(mocker, rpl_config)
 
 
-def test_volume_change_pair_list_init_wrong_config(mocker, rpl_config):
+async def test_volume_change_pair_list_init_wrong_config(mocker, rpl_config):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -127,10 +128,12 @@ def test_volume_change_pair_list_init_wrong_config(mocker, rpl_config):
         match=r"`number_assets` not specified. Please check your configuration "
         r'for "pairlist.config.number_assets"',
     ):
-        get_patched_freqtradebot(mocker, rpl_config)
+        await get_patched_freqtradebot(mocker, rpl_config)
 
 
-def test_gen_pairlist_with_valid_change_pair_list_config(mocker, rpl_config, tickers, time_machine):
+async def test_gen_pairlist_with_valid_change_pair_list_config(
+    mocker, rpl_config, tickers, time_machine
+):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -197,22 +200,22 @@ def test_gen_pairlist_with_valid_change_pair_list_config(mocker, rpl_config, tic
         ),
     }
 
-    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", MagicMock(return_value=mock_ohlcv_data))
+    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", get_mock_coro(return_value=mock_ohlcv_data))
 
-    exchange = get_patched_exchange(mocker, rpl_config, exchange="binance")
+    exchange = await get_patched_exchange(mocker, rpl_config, exchange="binance")
     pairlistmanager = PairListManager(exchange, rpl_config)
 
     remote_pairlist = PercentChangePairList(
         exchange, pairlistmanager, rpl_config, rpl_config["pairlists"][0], 0
     )
 
-    result = remote_pairlist.gen_pairlist(tickers)
+    result = await remote_pairlist.gen_pairlist(await tickers())
 
     assert len(result) == 2
     assert result == ["NEO/USDT", "TKN/USDT"]
 
 
-def test_filter_pairlist_with_empty_ticker(mocker, rpl_config, tickers, time_machine):
+async def test_filter_pairlist_with_empty_ticker(mocker, rpl_config, tickers, time_machine):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -264,21 +267,21 @@ def test_filter_pairlist_with_empty_ticker(mocker, rpl_config, tickers, time_mac
         ),
     }
 
-    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", MagicMock(return_value=mock_ohlcv_data))
-    exchange = get_patched_exchange(mocker, rpl_config, exchange="binance")
+    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", get_mock_coro(return_value=mock_ohlcv_data))
+    exchange = await get_patched_exchange(mocker, rpl_config, exchange="binance")
     pairlistmanager = PairListManager(exchange, rpl_config)
 
     remote_pairlist = PercentChangePairList(
         exchange, pairlistmanager, rpl_config, rpl_config["pairlists"][0], 0
     )
 
-    result = remote_pairlist.filter_pairlist(rpl_config["exchange"]["pair_whitelist"], {})
+    result = await remote_pairlist.filter_pairlist(rpl_config["exchange"]["pair_whitelist"], {})
 
     assert len(result) == 2
     assert result == ["XRP/USDT", "ETH/USDT"]
 
 
-def test_filter_pairlist_with_max_value_set(mocker, rpl_config, tickers, time_machine):
+async def test_filter_pairlist_with_max_value_set(mocker, rpl_config, tickers, time_machine):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -331,21 +334,21 @@ def test_filter_pairlist_with_max_value_set(mocker, rpl_config, tickers, time_ma
         ),
     }
 
-    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", MagicMock(return_value=mock_ohlcv_data))
-    exchange = get_patched_exchange(mocker, rpl_config, exchange="binance")
+    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", get_mock_coro(return_value=mock_ohlcv_data))
+    exchange = await get_patched_exchange(mocker, rpl_config, exchange="binance")
     pairlistmanager = PairListManager(exchange, rpl_config)
 
     remote_pairlist = PercentChangePairList(
         exchange, pairlistmanager, rpl_config, rpl_config["pairlists"][0], 0
     )
 
-    result = remote_pairlist.filter_pairlist(rpl_config["exchange"]["pair_whitelist"], {})
+    result = await remote_pairlist.filter_pairlist(rpl_config["exchange"]["pair_whitelist"], {})
 
     assert len(result) == 1
     assert result == ["ETH/USDT"]
 
 
-def test_gen_pairlist_from_tickers(mocker, rpl_config, tickers):
+async def test_gen_pairlist_from_tickers(mocker, rpl_config, tickers):
     rpl_config["pairlists"] = [
         {
             "method": "PercentChangePairList",
@@ -357,14 +360,14 @@ def test_gen_pairlist_from_tickers(mocker, rpl_config, tickers):
 
     mocker.patch(f"{EXMS}.exchange_has", MagicMock(return_value=True))
 
-    exchange = get_patched_exchange(mocker, rpl_config, exchange="binance")
+    exchange = await get_patched_exchange(mocker, rpl_config, exchange="binance")
     pairlistmanager = PairListManager(exchange, rpl_config)
 
     remote_pairlist = PercentChangePairList(
         exchange, pairlistmanager, rpl_config, rpl_config["pairlists"][0], 0
     )
 
-    result = remote_pairlist.gen_pairlist(tickers.return_value)
+    result = await remote_pairlist.gen_pairlist(await tickers())
 
     assert len(result) == 1
     assert result == ["ETH/USDT"]

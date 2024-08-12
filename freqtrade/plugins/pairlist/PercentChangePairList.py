@@ -163,7 +163,7 @@ class PercentChangePairList(IPairList):
             },
         }
 
-    def gen_pairlist(self, tickers: Tickers) -> List[str]:
+    async def gen_pairlist(self, tickers: Tickers) -> List[str]:
         """
         Generate the pairlist
         :param tickers: Tickers (from exchange.get_tickers). May be cached.
@@ -199,12 +199,12 @@ class PercentChangePairList(IPairList):
             else:
                 pairlist = _pairlist
 
-            pairlist = self.filter_pairlist(pairlist, tickers)
+            pairlist = await self.filter_pairlist(pairlist, tickers)
             self._pair_cache["pairlist"] = pairlist.copy()
 
         return pairlist
 
-    def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
+    async def filter_pairlist(self, pairlist: List[str], tickers: Dict) -> List[str]:
         """
         Filters and sorts pairlist and returns the whitelist again.
         Called on each bot iteration - please use internal caching if necessary
@@ -215,7 +215,7 @@ class PercentChangePairList(IPairList):
         filtered_tickers: List[Dict[str, Any]] = [{"symbol": k} for k in pairlist]
         if self._use_range:
             # calculating using lookback_period
-            self.fetch_percent_change_from_lookback_period(filtered_tickers)
+            await self.fetch_percent_change_from_lookback_period(filtered_tickers)
         else:
             # Fetching 24h change by default from supported exchange tickers
             self.fetch_percent_change_from_tickers(filtered_tickers, tickers)
@@ -239,7 +239,7 @@ class PercentChangePairList(IPairList):
 
         return pairs
 
-    def fetch_candles_for_lookback_period(
+    async def fetch_candles_for_lookback_period(
         self, filtered_tickers: List[Dict[str, str]]
     ) -> Dict[PairWithTimeframe, DataFrame]:
         since_ms = (
@@ -274,12 +274,14 @@ class PercentChangePairList(IPairList):
             for p in [s["symbol"] for s in filtered_tickers]
             if p not in self._pair_cache
         ]
-        candles = self._exchange.refresh_ohlcv_with_cache(needed_pairs, since_ms)
+        candles = await self._exchange.refresh_ohlcv_with_cache(needed_pairs, since_ms)
         return candles
 
-    def fetch_percent_change_from_lookback_period(self, filtered_tickers: List[Dict[str, Any]]):
+    async def fetch_percent_change_from_lookback_period(
+        self, filtered_tickers: List[Dict[str, Any]]
+    ):
         # get lookback period in ms, for exchange ohlcv fetch
-        candles = self.fetch_candles_for_lookback_period(filtered_tickers)
+        candles = await self.fetch_candles_for_lookback_period(filtered_tickers)
 
         for i, p in enumerate(filtered_tickers):
             pair_candles = (

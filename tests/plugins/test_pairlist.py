@@ -2422,7 +2422,7 @@ def test_MarketCapPairList_exceptions(mocker, default_conf_usdt):
         ),
     ],
 )
-def test_backtesting_modes(
+async def test_backtesting_modes(
     mocker, default_conf_usdt, pairlists, expected_error, expected_warning, caplog, markets, tickers
 ):
     default_conf_usdt["runmode"] = "dry_run"
@@ -2434,7 +2434,7 @@ def test_backtesting_modes(
         exchange_has=MagicMock(return_value=True),
         get_tickers=tickers,
     )
-    exchange = get_patched_exchange(mocker, default_conf_usdt)
+    exchange = await get_patched_exchange(mocker, default_conf_usdt)
 
     # Dry run mode - works always
     PairListManager(exchange, default_conf_usdt)

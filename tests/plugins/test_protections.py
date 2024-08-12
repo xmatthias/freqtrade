@@ -425,14 +425,14 @@ async def test_CooldownPeriod(mocker, default_conf, fee, caplog):
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_CooldownPeriod_unlock_at(mocker, default_conf, fee, caplog, time_machine):
+async def test_CooldownPeriod_unlock_at(mocker, default_conf, fee, caplog, time_machine):
     default_conf["protections"] = [
         {
             "method": "CooldownPeriod",
             "unlock_at": "05:00",
         }
     ]
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
+    freqtrade = await get_patched_freqtradebot(mocker, default_conf)
     message = r"Trading stopped due to .*"
     assert not freqtrade.protections.global_stop()
     assert not freqtrade.protections.stop_per_pair("XRP/BTC")
