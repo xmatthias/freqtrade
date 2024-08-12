@@ -251,7 +251,7 @@ def patch_exchange(
     mocker.patch("freqtrade.exchange.bybit.Bybit.additional_exchange_init")
 
     if mock_markets:
-        mocker.patch(f"{EXMS}.load_markets", get_mock_coro())
+        mocker.patch(f"{EXMS}.reload_markets", get_mock_coro())
         if isinstance(mock_markets, bool):
             mock_markets = get_markets()
         mocker.patch(f"{EXMS}.markets", PropertyMock(return_value=mock_markets))

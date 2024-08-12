@@ -266,7 +266,7 @@ class Exchange:
         logger.info(f'Using Exchange "{self.name}"')
         if load_markets:
             # Initial markets load
-            await self.load_markets()
+            await self.reload_markets()
 
         self.required_candle_call_count = 1
         if validate:
@@ -602,14 +602,6 @@ class Exchange:
         if self._exchange_ws:
             self._exchange_ws.reset_connections()
 
-    async def load_markets(self, reload: bool = False) -> None:
-        """Initialize markets"""
-        try:
-            self._markets = await self._api_async.load_markets(reload=reload)
-
-        except (asyncio.TimeoutError, ccxt.BaseError) as e:
-            logger.exception("Unable to initialize markets. Reason: %s", e)
-
     async def reload_markets(
         self, force: bool = False, *, load_leverage_tiers: bool = True
     ) -> None:
@@ -625,7 +617,7 @@ class Exchange:
         logger.debug("Performing scheduled market reload..")
         try:
             # Reload async markets, then assign them to sync api
-            await self.load_markets(reload=True)
+            self._markets = await self._api_async.load_markets(reload=True)
             self._api.set_markets(self._api_async.markets, self._api_async.currencies)
             # Assign options array, as it contains some temporary information from the exchange.
             self._api.options = self._api_async.options
