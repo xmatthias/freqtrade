@@ -19,7 +19,7 @@ async def test_import_kraken_trades_from_csv(
 
     default_conf_usdt["exchange"]["name"] = "kraken"
 
-    patch_exchange(mocker, id="kraken")
+    patch_exchange(mocker, exchange="kraken")
     mocker.patch(
         f"{EXMS}.markets",
         PropertyMock(

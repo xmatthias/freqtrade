@@ -5,15 +5,15 @@ Minimum age (days listed) pair list filter
 import logging
 from copy import deepcopy
 from datetime import timedelta
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from pandas import DataFrame
 
-from freqtrade.constants import Config, ListPairsWithTimeframes
+from freqtrade.constants import ListPairsWithTimeframes
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange.types import Tickers
 from freqtrade.misc import plural
-from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter
+from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
 from freqtrade.util import PeriodicCache, dt_floor_day, dt_now, dt_ts
 
 
@@ -21,24 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 class AgeFilter(IPairList):
-    def __init__(
-        self,
-        exchange,
-        pairlistmanager,
-        config: Config,
-        pairlistconfig: Dict[str, Any],
-        pairlist_pos: int,
-    ) -> None:
-        super().__init__(exchange, pairlistmanager, config, pairlistconfig, pairlist_pos)
+    supports_backtesting = SupportsBacktesting.NO
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         # Checked symbols cache (dictionary of ticker symbol => timestamp)
         self._symbolsChecked: Dict[str, int] = {}
         self._symbolsCheckFailed = PeriodicCache(maxsize=1000, ttl=86_400)
 
-        self._min_days_listed = pairlistconfig.get("min_days_listed", 10)
-        self._max_days_listed = pairlistconfig.get("max_days_listed")
+        self._min_days_listed = self._pairlistconfig.get("min_days_listed", 10)
+        self._max_days_listed = self._pairlistconfig.get("max_days_listed")
 
-        candle_limit = exchange.ohlcv_candle_limit("1d", self._config["candle_type_def"])
+        candle_limit = self._exchange.ohlcv_candle_limit("1d", self._config["candle_type_def"])
         if self._min_days_listed < 1:
             raise OperationalException("AgeFilter requires min_days_listed to be >= 1")
         if self._min_days_listed > candle_limit:

@@ -228,7 +228,7 @@ async def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
 
 async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
     mocker.patch.multiple(
-        "freqtrade.rpc.fiat_convert.CoinGeckoAPI",
+        "freqtrade.rpc.fiat_convert.FtCoinGeckoApi",
         get_price=MagicMock(return_value={"bitcoin": {"usd": 15000.0}}),
     )
     mocker.patch("freqtrade.rpc.rpc.CryptoToFiatConverter._find_price", return_value=15000.0)
@@ -269,7 +269,7 @@ async def test_rpc_status_table(default_conf, ticker, fee, mocker) -> None:
     assert "-0.00" == f"{fiat_profit_sum:.2f}"
 
     # Test with fiat convert
-    rpc._fiat_converter = CryptoToFiatConverter()
+    rpc._fiat_converter = CryptoToFiatConverter({})
     result, headers, fiat_profit_sum = rpc._rpc_status_table(default_conf["stake_currency"], "USD")
     assert "Since" in headers
     assert "Pair" in headers
@@ -315,7 +315,7 @@ async def test__rpc_timeunit_profit(
     fiat_display_currency = default_conf_usdt["fiat_display_currency"]
 
     rpc = RPC(freqtradebot)
-    rpc._fiat_converter = CryptoToFiatConverter()
+    rpc._fiat_converter = CryptoToFiatConverter({})
 
     # Try valid data
     days = rpc._rpc_timeunit_profit(7, stake_currency, fiat_display_currency)
@@ -347,7 +347,7 @@ async def test_rpc_trade_history(mocker, default_conf, markets, fee, is_short):
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     create_mock_trades(fee, is_short)
     rpc = RPC(freqtradebot)
-    rpc._fiat_converter = CryptoToFiatConverter()
+    rpc._fiat_converter = CryptoToFiatConverter({})
     trades = rpc._rpc_trade_history(2)
     assert len(trades["trades"]) == 2
     assert trades["trades_count"] == 2
@@ -439,7 +439,7 @@ async def test_rpc_trade_statistics(default_conf_usdt, ticker, fee, mocker) -> N
     fiat_display_currency = default_conf_usdt["fiat_display_currency"]
 
     rpc = RPC(freqtradebot)
-    rpc._fiat_converter = CryptoToFiatConverter()
+    rpc._fiat_converter = CryptoToFiatConverter({})
 
     res = rpc._rpc_trade_statistics(stake_currency, fiat_display_currency)
     assert res["trade_count"] == 0
@@ -501,7 +501,7 @@ async def test_rpc_balance_handle_error(default_conf, mocker):
     # ETH will be skipped due to mocked Error below
 
     mocker.patch.multiple(
-        "freqtrade.rpc.fiat_convert.CoinGeckoAPI",
+        "freqtrade.rpc.fiat_convert.FtCoinGeckoApi",
         get_price=MagicMock(return_value={"bitcoin": {"usd": 15000.0}}),
     )
     mocker.patch("freqtrade.rpc.rpc.CryptoToFiatConverter._find_price", return_value=15000.0)
@@ -515,7 +515,7 @@ async def test_rpc_balance_handle_error(default_conf, mocker):
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
-    rpc._fiat_converter = CryptoToFiatConverter()
+    rpc._fiat_converter = CryptoToFiatConverter({})
     with pytest.raises(RPCException, match="Error getting current tickers."):
         await rpc._rpc_balance(
             default_conf["stake_currency"], default_conf["fiat_display_currency"]
@@ -566,7 +566,7 @@ async def test_rpc_balance_handle(default_conf_usdt, mocker, tickers):
     ]
 
     mocker.patch.multiple(
-        "freqtrade.rpc.fiat_convert.CoinGeckoAPI",
+        "freqtrade.rpc.fiat_convert.FtCoinGeckoApi",
         get_price=MagicMock(return_value={"bitcoin": {"usd": 1.2}}),
     )
     mocker.patch("freqtrade.rpc.rpc.CryptoToFiatConverter._find_price", return_value=1.2)
@@ -588,7 +588,7 @@ async def test_rpc_balance_handle(default_conf_usdt, mocker, tickers):
     freqtradebot = await get_patched_freqtradebot_thread(mocker, default_conf_usdt)
     patch_get_signal(freqtradebot)
     rpc = RPC(freqtradebot)
-    rpc._fiat_converter = CryptoToFiatConverter()
+    rpc._fiat_converter = CryptoToFiatConverter({})
 
     result = rpc._rpc_balance(
         default_conf_usdt["stake_currency"], default_conf_usdt["fiat_display_currency"]

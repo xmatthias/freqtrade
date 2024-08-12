@@ -47,7 +47,7 @@ def generate_result_metrics():
         "profit_total_abs": 0.001,
         "profit_total": 0.01,
         "holding_avg": timedelta(minutes=20),
-        "max_drawdown": 0.001,
+        "max_drawdown_account": 0.001,
         "max_drawdown_abs": 0.001,
         "loss": 0.001,
         "is_initial_point": 0.001,
@@ -291,9 +291,10 @@ def test_log_results_if_loss_improves(hyperopt, capsys) -> None:
             "is_best": True,
         }
     )
+    hyperopt._hyper_out.print()
     out, _err = capsys.readouterr()
     assert all(
-        x in out for x in ["Best", "2/2", " 1", "0.10%", "0.00100000 BTC    (1.00%)", "00:20:00"]
+        x in out for x in ["Best", "2/2", "1", "0.10%", "0.00100000 BTC    (1.00%)", "0:20:00"]
     )
 
 
@@ -415,10 +416,10 @@ def test_hyperopt_format_results(hyperopt):
                 "is_short": [False, False, False, False],
                 "stake_amount": [0.01, 0.01, 0.01, 0.01],
                 "exit_reason": [
-                    ExitType.ROI,
-                    ExitType.STOP_LOSS,
-                    ExitType.ROI,
-                    ExitType.FORCE_EXIT,
+                    ExitType.ROI.value,
+                    ExitType.STOP_LOSS.value,
+                    ExitType.ROI.value,
+                    ExitType.FORCE_EXIT.value,
                 ],
             }
         ),
@@ -507,10 +508,10 @@ def test_generate_optimizer(mocker, hyperopt_conf) -> None:
                 "is_short": [False, False, False, False],
                 "stake_amount": [0.01, 0.01, 0.01, 0.01],
                 "exit_reason": [
-                    ExitType.ROI,
-                    ExitType.STOP_LOSS,
-                    ExitType.ROI,
-                    ExitType.FORCE_EXIT,
+                    ExitType.ROI.value,
+                    ExitType.STOP_LOSS.value,
+                    ExitType.ROI.value,
+                    ExitType.FORCE_EXIT.value,
                 ],
             }
         ),

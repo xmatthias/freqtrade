@@ -26,8 +26,7 @@ from freqtrade.enums import CandleType, TradingMode
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange import Exchange
 from freqtrade.plugins.pairlist.pairlist_helpers import dynamic_expand_pairlist
-from freqtrade.util import dt_ts, format_ms_time
-from freqtrade.util.datetime_helpers import dt_now
+from freqtrade.util import dt_now, dt_ts, format_ms_time, get_progress_tracker
 from freqtrade.util.migrations import migrate_data
 
 
@@ -155,11 +154,9 @@ async def refresh_data(
     :param candle_type: Any of the enum CandleType (must match trading mode!)
     """
     data_handler = get_datahandler(datadir, data_format)
-    for idx, pair in enumerate(pairs):
-        process = f"{idx}/{len(pairs)}"
+    for pair in pairs:
         await _download_pair_history(
             pair=pair,
-            process=process,
             timeframe=timeframe,
             datadir=datadir,
             timerange=timerange,
@@ -223,7 +220,6 @@ async def _download_pair_history(
     datadir: Path,
     exchange: Exchange,
     timeframe: str = "5m",
-    process: str = "",
     new_pairs_days: int = 30,
     data_handler: Optional[IDataHandler] = None,
     timerange: Optional[TimeRange] = None,
@@ -261,7 +257,7 @@ async def _download_pair_history(
         )
 
         logger.info(
-            f'({process}) - Download history data for "{pair}", {timeframe}, '
+            f'Download history data for "{pair}", {timeframe}, '
             f"{candle_type} and store in {datadir}. "
             f'From {format_ms_time(since_ms) if since_ms else "start"} to '
             f'{format_ms_time(until_ms) if until_ms else "now"}'
@@ -343,53 +339,65 @@ async def refresh_backtest_ohlcv_data(
     pairs_not_available = []
     data_handler = get_datahandler(datadir, data_format)
     candle_type = CandleType.get_default(trading_mode)
-    process = ""
-    for idx, pair in enumerate(pairs, start=1):
-        if pair not in exchange.markets:
-            pairs_not_available.append(pair)
-            logger.info(f"Skipping pair {pair}...")
-            continue
-        for timeframe in timeframes:
-            logger.debug(f"Downloading pair {pair}, {candle_type}, interval {timeframe}.")
-            process = f"{idx}/{len(pairs)}"
-            await _download_pair_history(
-                pair=pair,
-                process=process,
-                datadir=datadir,
-                exchange=exchange,
-                timerange=timerange,
-                data_handler=data_handler,
-                timeframe=str(timeframe),
-                new_pairs_days=new_pairs_days,
-                candle_type=candle_type,
-                erase=erase,
-                prepend=prepend,
-            )
-        if trading_mode == "futures":
-            # Predefined candletype (and timeframe) depending on exchange
-            # Downloads what is necessary to backtest based on futures data.
-            tf_mark = exchange.get_option("mark_ohlcv_timeframe")
-            tf_funding_rate = exchange.get_option("funding_fee_timeframe")
+    with get_progress_tracker() as progress:
+        tf_length = len(timeframes) if trading_mode != "futures" else len(timeframes) + 2
+        timeframe_task = progress.add_task("Timeframe", total=tf_length)
+        pair_task = progress.add_task("Downloading data...", total=len(pairs))
 
-            fr_candle_type = CandleType.from_string(exchange.get_option("mark_ohlcv_price"))
-            # All exchanges need FundingRate for futures trading.
-            # The timeframe is aligned to the mark-price timeframe.
-            combs = ((CandleType.FUNDING_RATE, tf_funding_rate), (fr_candle_type, tf_mark))
-            for candle_type_f, tf in combs:
-                logger.debug(f"Downloading pair {pair}, {candle_type_f}, interval {tf}.")
+        for pair in pairs:
+            progress.update(pair_task, description=f"Downloading {pair}")
+            progress.update(timeframe_task, completed=0)
+
+            if pair not in exchange.markets:
+                pairs_not_available.append(pair)
+                logger.info(f"Skipping pair {pair}...")
+                continue
+            for timeframe in timeframes:
+                progress.update(timeframe_task, description=f"Timeframe {timeframe}")
+                logger.debug(f"Downloading pair {pair}, {candle_type}, interval {timeframe}.")
                 await _download_pair_history(
                     pair=pair,
-                    process=process,
                     datadir=datadir,
                     exchange=exchange,
                     timerange=timerange,
                     data_handler=data_handler,
-                    timeframe=str(tf),
+                    timeframe=str(timeframe),
                     new_pairs_days=new_pairs_days,
-                    candle_type=candle_type_f,
+                    candle_type=candle_type,
                     erase=erase,
                     prepend=prepend,
                 )
+                progress.update(timeframe_task, advance=1)
+            if trading_mode == "futures":
+                # Predefined candletype (and timeframe) depending on exchange
+                # Downloads what is necessary to backtest based on futures data.
+                tf_mark = exchange.get_option("mark_ohlcv_timeframe")
+                tf_funding_rate = exchange.get_option("funding_fee_timeframe")
+
+                fr_candle_type = CandleType.from_string(exchange.get_option("mark_ohlcv_price"))
+                # All exchanges need FundingRate for futures trading.
+                # The timeframe is aligned to the mark-price timeframe.
+                combs = ((CandleType.FUNDING_RATE, tf_funding_rate), (fr_candle_type, tf_mark))
+                for candle_type_f, tf in combs:
+                    logger.debug(f"Downloading pair {pair}, {candle_type_f}, interval {tf}.")
+                    await _download_pair_history(
+                        pair=pair,
+                        datadir=datadir,
+                        exchange=exchange,
+                        timerange=timerange,
+                        data_handler=data_handler,
+                        timeframe=str(tf),
+                        new_pairs_days=new_pairs_days,
+                        candle_type=candle_type_f,
+                        erase=erase,
+                        prepend=prepend,
+                    )
+                    progress.update(
+                        timeframe_task, advance=1, description=f"Timeframe {candle_type_f}, {tf}"
+                    )
+
+            progress.update(pair_task, advance=1)
+            progress.update(timeframe_task, description="Timeframe")
 
     return pairs_not_available
 
@@ -478,7 +486,7 @@ async def _download_trades_history(
         return True
 
     except Exception:
-        logger.exception(f'Failed to download historic trades for pair: "{pair}". ')
+        logger.exception(f'Failed to download and store historic trades for pair: "{pair}". ')
         return False
 
 
@@ -499,25 +507,30 @@ async def refresh_backtest_trades_data(
     """
     pairs_not_available = []
     data_handler = get_datahandler(datadir, data_format=data_format)
-    for pair in pairs:
-        if pair not in exchange.markets:
-            pairs_not_available.append(pair)
-            logger.info(f"Skipping pair {pair}...")
-            continue
+    with get_progress_tracker() as progress:
+        pair_task = progress.add_task("Downloading data...", total=len(pairs))
+        for pair in pairs:
+            progress.update(pair_task, description=f"Downloading trades [{pair}]")
+            if pair not in exchange.markets:
+                pairs_not_available.append(pair)
+                logger.info(f"Skipping pair {pair}...")
+                continue
 
-        if erase:
-            if data_handler.trades_purge(pair, trading_mode):
-                logger.info(f"Deleting existing data for pair {pair}.")
+            if erase:
+                if data_handler.trades_purge(pair, trading_mode):
+                    logger.info(f"Deleting existing data for pair {pair}.")
 
-        logger.info(f"Downloading trades for pair {pair}.")
-        await _download_trades_history(
-            exchange=exchange,
-            pair=pair,
-            new_pairs_days=new_pairs_days,
-            timerange=timerange,
-            data_handler=data_handler,
-            trading_mode=trading_mode,
-        )
+            logger.info(f"Downloading trades for pair {pair}.")
+            await _download_trades_history(
+                exchange=exchange,
+                pair=pair,
+                new_pairs_days=new_pairs_days,
+                timerange=timerange,
+                data_handler=data_handler,
+                trading_mode=trading_mode,
+            )
+            progress.update(pair_task, advance=1)
+
     return pairs_not_available
 
 
@@ -616,6 +629,11 @@ async def download_data_main(config: Config) -> None:
     # Start downloading
     try:
         if config.get("download_trades"):
+            if not exchange.get_option("trades_has_history", True):
+                raise OperationalException(
+                    f"Trade history not available for {exchange.name}. "
+                    "You cannot use --dl-trades for this exchange."
+                )
             pairs_not_available = await refresh_backtest_trades_data(
                 exchange,
                 pairs=expanded_pairs,
@@ -627,17 +645,20 @@ async def download_data_main(config: Config) -> None:
                 trading_mode=config.get("trading_mode", TradingMode.SPOT),
             )
 
-            # Convert downloaded trade data to different timeframes
-            convert_trades_to_ohlcv(
-                pairs=expanded_pairs,
-                timeframes=config["timeframes"],
-                datadir=config["datadir"],
-                timerange=timerange,
-                erase=bool(config.get("erase")),
-                data_format_ohlcv=config["dataformat_ohlcv"],
-                data_format_trades=config["dataformat_trades"],
-                candle_type=config.get("candle_type_def", CandleType.SPOT),
-            )
+            if config.get("convert_trades") or not exchange.get_option("ohlcv_has_history", True):
+                # Convert downloaded trade data to different timeframes
+                # Only auto-convert for exchanges without historic klines
+
+                convert_trades_to_ohlcv(
+                    pairs=expanded_pairs,
+                    timeframes=config["timeframes"],
+                    datadir=config["datadir"],
+                    timerange=timerange,
+                    erase=bool(config.get("erase")),
+                    data_format_ohlcv=config["dataformat_ohlcv"],
+                    data_format_trades=config["dataformat_trades"],
+                    candle_type=config.get("candle_type_def", CandleType.SPOT),
+                )
         else:
             if not exchange.get_option("ohlcv_has_history", True):
                 raise OperationalException(

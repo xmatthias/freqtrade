@@ -67,10 +67,10 @@ def test_backtest_analysis_nomock(default_conf, mocker, caplog, testdatadir, use
                 "enter_tag_long_b",
             ],
             "exit_reason": [
-                ExitType.ROI,
-                ExitType.EXIT_SIGNAL,
-                ExitType.STOP_LOSS,
-                ExitType.TRAILING_STOP_LOSS,
+                ExitType.ROI.value,
+                ExitType.EXIT_SIGNAL.value,
+                ExitType.STOP_LOSS.value,
+                ExitType.TRAILING_STOP_LOSS.value,
             ],
         }
     )
@@ -154,10 +154,10 @@ def test_backtest_analysis_nomock(default_conf, mocker, caplog, testdatadir, use
     assert "-3.5" in captured.out
     assert "50" in captured.out
     assert "0" in captured.out
-    assert "0.01616" in captured.out
+    assert "0.016" in captured.out
     assert "34.049" in captured.out
-    assert "0.104411" in captured.out
-    assert "52.8292" in captured.out
+    assert "0.104" in captured.out
+    assert "52.829" in captured.out
 
     # test group 1
     args = get_args(base_args + ["--analysis-groups", "1"])

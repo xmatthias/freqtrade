@@ -1,12 +1,12 @@
 """Freqtrade bot"""
 
-__version__ = "2024.5-dev"
+__version__ = "2024.8-dev"
 
 if "dev" in __version__:
     from pathlib import Path
 
     try:
-        import subprocess
+        import subprocess  # noqa: S404
 
         freqtrade_basedir = Path(__file__).parent
 
@@ -30,5 +30,5 @@ if "dev" in __version__:
             versionfile = Path("./freqtrade_commit")
             if versionfile.is_file():
                 __version__ = f"docker-{__version__}-{versionfile.read_text()[:8]}"
-        except Exception:
+        except Exception:  # noqa: S110
             pass

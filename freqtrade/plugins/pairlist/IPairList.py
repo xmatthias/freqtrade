@@ -3,8 +3,9 @@ PairList Handler base class
 """
 
 import logging
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from copy import deepcopy
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
 from freqtrade.constants import Config
@@ -51,8 +52,20 @@ PairlistParameter = Union[
 ]
 
 
+class SupportsBacktesting(str, Enum):
+    """
+    Enum to indicate if a Pairlist Handler supports backtesting.
+    """
+
+    YES = "yes"
+    NO = "no"
+    NO_ACTION = "no_action"
+    BIASED = "biased"
+
+
 class IPairList(LoggingMixin, ABC):
     is_pairlist_generator = False
+    supports_backtesting: SupportsBacktesting = SupportsBacktesting.NO
 
     def __init__(
         self,
@@ -87,7 +100,8 @@ class IPairList(LoggingMixin, ABC):
         """
         return self.__class__.__name__
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def needstickers(self) -> bool:
         """
         Boolean property defining if tickers are necessary.

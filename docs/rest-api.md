@@ -2,7 +2,7 @@
 
 ## FreqUI
 
-FreqUI now has it's own dedicated [documentation section](frequi.md) - please refer to that section for all information regarding the FreqUI.
+FreqUI now has it's own dedicated [documentation section](freq-ui.md) - please refer to that section for all information regarding the FreqUI.
 
 ## Configuration
 
@@ -118,6 +118,14 @@ By default, the script assumes `127.0.0.1` (localhost) and port `8080` to be use
 freqtrade-client --config rest_config.json <command> [optional parameters]
 ```
 
+Commands with many arguments may require keyword arguments (for clarity) - which can be provided as follows:
+
+``` bash
+freqtrade-client --config rest_config.json forceenter BTC/USDT long enter_tag=GutFeeling
+```
+
+This method will work for all arguments - check the "show" command for a list of available parameters.
+
 ??? Note "Programmatic use"
     The `freqtrade-client` package (installable independent of freqtrade) can be used in your own scripts to interact with the freqtrade API.
     to do so, please use the following:
@@ -161,7 +169,7 @@ freqtrade-client --config rest_config.json <command> [optional parameters]
 | `delete_lock <lock_id>` | Deletes (disables) the lock by id.
 | `locks add <pair>, <until>, [side], [reason]` | Locks a pair until "until". (Until will be rounded up to the nearest timeframe).
 | `profit` | Display a summary of your profit/loss from close trades and some stats about your performance.
-| `forceexit <trade_id>` | Instantly exits the given trade  (Ignoring `minimum_roi`).
+| `forceexit <trade_id> [order_type] [amount]` | Instantly exits the given trade (ignoring `minimum_roi`), using the given order type ("market" or "limit", uses your config setting if not specified), and the chosen amount (full sell if not specified).
 | `forceexit all` | Instantly exits all open trades (Ignoring `minimum_roi`).
 | `forceenter <pair> [rate]` | Instantly enters the given pair. Rate is optional. (`force_entry_enable` must be set to True)
 | `forceenter <pair> <side> [rate]` | Instantly longs or shorts the given pair. Rate is optional. (`force_entry_enable` must be set to True)

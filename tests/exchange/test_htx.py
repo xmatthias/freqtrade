@@ -128,7 +128,7 @@ async def test_stoploss_order_dry_run_huobi(default_conf, mocker):
 
 
 async def test_stoploss_adjust_htx(mocker, default_conf):
-    exchange = await get_patched_exchange(mocker, default_conf, id="htx")
+    exchange = await get_patched_exchange(mocker, default_conf, exchange="htx")
     order = {
         "type": "stop",
         "price": 1500,

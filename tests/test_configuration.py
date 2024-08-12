@@ -27,7 +27,7 @@ from freqtrade.configuration.load_config import (
 )
 from freqtrade.constants import DEFAULT_DB_DRYRUN_URL, DEFAULT_DB_PROD_URL, ENV_VAR_PREFIX
 from freqtrade.enums import RunMode
-from freqtrade.exceptions import OperationalException
+from freqtrade.exceptions import ConfigurationError, OperationalException
 from tests.conftest import (
     CURRENT_TEST_STRATEGY,
     log_has,
@@ -401,11 +401,11 @@ def test_load_dry_run(default_conf, mocker, config_value, expected, arglist) -> 
     assert validated_conf["runmode"] == (RunMode.DRY_RUN if expected else RunMode.LIVE)
 
 
-def test_load_custom_strategy(default_conf, mocker) -> None:
+def test_load_custom_strategy(default_conf, mocker, tmp_path) -> None:
     default_conf.update(
         {
             "strategy": "CustomStrategy",
-            "strategy_path": "/tmp/strategies",
+            "strategy_path": f"{tmp_path}/strategies",
         }
     )
     patched_configuration_load_config_file(mocker, default_conf)
@@ -415,7 +415,7 @@ def test_load_custom_strategy(default_conf, mocker) -> None:
     validated_conf = configuration.load_config()
 
     assert validated_conf.get("strategy") == "CustomStrategy"
-    assert validated_conf.get("strategy_path") == "/tmp/strategies"
+    assert validated_conf.get("strategy_path") == f"{tmp_path}/strategies"
 
 
 def test_show_info(default_conf, mocker, caplog) -> None:
@@ -469,7 +469,7 @@ def test_setup_configuration_without_arguments(mocker, default_conf, caplog) -> 
     assert "timerange" not in config
 
 
-def test_setup_configuration_with_arguments(mocker, default_conf, caplog) -> None:
+def test_setup_configuration_with_arguments(mocker, default_conf, caplog, tmp_path) -> None:
     patched_configuration_load_config_file(mocker, default_conf)
     mocker.patch("freqtrade.configuration.configuration.create_datadir", lambda c, x: x)
     mocker.patch(
@@ -485,7 +485,7 @@ def test_setup_configuration_with_arguments(mocker, default_conf, caplog) -> Non
         "--datadir",
         "/foo/bar",
         "--userdir",
-        "/tmp/freqtrade",
+        f"{tmp_path}/freqtrade",
         "--timeframe",
         "1m",
         "--enable-position-stacking",
@@ -509,7 +509,7 @@ def test_setup_configuration_with_arguments(mocker, default_conf, caplog) -> Non
     assert "pair_whitelist" in config["exchange"]
     assert "datadir" in config
     assert log_has("Using data directory: {} ...".format("/foo/bar"), caplog)
-    assert log_has("Using user-data directory: {} ...".format(Path("/tmp/freqtrade")), caplog)
+    assert log_has(f"Using user-data directory: {tmp_path / 'freqtrade'} ...", caplog)
     assert "user_data_dir" in config
 
     assert "timeframe" in config
@@ -656,6 +656,16 @@ def test_load_config_warn_forcebuy(default_conf, mocker, caplog) -> None:
 
 def test_validate_default_conf(default_conf) -> None:
     # Validate via our validator - we allow setting defaults!
+    validate_config_schema(default_conf)
+
+
+@pytest.mark.parametrize("fiat", ["EUR", "USD", "", None])
+def test_validate_fiat_currency_options(default_conf, fiat) -> None:
+    # Validate via our validator - we allow setting defaults!
+    if fiat is not None:
+        default_conf["fiat_display_currency"] = fiat
+    else:
+        del default_conf["fiat_display_currency"]
     validate_config_schema(default_conf)
 
 
@@ -829,6 +839,25 @@ def test_validate_whitelist(default_conf):
                 }
             ],
             r"Protections must specify either `stop_duration`.*",
+        ),
+        (
+            [
+                {
+                    "method": "StoplossGuard",
+                    "lookback_period": 20,
+                    "stop_duration": 10,
+                    "unlock_at": "20:02",
+                }
+            ],
+            r"Protections must specify either `unlock_at`, `stop_duration` or.*",
+        ),
+        (
+            [{"method": "StoplossGuard", "lookback_period_candles": 20, "unlock_at": "20:02"}],
+            None,
+        ),
+        (
+            [{"method": "StoplossGuard", "lookback_period_candles": 20, "unlock_at": "55:102"}],
+            "Invalid date format for unlock_at: 55:102.",
         ),
     ],
 )
@@ -1072,6 +1101,29 @@ def test__validate_consumers(default_conf, caplog) -> None:
     )
     validate_config_consistency(conf)
     assert log_has_re("To receive best performance with external data.*", caplog)
+
+
+def test__validate_orderflow(default_conf) -> None:
+    conf = deepcopy(default_conf)
+    conf["exchange"]["use_public_trades"] = True
+    with pytest.raises(
+        ConfigurationError,
+        match="Orderflow is a required configuration key when using public trades.",
+    ):
+        validate_config_consistency(conf)
+
+    conf.update(
+        {
+            "orderflow": {
+                "scale": 0.5,
+                "stacked_imbalance_range": 3,
+                "imbalance_volume": 100,
+                "imbalance_ratio": 3,
+            }
+        }
+    )
+    # Should pass.
+    validate_config_consistency(conf)
 
 
 def test_load_config_test_comments() -> None:

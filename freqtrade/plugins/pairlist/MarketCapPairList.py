@@ -5,15 +5,14 @@ Provides dynamic pair list based on Market Cap
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from cachetools import TTLCache
-from pycoingecko import CoinGeckoAPI
 
-from freqtrade.constants import Config
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange.types import Tickers
-from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter
+from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
+from freqtrade.util.coin_gecko import FtCoinGeckoApi
 
 
 logger = logging.getLogger(__name__)
@@ -21,16 +20,10 @@ logger = logging.getLogger(__name__)
 
 class MarketCapPairList(IPairList):
     is_pairlist_generator = True
+    supports_backtesting = SupportsBacktesting.BIASED
 
-    def __init__(
-        self,
-        exchange,
-        pairlistmanager,
-        config: Config,
-        pairlistconfig: Dict[str, Any],
-        pairlist_pos: int,
-    ) -> None:
-        super().__init__(exchange, pairlistmanager, config, pairlistconfig, pairlist_pos)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         if "number_assets" not in self._pairlistconfig:
             raise OperationalException(
@@ -38,13 +31,19 @@ class MarketCapPairList(IPairList):
                 'for "pairlist.config.number_assets"'
             )
 
-        self._stake_currency = config["stake_currency"]
+        self._stake_currency = self._config["stake_currency"]
         self._number_assets = self._pairlistconfig["number_assets"]
         self._max_rank = self._pairlistconfig.get("max_rank", 30)
         self._refresh_period = self._pairlistconfig.get("refresh_period", 86400)
         self._marketcap_cache: TTLCache = TTLCache(maxsize=1, ttl=self._refresh_period)
         self._def_candletype = self._config["candle_type_def"]
-        self._coingecko: CoinGeckoAPI = CoinGeckoAPI()
+
+        _coingecko_config = self._config.get("coingecko", {})
+
+        self._coingecko: FtCoinGeckoApi = FtCoinGeckoApi(
+            api_key=_coingecko_config.get("api_key", ""),
+            is_demo=_coingecko_config.get("is_demo", True),
+        )
 
         if self._max_rank > 250:
             raise OperationalException("This filter only support marketcap rank up to 250.")

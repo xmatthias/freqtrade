@@ -37,7 +37,6 @@ API_FETCH_ORDER_RETRY_COUNT = 5
 
 BAD_EXCHANGES = {
     "bitmex": "Various reasons.",
-    "phemex": "Does not provide history.",
     "probit": "Requires additional, regular calls to `signIn()`.",
     "poloniex": "Does not provide fetch_order endpoint to fetch both open and closed orders.",
 }
@@ -53,6 +52,7 @@ MAP_EXCHANGE_CHILDCLASS = {
 
 SUPPORTED_EXCHANGES = [
     "binance",
+    "bingx",
     "bitmart",
     "gate",
     "htx",
@@ -64,6 +64,7 @@ SUPPORTED_EXCHANGES = [
 EXCHANGE_HAS_REQUIRED: Dict[str, List[str]] = {
     # Required / private
     "fetchOrder": ["fetchOpenOrder", "fetchClosedOrder"],
+    "fetchL2OrderBook": ["fetchTicker"],
     "cancelOrder": [],
     "createOrder": [],
     "fetchBalance": [],
@@ -91,6 +92,8 @@ EXCHANGE_HAS_OPTIONAL = [
     # 'fetchMarketLeverageTiers',  # Futures initialization
     # 'fetchOpenOrder', 'fetchClosedOrder',  # replacement for fetchOrder
     # 'fetchOpenOrders', 'fetchClosedOrders',  # 'fetchOrders',  # Refinding balance...
+    # ccxt.pro
+    "watchOHLCV",
 ]
 
 

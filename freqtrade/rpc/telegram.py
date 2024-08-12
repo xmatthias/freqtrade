@@ -1403,19 +1403,21 @@ class Telegram(RPCHandler):
             nrecent = int(context.args[0]) if context.args else 10
         except (TypeError, ValueError, IndexError):
             nrecent = 10
+        nonspot = self._config.get("trading_mode", TradingMode.SPOT) != TradingMode.SPOT
         trades = self._rpc._rpc_trade_history(nrecent)
         trades_tab = tabulate(
             [
                 [
                     dt_humanize_delta(dt_from_ts(trade["close_timestamp"])),
-                    trade["pair"] + " (#" + str(trade["trade_id"]) + ")",
+                    f"{trade['pair']} (#{trade['trade_id']}"
+                    f"{(' ' + ('S' if trade['is_short'] else 'L')) if nonspot else ''})",
                     f"{(trade['close_profit']):.2%} ({trade['close_profit_abs']})",
                 ]
                 for trade in trades["trades"]
             ],
             headers=[
                 "Close Date",
-                "Pair (ID)",
+                "Pair (ID L/S)" if nonspot else "Pair (ID)",
                 f"Profit ({stake_cur})",
             ],
             tablefmt="simple",
@@ -1789,7 +1791,7 @@ class Telegram(RPCHandler):
             "_Bot Control_\n"
             "------------\n"
             "*/start:* `Starts the trader`\n"
-            "*/stop:* Stops the trader\n"
+            "*/stop:* `Stops the trader`\n"
             "*/stopentry:* `Stops entering, but handles open trades gracefully` \n"
             "*/forceexit <trade_id>|all:* `Instantly exits the given trade or all trades, "
             "regardless of profit`\n"
@@ -1822,7 +1824,7 @@ class Telegram(RPCHandler):
             "that represents the current market direction. If no direction is provided `"
             "`the currently set market direction will be output.` \n"
             "*/list_custom_data <trade_id> <key>:* `List custom_data for Trade ID & Key combo.`\n"
-            "`If no Key is supplied it will list all key-value pairs found for that Trade ID.`"
+            "`If no Key is supplied it will list all key-value pairs found for that Trade ID.`\n"
             "_Statistics_\n"
             "------------\n"
             "*/status <trade_id>|[table]:* `Lists all open trades`\n"

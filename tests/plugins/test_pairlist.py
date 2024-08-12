@@ -39,6 +39,7 @@ TESTABLE_PAIRLISTS = [p for p in AVAILABLE_PAIRLISTS if p not in ["RemotePairLis
 
 @pytest.fixture(scope="function")
 def whitelist_conf(default_conf):
+    default_conf["runmode"] = "dry_run"
     default_conf["stake_currency"] = "BTC"
     default_conf["exchange"]["pair_whitelist"] = [
         "ETH/BTC",
@@ -69,6 +70,7 @@ def whitelist_conf(default_conf):
 
 @pytest.fixture(scope="function")
 def whitelist_conf_2(default_conf):
+    default_conf["runmode"] = "dry_run"
     default_conf["stake_currency"] = "BTC"
     default_conf["exchange"]["pair_whitelist"] = [
         "ETH/BTC",
@@ -95,6 +97,7 @@ def whitelist_conf_2(default_conf):
 
 @pytest.fixture(scope="function")
 def whitelist_conf_agefilter(default_conf):
+    default_conf["runmode"] = "dry_run"
     default_conf["stake_currency"] = "BTC"
     default_conf["exchange"]["pair_whitelist"] = [
         "ETH/BTC",
@@ -770,6 +773,7 @@ async def test_VolumePairList_whitelist_gen(
     whitelist_result,
     caplog,
 ) -> None:
+    whitelist_conf["runmode"] = "util_exchange"
     whitelist_conf["pairlists"] = pairlists
     whitelist_conf["stake_currency"] = base_currency
 
@@ -1267,6 +1271,7 @@ async def test_ShuffleFilter_init(mocker, whitelist_conf, caplog) -> None:
         {"method": "StaticPairList"},
         {"method": "ShuffleFilter", "seed": 43},
     ]
+    whitelist_conf["runmode"] = "backtest"
 
     exchange = await get_patched_exchange(mocker, whitelist_conf)
     plm = PairListManager(exchange, whitelist_conf)
@@ -2303,7 +2308,7 @@ async def test_MarketCapPairList_filter(
     )
 
     mocker.patch(
-        "freqtrade.plugins.pairlist.MarketCapPairList.CoinGeckoAPI.get_coins_markets",
+        "freqtrade.plugins.pairlist.MarketCapPairList.FtCoinGeckoApi.get_coins_markets",
         return_value=test_value,
     )
 
@@ -2341,7 +2346,7 @@ async def test_MarketCapPairList_timing(mocker, default_conf_usdt, markets, time
     )
 
     mocker.patch(
-        "freqtrade.plugins.pairlist.MarketCapPairList.CoinGeckoAPI.get_coins_markets",
+        "freqtrade.plugins.pairlist.MarketCapPairList.FtCoinGeckoApi.get_coins_markets",
         return_value=test_value,
     )
 
@@ -2382,3 +2387,65 @@ def test_MarketCapPairList_exceptions(mocker, default_conf_usdt):
         OperationalException, match="This filter only support marketcap rank up to 250."
     ):
         PairListManager(exchange, default_conf_usdt)
+
+
+@pytest.mark.parametrize(
+    "pairlists,expected_error,expected_warning",
+    [
+        (
+            [{"method": "StaticPairList"}],
+            None,  # Error
+            None,  # Warning
+        ),
+        (
+            [{"method": "VolumePairList", "number_assets": 10}],
+            "VolumePairList",  # Error
+            None,  # Warning
+        ),
+        (
+            [{"method": "MarketCapPairList", "number_assets": 10}],
+            None,  # Error
+            r"MarketCapPairList.*lookahead.*",  # Warning
+        ),
+        (
+            [{"method": "StaticPairList"}, {"method": "FullTradesFilter"}],
+            None,  # Error
+            r"FullTradesFilter do not generate.*",  # Warning
+        ),
+        (  # combi, fails and warns
+            [
+                {"method": "VolumePairList", "number_assets": 10},
+                {"method": "MarketCapPairList", "number_assets": 10},
+            ],
+            "VolumePairList",  # Error
+            r"MarketCapPairList.*lookahead.*",  # Warning
+        ),
+    ],
+)
+def test_backtesting_modes(
+    mocker, default_conf_usdt, pairlists, expected_error, expected_warning, caplog, markets, tickers
+):
+    default_conf_usdt["runmode"] = "dry_run"
+    default_conf_usdt["pairlists"] = pairlists
+
+    mocker.patch.multiple(
+        EXMS,
+        markets=PropertyMock(return_value=markets),
+        exchange_has=MagicMock(return_value=True),
+        get_tickers=tickers,
+    )
+    exchange = get_patched_exchange(mocker, default_conf_usdt)
+
+    # Dry run mode - works always
+    PairListManager(exchange, default_conf_usdt)
+
+    default_conf_usdt["runmode"] = "backtest"
+    if expected_error:
+        with pytest.raises(OperationalException, match=f"Pairlist Handlers {expected_error}.*"):
+            PairListManager(exchange, default_conf_usdt)
+
+    if not expected_error:
+        PairListManager(exchange, default_conf_usdt)
+
+    if expected_warning:
+        assert log_has_re(f"Pairlist Handlers {expected_warning}", caplog)

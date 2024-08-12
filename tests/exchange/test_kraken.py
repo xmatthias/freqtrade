@@ -34,7 +34,7 @@ async def test_kraken_trading_agreement(
 
     mocker.patch(f"{EXMS}.amount_to_precision", lambda s, x, y: y)
     mocker.patch(f"{EXMS}.price_to_precision", lambda s, x, y, **kwargs: y)
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="kraken")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, exchange="kraken")
 
     order = await exchange.create_order(
         pair="ETH/BTC",
@@ -123,7 +123,7 @@ async def test_get_balances_prod(default_conf, mocker):
     ]
     api_mock.fetch_open_orders = get_mock_coro(return_value=kraken_open_orders)
     default_conf["dry_run"] = False
-    exchange = await get_patched_exchange(mocker, default_conf, api_mock, id="kraken")
+    exchange = await get_patched_exchange(mocker, default_conf, api_mock, exchange="kraken")
     balances = await exchange.get_balances()
     assert len(balances) == 6
 
@@ -263,7 +263,7 @@ async def test_create_stoploss_order_dry_run_kraken(default_conf, mocker, side):
     "sl1,sl2,sl3,side", [(1501, 1499, 1501, "sell"), (1499, 1501, 1499, "buy")]
 )
 async def test_stoploss_adjust_kraken(mocker, default_conf, sl1, sl2, sl3, side):
-    exchange = await get_patched_exchange(mocker, default_conf, id="kraken")
+    exchange = await get_patched_exchange(mocker, default_conf, exchange="kraken")
     order = {
         "type": "market",
         "stopLossPrice": 1500,
@@ -285,5 +285,5 @@ async def test_stoploss_adjust_kraken(mocker, default_conf, sl1, sl2, sl3, side)
     ],
 )
 async def test__valid_trade_pagination_id_kraken(mocker, default_conf_usdt, trade_id, expected):
-    exchange = await get_patched_exchange(mocker, default_conf_usdt, id="kraken")
+    exchange = await get_patched_exchange(mocker, default_conf_usdt, exchange="kraken")
     assert exchange._valid_trade_pagination_id("XRP/USDT", trade_id) == expected

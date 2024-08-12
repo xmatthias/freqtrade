@@ -429,7 +429,7 @@ def test_backtesting_start_no_data(default_conf, mocker, caplog, testdatadir) ->
         backtesting.start()
 
 
-def test_backtesting_no_pair_left(default_conf, mocker, caplog, testdatadir) -> None:
+def test_backtesting_no_pair_left(default_conf, mocker) -> None:
     mocker.patch(f"{EXMS}.exchange_has", MagicMock(return_value=True))
     mocker.patch(
         "freqtrade.data.history.history_utils.load_pair_history",
@@ -449,13 +449,6 @@ def test_backtesting_no_pair_left(default_conf, mocker, caplog, testdatadir) -> 
     with pytest.raises(OperationalException, match="No pair in whitelist."):
         Backtesting(default_conf)
 
-    default_conf["pairlists"] = [{"method": "VolumePairList", "number_assets": 5}]
-    with pytest.raises(
-        OperationalException,
-        match=r"VolumePairList not allowed for backtesting\..*StaticPairList.*",
-    ):
-        Backtesting(default_conf)
-
     default_conf.update(
         {
             "pairlists": [{"method": "StaticPairList"}],
@@ -469,7 +462,7 @@ def test_backtesting_no_pair_left(default_conf, mocker, caplog, testdatadir) -> 
         Backtesting(default_conf)
 
 
-def test_backtesting_pairlist_list(default_conf, mocker, caplog, testdatadir, tickers) -> None:
+def test_backtesting_pairlist_list(default_conf, mocker, tickers) -> None:
     mocker.patch(f"{EXMS}.exchange_has", MagicMock(return_value=True))
     mocker.patch(f"{EXMS}.get_tickers", tickers)
     mocker.patch(f"{EXMS}.price_to_precision", lambda s, x, y: y)
@@ -492,12 +485,6 @@ def test_backtesting_pairlist_list(default_conf, mocker, caplog, testdatadir, ti
     with pytest.raises(
         OperationalException,
         match=r"VolumePairList not allowed for backtesting\..*StaticPairList.*",
-    ):
-        Backtesting(default_conf)
-
-    default_conf["pairlists"] = [{"method": "StaticPairList"}, {"method": "PerformanceFilter"}]
-    with pytest.raises(
-        OperationalException, match="PerformanceFilter not allowed for backtesting."
     ):
         Backtesting(default_conf)
 
@@ -1650,11 +1637,11 @@ def test_backtest_start_multi_strat(default_conf, mocker, caplog, testdatadir):
     ]
     args = get_args(args)
     start_backtesting(args)
-    # 2 backtests, 4 tables
+    # 2 backtests, 6 tables (entry, exit, mixed - each 2x)
     assert backtestmock.call_count == 2
     assert text_table_mock.call_count == 4
     assert strattable_mock.call_count == 1
-    assert tag_metrics_mock.call_count == 4
+    assert tag_metrics_mock.call_count == 6
     assert strat_summary.call_count == 1
 
     # check the logs, that will contain the backtest result
@@ -1709,7 +1696,7 @@ def test_backtest_start_multi_strat_nomock(default_conf, mocker, caplog, testdat
             "open_rate": [0.104445, 0.10302485],
             "close_rate": [0.104969, 0.103541],
             "is_short": [False, False],
-            "exit_reason": [ExitType.ROI, ExitType.ROI],
+            "exit_reason": [ExitType.ROI.value, ExitType.ROI.value],
         }
     )
     result2 = pd.DataFrame(
@@ -1729,7 +1716,7 @@ def test_backtest_start_multi_strat_nomock(default_conf, mocker, caplog, testdat
             "open_rate": [0.104445, 0.10302485, 0.122541],
             "close_rate": [0.104969, 0.103541, 0.123541],
             "is_short": [False, False, False],
-            "exit_reason": [ExitType.ROI, ExitType.ROI, ExitType.STOP_LOSS],
+            "exit_reason": [ExitType.ROI.value, ExitType.ROI.value, ExitType.STOP_LOSS.value],
         }
     )
     backtestmock = MagicMock(

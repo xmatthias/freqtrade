@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04 ]
+        os: [ "ubuntu-20.04", "ubuntu-22.04", "ubuntu-24.04" ]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
@@ -80,6 +80,11 @@ jobs:
       run: |
         # Allow failure for coveralls
         coveralls || true
+
+    - name: Run json schema extract
+      # This should be kept before the repository check to ensure that the schema is up-to-date
+      run: |
+        python build_helpers/extract_config_json_schema.py
 
     - name: Check for repository changes
       run: |
@@ -319,6 +324,17 @@ jobs:
       run: |
         mypy freqtrade scripts tests
 
+    - name: Run Pester tests (PowerShell)
+      run: |
+        $PSVersionTable
+        Set-PSRepository psgallery -InstallationPolicy trusted
+        Install-Module -Name Pester -RequiredVersion 5.3.1 -Confirm:$false -Force -SkipPublisherCheck
+        $Error.clear()
+        Invoke-Pester -Path "tests" -CI
+        if ($Error.Length -gt 0) {exit 1}
+
+      shell: powershell
+
     - name: Discord notification
       uses: rjstone/discord-webhook-notify@v1
       if: failure() && ( github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
@@ -335,7 +351,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.12"
 
     - name: pre-commit dependencies
       run: |
@@ -349,7 +365,7 @@ jobs:
 
     - uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.12"
     - uses: pre-commit/action@v3.0.1
 
   docs-check:
@@ -364,12 +380,11 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.12"
 
     - name: Documentation build
       run: |
         pip install -r docs/requirements-docs.txt
-        pip install mkdocs
         mkdocs build
 
     - name: Discord notification
@@ -390,7 +405,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.12"
 
     - name: Cache_dependencies
       uses: actions/cache@v4
@@ -472,7 +487,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.12"
 
     - name: Build distribution
       run: |
@@ -523,12 +538,12 @@ jobs:
 
 
     - name: Publish to PyPI (Test)
-      uses: pypa/gh-action-pypi-publish@v1.8.14
+      uses: pypa/gh-action-pypi-publish@v1.9.0
       with:
         repository-url: https://test.pypi.org/legacy/
 
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@v1.8.14
+      uses: pypa/gh-action-pypi-publish@v1.9.0
 
 
   deploy-docker:
@@ -543,7 +558,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.12"
 
     - name: Extract branch name
       id: extract-branch
@@ -566,12 +581,12 @@ jobs:
           sudo systemctl restart docker
           docker version -f '{{.Server.Experimental}}'
 
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
     - name: Set up Docker Buildx
       id: buildx
-      uses: crazy-max/ghaction-docker-buildx@v3.3.1
-      with:
-        buildx-version: latest
-        qemu-version: latest
+      uses: docker/setup-buildx-action@v3
 
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}

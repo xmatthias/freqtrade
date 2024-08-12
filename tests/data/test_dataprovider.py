@@ -63,6 +63,42 @@ def test_historic_ohlcv(mocker, default_conf, ohlcv_history):
     assert historymock.call_args_list[0][1]["timeframe"] == "5m"
 
 
+async def test_historic_trades(mocker, default_conf, trades_history_df):
+    historymock = MagicMock(return_value=trades_history_df)
+    mocker.patch(
+        "freqtrade.data.history.datahandlers.featherdatahandler.FeatherDataHandler._trades_load",
+        historymock,
+    )
+
+    dp = DataProvider(default_conf, None, asyncio.get_event_loop())
+    # Live mode..
+    with pytest.raises(OperationalException, match=r"Exchange is not available to DataProvider\."):
+        dp.trades("UNITTEST/BTC", "5m")
+
+    exchange = await get_patched_exchange(mocker, default_conf)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
+    data = dp.trades("UNITTEST/BTC", "5m")
+
+    assert isinstance(data, DataFrame)
+    assert len(data) == 0
+
+    # Switch to backtest mode
+    default_conf["runmode"] = RunMode.BACKTEST
+    default_conf["dataformat_trades"] = "feather"
+    exchange = await get_patched_exchange(mocker, default_conf)
+    dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
+    data = dp.trades("UNITTEST/BTC", "5m")
+    assert isinstance(data, DataFrame)
+    assert len(data) == len(trades_history_df)
+
+    # Random other runmode
+    default_conf["runmode"] = RunMode.UTIL_EXCHANGE
+    dp = DataProvider(default_conf, None, asyncio.get_event_loop())
+    data = dp.trades("UNITTEST/BTC", "5m")
+    assert isinstance(data, DataFrame)
+    assert len(data) == 0
+
+
 async def test_historic_ohlcv_dataformat(mocker, default_conf, ohlcv_history):
     hdf5loadmock = MagicMock(return_value=ohlcv_history)
     featherloadmock = MagicMock(return_value=ohlcv_history)
@@ -248,10 +284,10 @@ def test_emit_df(mocker, default_conf, ohlcv_history):
 
 
 async def test_refresh(mocker, default_conf):
-    refresh_mock = get_mock_coro()
-    mocker.patch(f"{EXMS}.refresh_latest_ohlcv", refresh_mock)
+    refresh_mock = mocker.patch(f"{EXMS}.refresh_latest_ohlcv")
+    mock_refresh_trades = mocker.patch(f"{EXMS}.refresh_latest_trades")
 
-    exchange = await get_patched_exchange(mocker, default_conf, id="binance")
+    exchange = await get_patched_exchange(mocker, default_conf, exchange="binance")
     timeframe = default_conf["timeframe"]
     pairs = [("XRP/BTC", timeframe), ("UNITTEST/BTC", timeframe)]
 
@@ -259,7 +295,7 @@ async def test_refresh(mocker, default_conf):
 
     dp = DataProvider(default_conf, exchange, asyncio.get_event_loop())
     await dp.refresh(pairs)
-
+    assert mock_refresh_trades.call_count == 0
     assert refresh_mock.call_count == 1
     assert len(refresh_mock.call_args[0]) == 1
     assert len(refresh_mock.call_args[0][0]) == len(pairs)
@@ -267,10 +303,19 @@ async def test_refresh(mocker, default_conf):
 
     refresh_mock.reset_mock()
     await dp.refresh(pairs, pairs_non_trad)
+    assert mock_refresh_trades.call_count == 0
     assert refresh_mock.call_count == 1
     assert len(refresh_mock.call_args[0]) == 1
     assert len(refresh_mock.call_args[0][0]) == len(pairs) + len(pairs_non_trad)
     assert refresh_mock.call_args[0][0] == pairs + pairs_non_trad
+
+    # Test with public trades
+    refresh_mock.reset_mock()
+    refresh_mock.reset_mock()
+    default_conf["exchange"]["use_public_trades"] = True
+    dp.refresh(pairs, pairs_non_trad)
+    assert mock_refresh_trades.call_count == 1
+    assert refresh_mock.call_count == 1
 
 
 async def test_orderbook(mocker, default_conf, order_book_l2_sync):

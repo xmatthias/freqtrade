@@ -3,28 +3,22 @@ Precision pair list filter
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from freqtrade.constants import Config
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange import ROUND_UP
 from freqtrade.exchange.types import Ticker
-from freqtrade.plugins.pairlist.IPairList import IPairList
+from freqtrade.plugins.pairlist.IPairList import IPairList, SupportsBacktesting
 
 
 logger = logging.getLogger(__name__)
 
 
 class PrecisionFilter(IPairList):
-    def __init__(
-        self,
-        exchange,
-        pairlistmanager,
-        config: Config,
-        pairlistconfig: Dict[str, Any],
-        pairlist_pos: int,
-    ) -> None:
-        super().__init__(exchange, pairlistmanager, config, pairlistconfig, pairlist_pos)
+    supports_backtesting = SupportsBacktesting.BIASED
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         if "stoploss" not in self._config:
             raise OperationalException(

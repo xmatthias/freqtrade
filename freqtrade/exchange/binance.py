@@ -28,7 +28,9 @@ class Binance(Exchange):
         "ohlcv_candle_limit": 1000,
         "trades_pagination": "id",
         "trades_pagination_arg": "fromId",
+        "trades_has_history": True,
         "l2_limit_range": [5, 10, 20, 50, 100, 500, 1000],
+        "ws.enabled": True,
     }
     _ft_has_futures: Dict = {
         "stoploss_order_types": {"limit": "stop", "market": "stop_market"},
@@ -41,6 +43,7 @@ class Binance(Exchange):
             PriceType.LAST: "CONTRACT_PRICE",
             PriceType.MARK: "MARK_PRICE",
         },
+        "ws.enabled": False,
     }
 
     _supported_trading_mode_margin_pairs: List[Tuple[TradingMode, MarginMode]] = [

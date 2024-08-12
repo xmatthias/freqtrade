@@ -12,6 +12,8 @@ from tests.conftest import EXMS, get_default_conf_usdt
 
 
 EXCHANGE_FIXTURE_TYPE = Tuple[Exchange, str]
+EXCHANGE_WS_FIXTURE_TYPE = Tuple[Exchange, str, str]
+
 
 # Exchanges that should be tested online
 EXCHANGES = {
@@ -46,7 +48,25 @@ EXCHANGES = {
                 "workingTime": 1674493798550,
                 "fills": [],
                 "selfTradePreventionMode": "NONE",
-            }
+            },
+            {
+                "symbol": "SOLUSDT",
+                "orderId": 3551312894,
+                "orderListId": -1,
+                "clientOrderId": "x-R4DD3S8297c73a11ccb9dc8f2811ba",
+                "transactTime": 1674493798550,
+                "price": "15.50000000",
+                "origQty": "1.10000000",
+                "executedQty": "1.10000000",
+                "cummulativeQuoteQty": "17.05",
+                "status": "FILLED",
+                "timeInForce": "GTC",
+                "type": "LIMIT",
+                "side": "BUY",
+                "workingTime": 1674493798550,
+                "fills": [],
+                "selfTradePreventionMode": "NONE",
+            },
         ],
     },
     "binanceus": {
@@ -289,6 +309,36 @@ EXCHANGES = {
         "hasQuoteVolume": True,
         "timeframe": "1h",
         "futures": False,
+        "sample_order": [
+            {
+                "symbol": "SOL-USDT",
+                "orderId": "1762393630149869568",
+                "transactTime": "1674493798550",
+                "price": "15.5",
+                "stopPrice": "0",
+                "origQty": "1.1",
+                "executedQty": "1.1",
+                "cummulativeQuoteQty": "17.05",
+                "status": "FILLED",
+                "type": "LIMIT",
+                "side": "BUY",
+                "clientOrderID": "",
+            },
+            {
+                "symbol": "SOL-USDT",
+                "orderId": "1762393630149869568",
+                "transactTime": "1674493798550",
+                "price": "15.5",
+                "stopPrice": "0",
+                "origQty": "1.1",
+                "executedQty": "1.1",
+                "cummulativeQuoteQty": "17.05",
+                "status": "FILLED",
+                "type": "MARKET",
+                "side": "BUY",
+                "clientOrderID": "",
+            },
+        ],
     },
 }
 
@@ -313,6 +363,7 @@ def set_test_proxy(config: Config, use_proxy: bool) -> Config:
         config1 = deepcopy(config)
         config1["exchange"]["ccxt_config"] = {
             "httpsProxy": proxy,
+            "wsProxy": proxy,
         }
         return config1
 
@@ -368,3 +419,29 @@ async def exchange_futures(request, exchange_conf, class_mocker):
 @pytest.fixture(scope="session")
 def event_loop():
     return asyncio.get_event_loop()
+
+
+@pytest.fixture(params=["spot", "futures"], scope="class")
+def exchange_mode(request):
+    return request.param
+
+
+@pytest.fixture(params=EXCHANGES, scope="class")
+def exchange_ws(request, exchange_conf, exchange_mode, class_mocker):
+    class_mocker.patch("freqtrade.exchange.bybit.Bybit.additional_exchange_init")
+    exchange_conf["exchange"]["enable_ws"] = True
+    if exchange_mode == "spot":
+        exchange, name = get_exchange(request.param, exchange_conf)
+        pair = EXCHANGES[request.param]["pair"]
+    elif EXCHANGES[request.param].get("futures"):
+        exchange, name = get_futures_exchange(
+            request.param, exchange_conf, class_mocker=class_mocker
+        )
+        pair = EXCHANGES[request.param]["futures_pair"]
+    else:
+        pytest.skip("Exchange does not support futures.")
+
+    if not exchange._has_watch_ohlcv:
+        pytest.skip("Exchange does not support watch_ohlcv.")
+    yield exchange, name, pair
+    exchange.close()

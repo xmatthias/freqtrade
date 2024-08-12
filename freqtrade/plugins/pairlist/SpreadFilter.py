@@ -3,29 +3,23 @@ Spread pair list filter
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
-from freqtrade.constants import Config
 from freqtrade.exceptions import OperationalException
 from freqtrade.exchange.types import Ticker
-from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter
+from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
 
 
 logger = logging.getLogger(__name__)
 
 
 class SpreadFilter(IPairList):
-    def __init__(
-        self,
-        exchange,
-        pairlistmanager,
-        config: Config,
-        pairlistconfig: Dict[str, Any],
-        pairlist_pos: int,
-    ) -> None:
-        super().__init__(exchange, pairlistmanager, config, pairlistconfig, pairlist_pos)
+    supports_backtesting = SupportsBacktesting.NO
 
-        self._max_spread_ratio = pairlistconfig.get("max_spread_ratio", 0.005)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._max_spread_ratio = self._pairlistconfig.get("max_spread_ratio", 0.005)
         self._enabled = self._max_spread_ratio != 0
 
         if not self._exchange.get_option("tickers_have_bid_ask"):
