@@ -350,10 +350,10 @@ async def test_validate_order_time_in_force(default_conf, mocker, caplog):
     ex.validate_order_time_in_force(tif2)
 
 
-def test_validate_orderflow(default_conf, mocker, caplog):
+async def test_validate_orderflow(default_conf, mocker, caplog):
     caplog.set_level(logging.INFO)
     # Test bybit - as it doesn't support historic trades data.
-    ex = get_patched_exchange(mocker, default_conf, exchange="bybit")
+    ex = await get_patched_exchange(mocker, default_conf, exchange="bybit")
     mocker.patch(f"{EXMS}.exchange_has", return_value=True)
     ex.validate_orderflow({"use_public_trades": False})
 
@@ -361,7 +361,7 @@ def test_validate_orderflow(default_conf, mocker, caplog):
         ex.validate_orderflow({"use_public_trades": True})
 
     # Binance supports orderflow.
-    ex = get_patched_exchange(mocker, default_conf, exchange="binance")
+    ex = await get_patched_exchange(mocker, default_conf, exchange="binance")
     ex.validate_orderflow({"use_public_trades": False})
     ex.validate_orderflow({"use_public_trades": True})
 
@@ -613,10 +613,9 @@ async def test_reload_markets(default_conf, mocker, caplog, time_machine):
     exchange = await get_patched_exchange(
         mocker, default_conf, api_mock, exchange="binance", mock_markets=False
     )
-    lam_spy = mocker.spy(exchange, "_load_async_markets")
+    lam_spy = mocker.spy(exchange, "load_markets")
     assert exchange._last_markets_refresh == dt_ts()
 
-    assert exchange._last_markets_refresh == 0
     await exchange.reload_markets()
     assert exchange._last_markets_refresh == dt_ts()
     assert exchange.markets == initial_markets
